@@ -515,17 +515,30 @@ class ScalpingTradingBot:
             logger.info(f"   Stop Loss: ${stop_loss:.2f}")
             logger.info(f"   Take Profit: ${take_profit:.2f}")
 
-            # Calculate position size
-            position_size_usd = self.sizer.calculate_position_size(
-                account_balance=self.trader.balance,
-                stop_loss_pct=abs((current_price - stop_loss) / current_price) * 100,
-                current_price=current_price
+            # Calculate position size with correct parameters
+            position_result = self.sizer.calculate_position_size(
+                entry_price=current_price,
+                stop_loss=stop_loss,
+                account_balance=self.trader.balance
             )
 
-            # Convert to BTC quantity
-            quantity = position_size_usd / current_price
+            # Extract values from returned dictionary
+            position_size_usd = position_result['position_size_usd']
+            quantity = position_result['position_size_btc']
+
+            # Validate position size
+            if not position_result['is_valid']:
+                logger.warning(f"⚠️  Position size invalid: ${position_size_usd:.2f} below minimum")
+                return
+
+            # Additional safety check: don't use more than 90% of balance
+            if position_size_usd > self.trader.balance * 0.9:
+                logger.warning(f"⚠️  Position size too large: ${position_size_usd:.2f} (>{self.trader.balance * 0.9:.2f})")
+                return
 
             logger.info(f"   Position Size: ${position_size_usd:.2f} ({quantity:.6f} BTC)")
+            logger.info(f"   Margin Required: ${position_result['margin_required']:.2f}")
+            logger.info(f"   Risk: ${position_result['actual_risk_amount']:.2f} ({position_result['actual_risk_percent']:.2f}%)")
 
             # Execute trade via paper trader
             success = self.trader.open_position(
