@@ -532,9 +532,13 @@ class ScalpingTradingBot:
             logger.info(f"   Stop Loss: ${stop_loss:.2f}")
             logger.info(f"   Take Profit: ${take_profit:.2f}")
 
-            # Send email notification for high-confidence signal
-            if self.email_notifier:
+            # Get minimum confidence threshold from config
+            min_confidence = self.config.get('min_confidence', 0.65)
+
+            # Send email notification ONLY for high-confidence signals (≥threshold)
+            if self.email_notifier and confidence >= min_confidence:
                 try:
+                    logger.info(f"📧 Sending email notification (confidence {confidence*100:.1f}% ≥ {min_confidence*100:.0f}% threshold)")
                     self.email_notifier.send_signal_notification(
                         signal=signal,
                         side=side,
@@ -544,6 +548,8 @@ class ScalpingTradingBot:
                     )
                 except Exception as e:
                     logger.warning(f"⚠️ Failed to send email notification: {e}")
+            elif self.email_notifier and confidence < min_confidence:
+                logger.info(f"⏭️  Skipping email notification (confidence {confidence*100:.1f}% < {min_confidence*100:.0f}% threshold)")
 
             # Calculate position size with enhanced error handling
             try:

@@ -144,7 +144,7 @@ class ScalpingEmailNotifier:
 {'='*70}
 
 Signal Type:     {"🟢 LONG (BUY)" if side == "LONG" else "🔴 SHORT (SELL)"}
-Confidence:      {confidence:.1f}% ⭐ (Above 65% threshold)
+Confidence:      {confidence:.1f}% ⭐ (HIGH QUALITY)
 Market Regime:   {signal.get('market_regime', 'N/A')}
 
 {'='*70}
