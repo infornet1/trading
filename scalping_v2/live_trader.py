@@ -11,14 +11,15 @@ sys.path.insert(0, '/var/www/dev/trading/scalping_v2')
 import time
 import signal
 import json
+import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 import pandas as pd
 import logging
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv('config/.env')
+# Load environment variables (use absolute path)
+load_dotenv('/var/www/dev/trading/adx_strategy_v2/config/.env')
 
 # Import shared components (via symlinks)
 from src.api.bingx_api import BingXAPI
@@ -34,6 +35,24 @@ from src.monitoring.system_monitor import SystemMonitor
 
 # Import scalping-specific components
 from src.signals.scalping_signal_generator import ScalpingSignalGenerator
+
+
+# Custom JSON Encoder to handle numpy types and other non-serializable objects
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles numpy types"""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        elif isinstance(obj, (datetime, pd.Timestamp)):
+            return obj.isoformat()
+        return super(NumpyEncoder, self).default(obj)
+
 
 # Setup logging
 logging.basicConfig(
@@ -93,8 +112,8 @@ class ScalpingTradingBot:
         self.signal_check_interval = self.config.get('signal_check_interval', 300)  # 5 minutes
         self.dashboard_update_interval = 60  # 1 minute
 
-        # Restore previous session data
-        self._restore_previous_session()
+        # Restore previous session data - DISABLED to start with fresh capital
+        # self._restore_previous_session()
 
         logger.info("✅ Scalping Trading Bot initialized successfully")
 
@@ -312,9 +331,11 @@ class ScalpingTradingBot:
         # 1. Update current BTC price
         if self.api:
             try:
-                price = self.api.get_ticker_price(self.config.get('symbol', 'BTC-USDT'))
-                if price:
-                    self.trader.current_price = price
+                ticker = self.api.get_ticker_price(self.config.get('symbol', 'BTC-USDT'))
+                if ticker and 'price' in ticker:
+                    self.trader.current_price = float(ticker['price'])
+                elif isinstance(ticker, (int, float)):
+                    self.trader.current_price = float(ticker)
             except Exception as e:
                 logger.warning(f"Could not fetch current price: {e}")
 
@@ -322,7 +343,10 @@ class ScalpingTradingBot:
         if hasattr(self.trader, 'current_price') and self.trader.current_price:
             self.trader.monitor_positions(self.trader.current_price)
 
-        # 3. Check for new signals (every signal_check_interval seconds)
+        # 3. Record closed positions for learning
+        self._monitor_and_record_closed_positions()
+
+        # 4. Check for new signals (every signal_check_interval seconds)
         if self.signal_gen and (self.last_signal_check is None or \
            (current_time - self.last_signal_check).total_seconds() >= self.signal_check_interval):
 
@@ -424,6 +448,31 @@ class ScalpingTradingBot:
         except Exception as e:
             logger.error(f"Error processing signal: {e}", exc_info=True)
 
+    def _monitor_and_record_closed_positions(self):
+        """Monitor for closed positions and record their results"""
+        try:
+            # Get recently closed positions (if PaperTrader supports it)
+            if hasattr(self.trader, 'get_recently_closed_positions'):
+                closed_positions = self.trader.get_recently_closed_positions()
+
+                for position in closed_positions:
+                    # Record trade result with PNL
+                    trade_data = {
+                        'side': position.side,
+                        'entry_price': position.entry_price,
+                        'exit_price': position.exit_price,
+                        'pnl': position.pnl,
+                        'confidence': getattr(position, 'confidence', 0.5),
+                        'timestamp': position.exit_time.isoformat() if hasattr(position, 'exit_time') else datetime.now().isoformat(),
+                        'reason': getattr(position, 'exit_reason', 'unknown')
+                    }
+
+                    self.signal_gen.record_trade_result(trade_data)
+                    logger.info(f"📊 Position closed - {position.side}: ${position.pnl:.2f}")
+
+        except Exception as e:
+            logger.debug(f"Closed position monitoring not available: {e}")
+
     def _export_snapshot(self):
         """Export current state snapshot for web dashboard"""
         try:
@@ -442,7 +491,7 @@ class ScalpingTradingBot:
                     'daily_pnl': self.risk_mgr.daily_pnl,
                     'can_trade': self.risk_mgr.can_open_position()
                 },
-                'recent_trades': self.trader.get_trade_history(limit=10),
+                'recent_trades': getattr(self.trader, 'trade_history', [])[-10:] if hasattr(self.trader, 'trade_history') else [],
                 'system': {
                     'last_update': datetime.now().isoformat(),
                     'update_count': getattr(self, '_update_count', 0)
@@ -457,7 +506,7 @@ class ScalpingTradingBot:
 
             # Write to file
             with open('logs/final_snapshot.json', 'w') as f:
-                json.dump(snapshot, f, indent=2)
+                json.dump(snapshot, f, indent=2, cls=NumpyEncoder)
 
         except Exception as e:
             logger.error(f"Error exporting snapshot: {e}")

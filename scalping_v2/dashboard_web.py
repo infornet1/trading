@@ -9,6 +9,7 @@ sys.path.insert(0, '/var/www/dev/trading/scalping_v2')
 
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 import json
 import os
 from datetime import datetime
@@ -26,6 +27,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.config['APPLICATION_ROOT'] = '/scalping'
+# Handle proxy headers to get correct URL generation
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 CORS(app)
 
 
@@ -100,10 +104,30 @@ def api_status():
     except Exception as e:
         logger.error(f"Error fetching BTC price: {e}")
 
+    # Format account data with required fields
+    account = snapshot.get('account', {})
+    positions = snapshot.get('positions', [])
+
+    # Calculate unrealized PnL from positions
+    unrealized_pnl = sum(pos.get('unrealized_pnl', 0) for pos in positions)
+
+    # Add calculated fields to account
+    account_data = {
+        'balance': account.get('balance', 0),
+        'equity': account.get('equity', account.get('balance', 0)),
+        'total_pnl': account.get('pnl', 0),
+        'total_return_percent': account.get('pnl_percent', 0),
+        'unrealized_pnl': unrealized_pnl
+    }
+
     return jsonify({
-        'status': bot_status,
-        'account': snapshot.get('account', {}),
-        'positions': snapshot.get('positions', []),
+        'bot_status': {
+            'running': bot_status in ['paper', 'live'],
+            'mode': bot_status
+        },
+        'account': account_data,
+        'positions': positions,
+        'positions_count': len(positions),
         'btc_price': btc_price,
         'indicators': snapshot.get('indicators', {}),
         'price_action': snapshot.get('price_action', {}),
@@ -135,10 +159,10 @@ def api_trades():
     snapshot = load_snapshot()
 
     if not snapshot:
-        return jsonify([])
+        return jsonify({'trades': []})
 
     trades = snapshot.get('recent_trades', [])
-    return jsonify(trades[:limit])
+    return jsonify({'trades': trades[:limit]})
 
 
 @app.route('/api/performance')
@@ -147,16 +171,43 @@ def api_performance():
     snapshot = load_snapshot()
 
     if not snapshot:
-        return jsonify({'error': 'No data available'})
+        return jsonify({
+            'total_trades': 0,
+            'wins': 0,
+            'losses': 0,
+            'win_rate': 0,
+            'profit_factor': 0,
+            'avg_pnl': 0,
+            'best_trade': 0
+        })
 
     account = snapshot.get('account', {})
+    trades = snapshot.get('recent_trades', [])
 
-    # Calculate basic stats from snapshot
+    # Calculate performance metrics
+    total_trades = len(trades)
+    wins = sum(1 for t in trades if t.get('pnl', 0) > 0)
+    losses = total_trades - wins
+    win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+
+    winning_pnl = sum(t.get('pnl', 0) for t in trades if t.get('pnl', 0) > 0)
+    losing_pnl = abs(sum(t.get('pnl', 0) for t in trades if t.get('pnl', 0) < 0))
+    profit_factor = (winning_pnl / losing_pnl) if losing_pnl > 0 else 0
+
+    avg_pnl = (sum(t.get('pnl', 0) for t in trades) / total_trades) if total_trades > 0 else 0
+    best_trade = max((t.get('pnl', 0) for t in trades), default=0)
+
     stats = {
+        'total_trades': total_trades,
+        'wins': wins,
+        'losses': losses,
+        'win_rate': win_rate,
+        'profit_factor': profit_factor,
+        'avg_pnl': avg_pnl,
+        'best_trade': best_trade,
         'balance': account.get('balance', 0),
         'pnl': account.get('pnl', 0),
         'pnl_percent': account.get('pnl_percent', 0),
-        'total_trades': len(snapshot.get('recent_trades', [])),
         'timestamp': snapshot.get('timestamp')
     }
 
@@ -169,10 +220,31 @@ def api_risk():
     snapshot = load_snapshot()
 
     if not snapshot:
-        return jsonify({'error': 'No data available'})
+        return jsonify({
+            'daily_pnl': 0,
+            'daily_loss_limit': 5.0,
+            'max_drawdown': 0,
+            'max_drawdown_limit': 10.0,
+            'consecutive_wins': 0,
+            'consecutive_losses': 0,
+            'circuit_breaker': False
+        })
 
     risk = snapshot.get('risk', {})
-    return jsonify(risk)
+    account = snapshot.get('account', {})
+
+    # Get risk data with defaults
+    risk_data = {
+        'daily_pnl': risk.get('daily_pnl', account.get('pnl', 0)),
+        'daily_loss_limit': 5.0,  # $5 daily loss limit
+        'max_drawdown': abs(min(account.get('pnl', 0), 0)),
+        'max_drawdown_limit': 10.0,  # 10% max drawdown
+        'consecutive_wins': 0,
+        'consecutive_losses': 0,
+        'circuit_breaker': not risk.get('can_trade', [True])[0] if risk.get('can_trade') else False
+    }
+
+    return jsonify(risk_data)
 
 
 @app.route('/health')

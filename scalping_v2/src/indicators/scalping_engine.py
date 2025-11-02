@@ -85,12 +85,26 @@ class BitcoinScalpingEngine:
             # Analyze price action
             price_action = self._analyze_price_action(df)
 
-            # Generate trading signals
+            # Detect market regime
+            market_regime = self._detect_market_regime(indicators, price_action)
+
+            # Generate trading signals (market regime aware)
             signals = self._generate_signals(
                 current_price=current_price,
                 indicators=indicators,
                 price_action=price_action
             )
+
+            # Filter signals based on market regime
+            if market_regime == 'choppy':
+                # Reduce confidence in choppy markets or skip
+                for signal_type in signals:
+                    signals[signal_type]['confidence'] *= 0.7
+                    signals[signal_type]['regime_warning'] = 'choppy_market'
+            elif market_regime == 'ranging':
+                # Slightly reduce confidence in ranging markets
+                for signal_type in signals:
+                    signals[signal_type]['confidence'] *= 0.9
 
             # Build result
             result = {
@@ -98,6 +112,7 @@ class BitcoinScalpingEngine:
                 'price': round(current_price, 2),
                 'indicators': indicators,
                 'price_action': price_action,
+                'market_regime': market_regime,
                 'signals': signals
             }
 
@@ -114,40 +129,117 @@ class BitcoinScalpingEngine:
     def _calculate_indicators(self, closes: np.ndarray, highs: np.ndarray,
                             lows: np.ndarray, opens: np.ndarray,
                             volumes: np.ndarray) -> Dict:
-        """Calculate all technical indicators"""
+        """Calculate indicators with enhanced validation"""
+
+        if len(closes) == 0:
+            return {}
 
         current_price = closes[-1]
 
-        # 1. EMA Trend Indicators
-        ema_micro = self._calculate_ema(closes, self.ema_micro)
-        ema_fast = self._calculate_ema(closes, self.ema_fast)
-        ema_slow = self._calculate_ema(closes, self.ema_slow)
+        try:
+            # 1. EMA Trend Indicators with validation
+            ema_micro = self._calculate_ema(closes, self.ema_micro)
+            ema_fast = self._calculate_ema(closes, self.ema_fast)
+            ema_slow = self._calculate_ema(closes, self.ema_slow)
 
-        # 2. RSI Momentum
-        rsi = self._calculate_rsi(closes, self.rsi_period)
+            # Validate EMA calculations
+            ema_micro_val = ema_micro[-1] if not np.isnan(ema_micro[-1]) and ema_micro[-1] > 0 else current_price
+            ema_fast_val = ema_fast[-1] if not np.isnan(ema_fast[-1]) and ema_fast[-1] > 0 else current_price
+            ema_slow_val = ema_slow[-1] if not np.isnan(ema_slow[-1]) and ema_slow[-1] > 0 else current_price
 
-        # 3. Stochastic Oscillator
-        stoch_k, stoch_d = self._calculate_stochastic(highs, lows, closes, self.stoch_period, self.stoch_smooth)
+            # 2. RSI Momentum with bounds checking
+            rsi = self._calculate_rsi(closes, self.rsi_period)
+            rsi_val = max(0, min(100, rsi[-1])) if not np.isnan(rsi[-1]) else 50
 
-        # 4. Volume Analysis
-        volume_sma = self._calculate_sma(volumes, self.volume_ma_period)
-        volume_ratio = current_volume / volume_sma[-1] if volume_sma[-1] > 0 else 1.0
+            # 3. Stochastic Oscillator
+            stoch_k, stoch_d = self._calculate_stochastic(highs, lows, closes, self.stoch_period, self.stoch_smooth)
+            stoch_k_val = max(0, min(100, stoch_k[-1])) if not np.isnan(stoch_k[-1]) else 50
+            stoch_d_val = max(0, min(100, stoch_d[-1])) if not np.isnan(stoch_d[-1]) else 50
 
-        # 5. ATR for Volatility
-        atr = self._calculate_atr(highs, lows, closes, self.atr_period)
-        atr_pct = (atr[-1] / current_price) if current_price > 0 else 0
+            # 4. Volume Analysis with spike detection
+            volume_sma = self._calculate_sma(volumes, self.volume_ma_period)
+            current_volume = volumes[-1]
+            volume_ratio = current_volume / volume_sma[-1] if volume_sma[-1] > 0 else 1.0
+            volume_spike = volume_ratio > 2.0  # Significant volume spike
 
-        return {
-            'ema_micro': round(ema_micro[-1], 2),
-            'ema_fast': round(ema_fast[-1], 2),
-            'ema_slow': round(ema_slow[-1], 2),
-            'rsi': round(rsi[-1], 2),
-            'stoch_k': round(stoch_k[-1], 2),
-            'stoch_d': round(stoch_d[-1], 2),
-            'volume_ratio': round(volume_ratio, 2),
-            'atr': round(atr[-1], 2),
-            'atr_pct': round(atr_pct * 100, 3)  # as percentage
-        }
+            # 5. ATR for Volatility with percentage
+            atr = self._calculate_atr(highs, lows, closes, self.atr_period)
+            atr_val = atr[-1] if not np.isnan(atr[-1]) and atr[-1] > 0 else 0
+            atr_pct = (atr_val / current_price) * 100 if current_price > 0 else 0
+
+            # Additional: Price rate of change (momentum)
+            roc_1 = ((closes[-1] - closes[-2]) / closes[-2]) * 100 if len(closes) > 1 else 0
+            roc_5 = ((closes[-1] - closes[-6]) / closes[-6]) * 100 if len(closes) > 5 else 0
+
+            return {
+                'ema_micro': round(ema_micro_val, 2),
+                'ema_fast': round(ema_fast_val, 2),
+                'ema_slow': round(ema_slow_val, 2),
+                'rsi': round(rsi_val, 2),
+                'stoch_k': round(stoch_k_val, 2),
+                'stoch_d': round(stoch_d_val, 2),
+                'volume_ratio': round(volume_ratio, 2),
+                'volume_spike': volume_spike,
+                'atr': round(atr_val, 2),
+                'atr_pct': round(atr_pct, 3),
+                'roc_1': round(roc_1, 3),
+                'roc_5': round(roc_5, 3)
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating indicators: {e}")
+            return {}
+
+    def _detect_market_regime(self, indicators: Dict, price_action: Dict) -> str:
+        """
+        Detect market regime: trending, ranging, or choppy
+        This helps filter signals in unfavorable market conditions
+        """
+        try:
+            ema_micro = indicators.get('ema_micro', 0)
+            ema_fast = indicators.get('ema_fast', 0)
+            ema_slow = indicators.get('ema_slow', 0)
+            atr_pct = indicators.get('atr_pct', 0)
+            roc_5 = indicators.get('roc_5', 0)
+            volume_ratio = indicators.get('volume_ratio', 1)
+
+            # Calculate EMA separation as % of price
+            ema_separation = abs(ema_micro - ema_slow) / ema_slow if ema_slow > 0 else 0
+
+            # Trending market conditions
+            strong_trend = (
+                (ema_micro > ema_fast > ema_slow or ema_micro < ema_fast < ema_slow) and
+                ema_separation > 0.002 and  # EMAs separated by > 0.2%
+                abs(roc_5) > 0.3 and  # Strong 5-candle momentum
+                volume_ratio > 1.0  # Decent volume
+            )
+
+            # Ranging market conditions
+            ranging = (
+                ema_separation < 0.001 and  # EMAs close together
+                abs(roc_5) < 0.2 and  # Low momentum
+                atr_pct < 0.015  # Low volatility
+            )
+
+            # Choppy/volatile market
+            roc_1 = indicators.get('roc_1', 0)
+            choppy = (
+                atr_pct > 0.025 or  # High volatility
+                (volume_ratio > 2.5 and abs(roc_1) < 0.1)  # Volume spike with no direction
+            )
+
+            if strong_trend:
+                return 'trending'
+            elif ranging:
+                return 'ranging'
+            elif choppy:
+                return 'choppy'
+            else:
+                return 'neutral'
+
+        except Exception as e:
+            logger.warning(f"Error detecting market regime: {e}")
+            return 'neutral'
 
     def _analyze_price_action(self, df: pd.DataFrame) -> Dict:
         """Analyze recent price action patterns"""
@@ -186,32 +278,45 @@ class BitcoinScalpingEngine:
         }
 
     def _generate_signals(self, current_price: float, indicators: Dict, price_action: Dict) -> Dict:
-        """Generate trading signals based on indicators and price action"""
+        """Generate trading signals with improved logic"""
 
         signals = {}
 
-        # Extract indicators
-        ema_micro = indicators['ema_micro']
-        ema_fast = indicators['ema_fast']
-        ema_slow = indicators['ema_slow']
-        rsi = indicators['rsi']
-        stoch_k = indicators['stoch_k']
-        stoch_d = indicators['stoch_d']
-        volume_ratio = indicators['volume_ratio']
-        atr_pct = indicators['atr_pct']
+        # Extract indicators with safety checks
+        try:
+            ema_micro = indicators.get('ema_micro', current_price)
+            ema_fast = indicators.get('ema_fast', current_price)
+            ema_slow = indicators.get('ema_slow', current_price)
+            rsi = indicators.get('rsi', 50)
+            stoch_k = indicators.get('stoch_k', 50)
+            stoch_d = indicators.get('stoch_d', 50)
+            volume_ratio = indicators.get('volume_ratio', 1)
+            atr_pct = indicators.get('atr_pct', 0)
+        except KeyError as e:
+            logger.warning(f"Missing indicator in signal generation: {e}")
+            return signals
 
-        # Trend conditions
-        bullish_trend = ema_micro > ema_fast > ema_slow
-        bearish_trend = ema_micro < ema_fast < ema_slow
+        # Enhanced trend analysis
+        ema_alignment_bullish = ema_micro > ema_fast > ema_slow
+        ema_alignment_bearish = ema_micro < ema_fast < ema_slow
+        ema_trend_strength = abs(ema_micro - ema_slow) / current_price
 
-        # Momentum conditions
+        # Strong trend requires minimum separation
+        strong_bullish_trend = ema_alignment_bullish and ema_trend_strength > 0.001  # 0.1%
+        strong_bearish_trend = ema_alignment_bearish and ema_trend_strength > 0.001
+
+        # Enhanced momentum analysis
         rsi_oversold = rsi < self.rsi_oversold
         rsi_overbought = rsi > self.rsi_overbought
-        stoch_bullish = stoch_k > stoch_d and stoch_k < 80
-        stoch_bearish = stoch_k < stoch_d and stoch_k > 20
+        rsi_trend = rsi > 50  # Simple bullish/bearish momentum
 
-        # Volume confirmation
+        stoch_bullish_cross = stoch_k > stoch_d and stoch_k < 80
+        stoch_bearish_cross = stoch_k < stoch_d and stoch_k > 20
+        stoch_momentum = stoch_k > 50  # Bullish momentum
+
+        # Volume and volatility analysis
         volume_ok = volume_ratio > self.min_volume_ratio
+        high_volatility = atr_pct > 0.02  # 2% ATR indicates high volatility
 
         # Price action
         near_support = price_action.get('near_support', False)
@@ -219,37 +324,74 @@ class BitcoinScalpingEngine:
         bullish_pattern = price_action.get('bullish_pattern', False)
         bearish_pattern = price_action.get('bearish_pattern', False)
 
-        # LONG SIGNAL CONDITIONS
+        # ENHANCED LONG SIGNAL CONDITIONS
         long_conditions = []
+        long_confidence = 0.0
 
-        if bullish_trend and stoch_bullish and volume_ok:
-            long_conditions.append(("trend_momentum", 0.7))
+        # Primary condition: Strong trend + momentum
+        if strong_bullish_trend and stoch_bullish_cross and volume_ok:
+            base_confidence = 0.7
+            # Boost confidence if RSI confirms
+            if rsi_trend and not rsi_overbought:
+                base_confidence += 0.1
+            long_conditions.append(("strong_trend_momentum", base_confidence))
 
-        if rsi_oversold and near_support and bullish_pattern:
-            long_conditions.append(("oversold_bounce", 0.8))
+        # Secondary condition: Oversold bounce at support
+        elif rsi_oversold and near_support:
+            base_confidence = 0.6
+            if bullish_pattern:
+                base_confidence += 0.2
+            if volume_ok:
+                base_confidence += 0.1
+            long_conditions.append(("oversold_bounce", base_confidence))
 
-        if ema_micro > ema_fast and volume_ratio > 1.5:
-            long_conditions.append(("ema_crossover", 0.6))
+        # Tertiary condition: EMA micro crossover with volume
+        elif ema_micro > ema_fast and volume_ratio > 1.5:
+            long_conditions.append(("ema_micro_crossover", 0.5))
 
-        # SHORT SIGNAL CONDITIONS
+        # ENHANCED SHORT SIGNAL CONDITIONS
         short_conditions = []
+        short_confidence = 0.0
 
-        if bearish_trend and stoch_bearish and volume_ok:
-            short_conditions.append(("trend_momentum", 0.7))
+        # Primary condition: Strong trend + momentum
+        if strong_bearish_trend and stoch_bearish_cross and volume_ok:
+            base_confidence = 0.7
+            # Boost confidence if RSI confirms
+            if not rsi_trend and not rsi_oversold:
+                base_confidence += 0.1
+            short_conditions.append(("strong_trend_momentum", base_confidence))
 
-        if rsi_overbought and near_resistance and bearish_pattern:
-            short_conditions.append(("overbought_rejection", 0.8))
+        # Secondary condition: Overbought rejection at resistance
+        elif rsi_overbought and near_resistance:
+            base_confidence = 0.6
+            if bearish_pattern:
+                base_confidence += 0.2
+            if volume_ok:
+                base_confidence += 0.1
+            short_conditions.append(("overbought_rejection", base_confidence))
 
-        if ema_micro < ema_fast and volume_ratio > 1.5:
-            short_conditions.append(("ema_crossover", 0.6))
+        # Tertiary condition: EMA micro crossover with volume
+        elif ema_micro < ema_fast and volume_ratio > 1.5:
+            short_conditions.append(("ema_micro_crossover", 0.5))
 
-        # Calculate confidence and create signals
+        # Calculate weighted confidence (prefer primary conditions)
         if long_conditions:
-            confidence = sum(conf for _, conf in long_conditions) / len(long_conditions)
-            confidence = self._adjust_confidence(confidence, 'long')
+            # Weight primary conditions higher
+            weights = [1.0 if "strong" in cond[0] else 0.8 if "oversold" in cond[0] else 0.6
+                      for cond in long_conditions]
+            total_weight = sum(weights)
+            weighted_confidence = sum(conf * weight for (_, conf), weight in zip(long_conditions, weights)) / total_weight
+
+            confidence = self._adjust_confidence(weighted_confidence, 'long')
 
             if confidence >= self.min_confidence:
-                stop_loss = current_price * (1 - self.max_loss_pct)
+                # Use ATR for dynamic stop loss in high volatility
+                if high_volatility:
+                    stop_loss_pct = min(self.max_loss_pct * 1.5, 0.003)  # Cap at 0.3%
+                else:
+                    stop_loss_pct = self.max_loss_pct
+
+                stop_loss = current_price * (1 - stop_loss_pct)
                 take_profit = current_price * (1 + self.target_profit_pct)
 
                 signals['long'] = {
@@ -257,15 +399,25 @@ class BitcoinScalpingEngine:
                     'stop_loss': round(stop_loss, 2),
                     'take_profit': round(take_profit, 2),
                     'conditions': [cond for cond, _ in long_conditions],
-                    'risk_reward': round(self.target_profit_pct / self.max_loss_pct, 2)
+                    'risk_reward': round(self.target_profit_pct / stop_loss_pct, 2),
+                    'volatility_adjusted': high_volatility
                 }
 
         if short_conditions:
-            confidence = sum(conf for _, conf in short_conditions) / len(short_conditions)
-            confidence = self._adjust_confidence(confidence, 'short')
+            weights = [1.0 if "strong" in cond[0] else 0.8 if "overbought" in cond[0] else 0.6
+                      for cond in short_conditions]
+            total_weight = sum(weights)
+            weighted_confidence = sum(conf * weight for (_, conf), weight in zip(short_conditions, weights)) / total_weight
+
+            confidence = self._adjust_confidence(weighted_confidence, 'short')
 
             if confidence >= self.min_confidence:
-                stop_loss = current_price * (1 + self.max_loss_pct)
+                if high_volatility:
+                    stop_loss_pct = min(self.max_loss_pct * 1.5, 0.003)
+                else:
+                    stop_loss_pct = self.max_loss_pct
+
+                stop_loss = current_price * (1 + stop_loss_pct)
                 take_profit = current_price * (1 - self.target_profit_pct)
 
                 signals['short'] = {
@@ -273,7 +425,8 @@ class BitcoinScalpingEngine:
                     'stop_loss': round(stop_loss, 2),
                     'take_profit': round(take_profit, 2),
                     'conditions': [cond for cond, _ in short_conditions],
-                    'risk_reward': round(self.target_profit_pct / self.max_loss_pct, 2)
+                    'risk_reward': round(self.target_profit_pct / stop_loss_pct, 2),
+                    'volatility_adjusted': high_volatility
                 }
 
         return signals

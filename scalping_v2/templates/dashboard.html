@@ -46,63 +46,200 @@
             </div>
         </div>
 
+        <!-- Active Scalping Signals Panel -->
+        <div class="scalping-alerts-panel">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>⚡ Active Scalping Signals</h2>
+                    <span class="signal-strength" id="signalStrength">NEUTRAL</span>
+                </div>
+                <div class="panel-body">
+                    <div class="signal-grid">
+                        <div class="signal-item" id="longSignal">
+                            <div class="signal-label">LONG Setup</div>
+                            <div class="signal-confidence">--%</div>
+                            <div class="signal-conditions"></div>
+                        </div>
+                        <div class="signal-item" id="shortSignal">
+                            <div class="signal-label">SHORT Setup</div>
+                            <div class="signal-confidence">--%</div>
+                            <div class="signal-conditions"></div>
+                        </div>
+                    </div>
+                    <div class="market-conditions">
+                        <div class="condition-item">
+                            <span class="condition-label">Trend Strength:</span>
+                            <span class="condition-value" id="trendStrength">--</span>
+                        </div>
+                        <div class="condition-item">
+                            <span class="condition-label">Volatility:</span>
+                            <span class="condition-value" id="volatilityLevel">--</span>
+                        </div>
+                        <div class="condition-item">
+                            <span class="condition-label">Volume Activity:</span>
+                            <span class="condition-value" id="volumeActivity">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content Grid -->
         <div class="content-grid">
             <!-- Left Column -->
             <div class="content-left">
-                <!-- ADX Indicators -->
+                <!-- Enhanced Scalping Indicators -->
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>📊 ADX Indicators</h2>
+                        <h2>📊 Scalping Indicators</h2>
                         <span class="market-state" id="marketState">LOADING</span>
                     </div>
                     <div class="panel-body">
-                        <div class="adx-metrics">
-                            <div class="metric">
-                                <div class="metric-label">ADX Value</div>
-                                <div class="metric-value-large" id="adxValue">0.00</div>
-                                <div class="metric-bar">
-                                    <div class="metric-bar-fill" id="adxBar" style="width: 0%"></div>
+                        <div class="indicators-grid">
+                            <!-- Trend Indicators -->
+                            <div class="indicator-group">
+                                <h3 class="group-title">Trend & Momentum</h3>
+                                <div class="indicator-row">
+                                    <div class="indicator">
+                                        <span class="indicator-label">RSI (14)</span>
+                                        <span class="indicator-value" id="rsiValue">--</span>
+                                        <div class="indicator-bar">
+                                            <div class="indicator-fill" id="rsiBar"></div>
+                                        </div>
+                                    </div>
+                                    <div class="indicator">
+                                        <span class="indicator-label">Stoch K/D</span>
+                                        <span class="indicator-value" id="stochValue">--/--</span>
+                                    </div>
                                 </div>
-                                <div class="metric-subtext">Threshold: 25.0</div>
+                                <div class="indicator-row">
+                                    <div class="indicator">
+                                        <span class="indicator-label">Trend Strength</span>
+                                        <span class="indicator-value" id="trendStrengthValue">--</span>
+                                    </div>
+                                    <div class="indicator">
+                                        <span class="indicator-label">Momentum</span>
+                                        <span class="indicator-value" id="momentumValue">--</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="metrics-row">
-                                <div class="metric-small">
-                                    <div class="metric-label">+DI</div>
-                                    <div class="metric-value" id="plusDi">0.00</div>
-                                </div>
-                                <div class="metric-small">
-                                    <div class="metric-label">-DI</div>
-                                    <div class="metric-value" id="minusDi">0.00</div>
+
+                            <!-- EMA Alignment -->
+                            <div class="indicator-group">
+                                <h3 class="group-title">EMA Alignment</h3>
+                                <div class="ema-status" id="emaStatus">
+                                    <div class="ema-line">
+                                        <span class="ema-label">EMA 5:</span>
+                                        <span class="ema-value" id="ema5Value">--</span>
+                                        <span class="ema-trend" id="ema5Trend">→</span>
+                                    </div>
+                                    <div class="ema-line">
+                                        <span class="ema-label">EMA 8:</span>
+                                        <span class="ema-value" id="ema8Value">--</span>
+                                        <span class="ema-trend" id="ema8Trend">→</span>
+                                    </div>
+                                    <div class="ema-line">
+                                        <span class="ema-label">EMA 21:</span>
+                                        <span class="ema-value" id="ema21Value">--</span>
+                                        <span class="ema-trend" id="ema21Trend">→</span>
+                                    </div>
+                                    <div class="alignment-status" id="alignmentStatus">
+                                        <span class="status-dot"></span>
+                                        <span>Alignment: --</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="metrics-row">
-                                <div class="metric-small">
-                                    <div class="metric-label">DI Spread</div>
-                                    <div class="metric-value" id="diSpread">0.00</div>
+
+                            <!-- Volume & Volatility -->
+                            <div class="indicator-group">
+                                <h3 class="group-title">Volume & Volatility</h3>
+                                <div class="indicator-row">
+                                    <div class="indicator">
+                                        <span class="indicator-label">Volume Ratio</span>
+                                        <span class="indicator-value" id="volumeRatio">--</span>
+                                        <div class="volume-indicator">
+                                            <div class="volume-bar" id="volumeBar"></div>
+                                        </div>
+                                    </div>
+                                    <div class="indicator">
+                                        <span class="indicator-label">ATR %</span>
+                                        <span class="indicator-value" id="atrPercent">--%</span>
+                                    </div>
                                 </div>
-                                <div class="metric-small">
-                                    <div class="metric-label">ADX Slope</div>
-                                    <div class="metric-value" id="adxSlope">0.00</div>
+                                <div class="volatility-meter">
+                                    <span class="meter-label">Market Volatility</span>
+                                    <div class="meter-bar">
+                                        <div class="meter-fill" id="volatilityMeter"></div>
+                                    </div>
+                                    <span class="meter-value" id="volatilityValue">LOW</span>
                                 </div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-label">Signal Confidence</div>
-                                <div class="metric-value" id="confidence">0.0%</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Active Positions -->
+                <!-- Enhanced Active Positions -->
                 <div class="panel">
                     <div class="panel-header">
                         <h2>🎯 Active Positions</h2>
+                        <div class="position-stats">
+                            <span class="stat">Total: <span id="totalPositions">0</span></span>
+                            <span class="stat">Max: <span id="maxPositions">1</span></span>
+                        </div>
                     </div>
                     <div class="panel-body">
                         <div id="positionsContainer">
-                            <div class="empty-state">No open positions</div>
+                            <div class="empty-state">
+                                <div class="empty-icon">📭</div>
+                                <div class="empty-text">No active positions</div>
+                                <div class="empty-subtext">Waiting for scalping signals...</div>
+                            </div>
                         </div>
+
+                        <!-- Position Template (Hidden) -->
+                        <template id="positionTemplate">
+                            <div class="position-card">
+                                <div class="position-header">
+                                    <span class="position-side long">LONG</span>
+                                    <span class="position-size">0.0025 BTC</span>
+                                    <span class="position-time" data-start-time="">0:45</span>
+                                </div>
+                                <div class="position-details">
+                                    <div class="detail-row">
+                                        <span class="detail-label">Entry:</span>
+                                        <span class="detail-value">$42,150.25</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Current:</span>
+                                        <span class="detail-value">$42,180.50</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Stop Loss:</span>
+                                        <span class="detail-value stop-loss">$42,080.00</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Take Profit:</span>
+                                        <span class="detail-value take-profit">$42,280.00</span>
+                                    </div>
+                                </div>
+                                <div class="position-performance">
+                                    <div class="pnl-display positive">
+                                        <span class="pnl-amount">+$7.56</span>
+                                        <span class="pnl-percent">+0.18%</span>
+                                    </div>
+                                    <div class="progress-bar-wrapper">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" style="width: 35%"></div>
+                                        </div>
+                                        <div class="progress-labels">
+                                            <span>SL</span>
+                                            <span>Current</span>
+                                            <span>TP</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
 
@@ -210,7 +347,7 @@
                 <span id="nextUpdate">Next update in: <span id="countdown">5</span>s</span>
             </div>
             <div class="footer-right">
-                <span>ADX Strategy v2.0 | Port 5900</span>
+                <span>Scalping Strategy v2.0 | Port 5902</span>
             </div>
         </footer>
     </div>

@@ -115,15 +115,18 @@ class ScalpingSignalGenerator:
             # Request 100 candles to ensure we have enough for all indicators
             limit = 100
 
-            df = self.api.get_kline_data(
+            klines = self.api.get_kline_data(
                 symbol=self.symbol,
                 interval=self.timeframe,
                 limit=limit
             )
 
-            if df is None or len(df) == 0:
+            if klines is None or len(klines) == 0:
                 logger.error("Failed to fetch market data from BingX")
                 return None
+
+            # Convert list of dicts to DataFrame
+            df = pd.DataFrame(klines)
 
             # Ensure required columns exist
             required_columns = ['open', 'high', 'low', 'close', 'volume', 'timestamp']
@@ -212,8 +215,17 @@ class ScalpingSignalGenerator:
             trade_data: Trade information including side, pnl, etc.
         """
         try:
+            # Ensure we have all required fields for complete trades
+            required_fields = ['side', 'entry_price', 'exit_price', 'pnl', 'confidence']
+            if not all(field in trade_data for field in required_fields):
+                logger.debug(f"Incomplete trade data (position opened): {trade_data.keys()}")
+                # For position opens, we don't have exit data yet - that's OK
+                return
+
             self.engine.record_trade(trade_data)
-            logger.debug(f"Trade result recorded - Side: {trade_data.get('side')}, PNL: {trade_data.get('pnl', 0):.2f}")
+            logger.info(f"📊 Trade recorded - {trade_data.get('side')} | "
+                       f"PNL: ${trade_data.get('pnl', 0):.2f} | "
+                       f"Confidence: {trade_data.get('confidence', 0)*100:.1f}%")
         except Exception as e:
             logger.error(f"Error recording trade: {e}")
 
