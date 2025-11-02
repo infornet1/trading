@@ -515,30 +515,43 @@ class ScalpingTradingBot:
             logger.info(f"   Stop Loss: ${stop_loss:.2f}")
             logger.info(f"   Take Profit: ${take_profit:.2f}")
 
-            # Calculate position size with correct parameters
-            position_result = self.sizer.calculate_position_size(
-                entry_price=current_price,
-                stop_loss=stop_loss,
-                account_balance=self.trader.balance
-            )
+            # Calculate position size with enhanced error handling
+            try:
+                position_result = self.sizer.calculate_position_size(
+                    entry_price=current_price,
+                    stop_loss=stop_loss,
+                    account_balance=self.trader.balance
+                )
 
-            # Extract values from returned dictionary
-            position_size_usd = position_result['position_size_usd']
-            quantity = position_result['position_size_btc']
+                # Defensive check for dictionary structure
+                if not isinstance(position_result, dict):
+                    logger.error(f"❌ Position sizer returned unexpected type: {type(position_result)}")
+                    self.health_metrics['signal_errors'] += 1
+                    return
 
-            # Validate position size
-            if not position_result['is_valid']:
-                logger.warning(f"⚠️  Position size invalid: ${position_size_usd:.2f} below minimum")
+                # Extract values with safe defaults
+                position_size_usd = position_result.get('position_size_usd', 0)
+                quantity = position_result.get('position_size_btc', 0)
+                is_valid = position_result.get('is_valid', False)
+
+                # Validate position size
+                if not is_valid or position_size_usd <= 0:
+                    logger.warning(f"⚠️  Position size invalid: ${position_size_usd:.2f}")
+                    return
+
+                # Additional safety check: don't use more than 90% of balance
+                if position_size_usd > self.trader.balance * 0.9:
+                    logger.warning(f"⚠️  Position size too large: ${position_size_usd:.2f} (>{self.trader.balance * 0.9:.2f})")
+                    return
+
+                logger.info(f"   Position Size: ${position_size_usd:.2f} ({quantity:.6f} BTC)")
+                logger.info(f"   Margin Required: ${position_result.get('margin_required', 0):.2f}")
+                logger.info(f"   Risk: ${position_result.get('actual_risk_amount', 0):.2f} ({position_result.get('actual_risk_percent', 0):.2f}%)")
+
+            except Exception as e:
+                logger.error(f"❌ Position sizing failed: {e}", exc_info=True)
+                self.health_metrics['signal_errors'] += 1
                 return
-
-            # Additional safety check: don't use more than 90% of balance
-            if position_size_usd > self.trader.balance * 0.9:
-                logger.warning(f"⚠️  Position size too large: ${position_size_usd:.2f} (>{self.trader.balance * 0.9:.2f})")
-                return
-
-            logger.info(f"   Position Size: ${position_size_usd:.2f} ({quantity:.6f} BTC)")
-            logger.info(f"   Margin Required: ${position_result['margin_required']:.2f}")
-            logger.info(f"   Risk: ${position_result['actual_risk_amount']:.2f} ({position_result['actual_risk_percent']:.2f}%)")
 
             # Execute trade via paper trader
             success = self.trader.open_position(
