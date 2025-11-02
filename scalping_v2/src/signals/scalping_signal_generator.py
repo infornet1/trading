@@ -59,11 +59,12 @@ class ScalpingSignalGenerator:
             df = self._fetch_market_data()
 
             if df is None or len(df) == 0:
-                logger.warning("No market data available")
+                logger.warning("⚠️  No market data available - Cannot generate signals")
                 return {
                     'timestamp': datetime.now().isoformat(),
                     'has_signal': False,
-                    'error': 'No market data'
+                    'error': 'No market data available',
+                    'critical_error': False  # Not critical, just temporary unavailability
                 }
 
             # Analyze market using scalping engine
@@ -96,11 +97,12 @@ class ScalpingSignalGenerator:
             return response
 
         except Exception as e:
-            logger.error(f"Error generating signals: {e}", exc_info=True)
+            logger.error(f"❌ CRITICAL: Signal generation failed: {e}", exc_info=True)
             return {
                 'timestamp': datetime.now().isoformat(),
                 'has_signal': False,
-                'error': str(e)
+                'error': f'Signal generation failed: {str(e)}',
+                'critical_error': True  # Flag for critical errors vs normal "no signal"
             }
 
     def _fetch_market_data(self) -> Optional[pd.DataFrame]:
@@ -122,7 +124,7 @@ class ScalpingSignalGenerator:
             )
 
             if klines is None or len(klines) == 0:
-                logger.error("Failed to fetch market data from BingX")
+                logger.error("❌ Failed to fetch market data from BingX - API returned empty response")
                 return None
 
             # Convert list of dicts to DataFrame
@@ -133,14 +135,14 @@ class ScalpingSignalGenerator:
             missing_columns = [col for col in required_columns if col not in df.columns]
 
             if missing_columns:
-                logger.error(f"Missing required columns: {missing_columns}")
+                logger.error(f"❌ Missing required columns in API response: {missing_columns}")
                 return None
 
-            logger.debug(f"Fetched {len(df)} candles from BingX - Latest price: {df['close'].iloc[-1]:.2f}")
+            logger.debug(f"✅ Fetched {len(df)} candles from BingX - Latest price: {df['close'].iloc[-1]:.2f}")
             return df
 
         except Exception as e:
-            logger.error(f"Error fetching market data: {e}", exc_info=True)
+            logger.error(f"❌ CRITICAL: Error fetching market data: {e}", exc_info=True)
             return None
 
     def should_update_signal(self, position_side: str) -> bool:

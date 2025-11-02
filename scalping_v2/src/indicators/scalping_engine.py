@@ -60,6 +60,23 @@ class BitcoinScalpingEngine:
             Dictionary with indicators, signals, and metadata
         """
         try:
+            # 1. Validate DataFrame is not empty
+            if df is None or df.empty:
+                logger.warning("⚠️  Empty DataFrame received")
+                return self._error_response("Empty DataFrame")
+
+            # 2. Validate required columns exist
+            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                logger.error(f"❌ Missing required columns: {missing_columns}")
+                return self._error_response(f"Missing columns: {missing_columns}")
+
+            # 3. Handle NaN values
+            if df[required_columns].isna().any().any():
+                logger.warning("⚠️  NaN values detected, applying forward fill")
+                df = df.fillna(method='ffill').fillna(method='bfill')
+
             # Validate minimum data requirements
             min_periods = max(self.ema_slow, self.rsi_period, self.volume_ma_period, self.stoch_period) + 10
             if len(df) < min_periods:
@@ -477,15 +494,12 @@ class BitcoinScalpingEngine:
     # ==================== Helper Methods for Indicator Calculation ====================
 
     def _calculate_ema(self, data: np.ndarray, period: int) -> np.ndarray:
-        """Calculate Exponential Moving Average"""
-        ema = np.zeros_like(data, dtype=float)
-        ema[0] = data[0]
-        multiplier = 2 / (period + 1)
-
-        for i in range(1, len(data)):
-            ema[i] = (data[i] * multiplier) + (ema[i-1] * (1 - multiplier))
-
-        return ema
+        """Calculate Exponential Moving Average using vectorized pandas operations"""
+        # Convert to pandas Series for vectorized EWM calculation
+        series = pd.Series(data)
+        # Use pandas ewm (exponentially weighted moving average) - much faster than loop
+        ema = series.ewm(span=period, adjust=False).mean()
+        return ema.values
 
     def _calculate_sma(self, data: np.ndarray, period: int) -> np.ndarray:
         """Calculate Simple Moving Average"""
@@ -494,30 +508,29 @@ class BitcoinScalpingEngine:
         return np.concatenate([np.full(period-1, np.nan), sma])
 
     def _calculate_rsi(self, closes: np.ndarray, period: int) -> np.ndarray:
-        """Calculate Relative Strength Index"""
-        deltas = np.diff(closes)
-        seed = deltas[:period]
-        up = seed[seed >= 0].sum() / period
-        down = -seed[seed < 0].sum() / period
-        rs = up / down if down != 0 else 0
-        rsi = np.zeros_like(closes)
-        rsi[:period] = 100. - 100. / (1. + rs)
+        """Calculate Relative Strength Index using vectorized pandas operations"""
+        # Convert to pandas Series for vectorized operations
+        close_series = pd.Series(closes)
 
-        for i in range(period, len(closes)):
-            delta = deltas[i-1]
-            if delta > 0:
-                upval = delta
-                downval = 0.
-            else:
-                upval = 0.
-                downval = -delta
+        # Calculate price changes
+        delta = close_series.diff()
 
-            up = (up * (period - 1) + upval) / period
-            down = (down * (period - 1) + downval) / period
-            rs = up / down if down != 0 else 0
-            rsi[i] = 100. - 100. / (1. + rs)
+        # Separate gains and losses using vectorized operations
+        gain = delta.where(delta > 0, 0)
+        loss = -delta.where(delta < 0, 0)
 
-        return rsi
+        # Calculate exponential moving averages of gains and losses
+        avg_gain = gain.ewm(span=period, adjust=False).mean()
+        avg_loss = loss.ewm(span=period, adjust=False).mean()
+
+        # Calculate RS and RSI
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+
+        # Fill NaN values with 50 (neutral RSI)
+        rsi = rsi.fillna(50)
+
+        return rsi.values
 
     def _calculate_stochastic(self, highs: np.ndarray, lows: np.ndarray,
                              closes: np.ndarray, period: int, smooth: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -591,3 +604,14 @@ class BitcoinScalpingEngine:
             return candle1_red and candle2_red and lower_high
         except:
             return False
+
+    def _error_response(self, error_msg: str) -> Dict:
+        """Return standardized error response"""
+        return {
+            'timestamp': datetime.now().isoformat(),
+            'signal': 'hold',
+            'reason': f'validation_error: {error_msg}',
+            'price': None,
+            'indicators': {},
+            'signals': {}
+        }

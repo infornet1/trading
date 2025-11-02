@@ -101,6 +101,9 @@ class ScalpingTradingBot:
         # Load configuration
         self.config = self._load_config(config_file)
 
+        # Validate configuration
+        self._validate_config()
+
         # Initialize components
         self._initialize_components()
 
@@ -111,6 +114,22 @@ class ScalpingTradingBot:
         self.last_dashboard_update = None
         self.signal_check_interval = self.config.get('signal_check_interval', 300)  # 5 minutes
         self.dashboard_update_interval = 60  # 1 minute
+
+        # Circuit Breaker
+        self.consecutive_errors = 0
+        self.circuit_breaker_tripped = False
+        self.circuit_breaker_threshold = 5
+        self.circuit_breaker_reset_time = None
+
+        # Health Metrics
+        self.health_metrics = {
+            'total_cycles': 0,
+            'successful_cycles': 0,
+            'api_errors': 0,
+            'signal_errors': 0,
+            'last_successful_cycle': None,
+            'uptime_start': datetime.now()
+        }
 
         # Restore previous session data - DISABLED to start with fresh capital
         # self._restore_previous_session()
@@ -147,6 +166,33 @@ class ScalpingTradingBot:
             'max_position_time': 300,
             'min_confidence': 0.6
         }
+
+    def _validate_config(self):
+        """Validate configuration parameters"""
+        required_params = ['initial_capital', 'leverage', 'risk_per_trade', 'symbol', 'timeframe']
+
+        # Check required parameters
+        for param in required_params:
+            if param not in self.config:
+                logger.error(f"❌ Missing required config parameter: {param}")
+                raise ValueError(f"Missing required parameter: {param}")
+
+        # Validate numeric ranges
+        if self.config.get('leverage', 0) > 10:
+            logger.warning(f"⚠️  High leverage detected: {self.config['leverage']}x (max recommended: 10x)")
+
+        if self.config.get('risk_per_trade', 0) > 2.0:
+            logger.warning(f"⚠️  High risk per trade: {self.config['risk_per_trade']}% (max recommended: 2%)")
+
+        if self.config.get('daily_loss_limit', 0) > 10.0:
+            logger.warning(f"⚠️  High daily loss limit: {self.config['daily_loss_limit']}%")
+
+        # Validate positive values
+        if self.config.get('initial_capital', 0) <= 0:
+            logger.error(f"❌ Invalid initial capital: {self.config.get('initial_capital')}")
+            raise ValueError("Initial capital must be positive")
+
+        logger.info("✅ Configuration validated successfully")
 
     def _initialize_components(self):
         """Initialize all trading components"""
@@ -328,30 +374,82 @@ class ScalpingTradingBot:
 
         current_time = datetime.now()
 
-        # 1. Update current BTC price
-        if self.api:
-            try:
-                ticker = self.api.get_ticker_price(self.config.get('symbol', 'BTC-USDT'))
-                if ticker and 'price' in ticker:
-                    self.trader.current_price = float(ticker['price'])
-                elif isinstance(ticker, (int, float)):
-                    self.trader.current_price = float(ticker)
-            except Exception as e:
-                logger.warning(f"Could not fetch current price: {e}")
+        # Track health metrics
+        self.health_metrics['total_cycles'] += 1
 
-        # 2. Monitor open positions (check stop loss, take profit, time exits)
-        if hasattr(self.trader, 'current_price') and self.trader.current_price:
-            self.trader.monitor_positions(self.trader.current_price)
+        # Circuit Breaker Check
+        if self.circuit_breaker_tripped:
+            # Check if we should reset (after 5 minutes)
+            if self.circuit_breaker_reset_time and current_time.timestamp() >= self.circuit_breaker_reset_time:
+                logger.info("✅ Circuit breaker reset - resuming operations")
+                self.circuit_breaker_tripped = False
+                self.consecutive_errors = 0
+                self.circuit_breaker_reset_time = None
+            else:
+                logger.debug("⚠️  Circuit breaker tripped - skipping update cycle")
+                return
 
-        # 3. Record closed positions for learning
-        self._monitor_and_record_closed_positions()
+        try:
+            # 0. Check API connection and reconnect if needed
+            if self.api is None or not hasattr(self, 'signal_gen') or self.signal_gen is None:
+                logger.warning("⚠️  API connection lost, attempting reconnection...")
+                self._reconnect_api()
 
-        # 4. Check for new signals (every signal_check_interval seconds)
-        if self.signal_gen and (self.last_signal_check is None or \
-           (current_time - self.last_signal_check).total_seconds() >= self.signal_check_interval):
+            # 1. Update current BTC price
+            if self.api:
+                try:
+                    ticker = self.api.get_ticker_price(self.config.get('symbol', 'BTC-USDT'))
+                    if ticker and 'price' in ticker:
+                        self.trader.current_price = float(ticker['price'])
+                    elif isinstance(ticker, (int, float)):
+                        self.trader.current_price = float(ticker)
+                except Exception as e:
+                    logger.warning(f"Could not fetch current price: {e}")
 
-            self._check_signals()
-            self.last_signal_check = current_time
+            # 2. Monitor open positions (check stop loss, take profit, time exits)
+            if hasattr(self.trader, 'current_price') and self.trader.current_price:
+                self.trader.monitor_positions(self.trader.current_price)
+
+            # 3. Record closed positions for learning
+            self._monitor_and_record_closed_positions()
+
+            # 4. Check for new signals (every signal_check_interval seconds)
+            if self.signal_gen and (self.last_signal_check is None or \
+               (current_time - self.last_signal_check).total_seconds() >= self.signal_check_interval):
+
+                self._check_signals()
+                self.last_signal_check = current_time
+
+            # Reset consecutive errors on successful cycle
+            self.consecutive_errors = 0
+
+            # Track successful cycle
+            self.health_metrics['successful_cycles'] += 1
+            self.health_metrics['last_successful_cycle'] = current_time.isoformat()
+
+        except Exception as e:
+            self.consecutive_errors += 1
+
+            # Categorize error type
+            if 'api' in str(e).lower() or 'connection' in str(e).lower():
+                self.health_metrics['api_errors'] += 1
+            elif 'signal' in str(e).lower():
+                self.health_metrics['signal_errors'] += 1
+
+            logger.error(f"❌ Error in update cycle ({self.consecutive_errors}/{self.circuit_breaker_threshold}): {e}", exc_info=True)
+
+            # Trip circuit breaker if threshold reached
+            if self.consecutive_errors >= self.circuit_breaker_threshold:
+                self.circuit_breaker_tripped = True
+                self.circuit_breaker_reset_time = current_time.timestamp() + 300  # Reset after 5 minutes
+                logger.critical(f"🚨 CIRCUIT BREAKER TRIPPED - {self.consecutive_errors} consecutive errors")
+                if hasattr(self, 'alert_system') and self.alert_system:
+                    self.alert_system.send_alert(
+                        alert_type=AlertType.ERROR,
+                        level=AlertLevel.CRITICAL,
+                        message=f"Circuit breaker tripped after {self.consecutive_errors} consecutive errors",
+                        data={'error': str(e), 'consecutive_errors': self.consecutive_errors}
+                    )
 
     def _check_signals(self):
         """Check for trading signals and execute if valid"""
@@ -369,6 +467,20 @@ class ScalpingTradingBot:
         # Generate signals
         try:
             signals = self.signal_gen.generate_signals()
+
+            # Check for critical errors (different from normal "no signal")
+            if signals.get('critical_error', False):
+                error_msg = signals.get('error', 'Unknown critical error')
+                logger.error(f"❌ CRITICAL: Signal generation system failure: {error_msg}")
+                # Send alert for critical errors
+                if self.alert_system:
+                    self.alert_system.send_alert(
+                        alert_type=AlertType.ERROR,
+                        level=AlertLevel.CRITICAL,
+                        message=f"Signal generation failed: {error_msg}",
+                        data=signals
+                    )
+                return
 
             if not signals.get('has_signal', False):
                 logger.debug("No signals detected")
@@ -515,6 +627,25 @@ class ScalpingTradingBot:
         """Handle shutdown signals"""
         logger.info(f"\n⚠️  Received signal {signum}, shutting down...")
         self.running = False
+
+    def _reconnect_api(self):
+        """Reconnect to BingX API if connection lost"""
+        try:
+            api_key = os.getenv('BINGX_API_KEY')
+            api_secret = os.getenv('BINGX_API_SECRET')
+            if api_key and api_secret:
+                self.api = BingXAPI(api_key=api_key, api_secret=api_secret)
+                logger.info("✅ API reconnected successfully")
+                # Also recreate signal generator with new API connection
+                self.signal_gen = ScalpingSignalGenerator(
+                    api_client=self.api,
+                    config=self.config
+                )
+                logger.info("✅ Signal Generator reconnected successfully")
+            else:
+                logger.error("❌ API credentials not found in environment")
+        except Exception as e:
+            logger.error(f"❌ API reconnection failed: {e}", exc_info=True)
 
     def _shutdown(self):
         """Graceful shutdown"""
