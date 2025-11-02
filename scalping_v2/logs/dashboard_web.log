@@ -1,0 +1,17 @@
+2025-11-02 00:33:08,334 - __main__ - INFO - ================================================================================
+2025-11-02 00:33:08,337 - __main__ - INFO - 🌐 Starting Scalping Dashboard Web Server
+2025-11-02 00:33:08,337 - __main__ - INFO -    Port: 5902
+2025-11-02 00:33:08,337 - __main__ - INFO -    Internal: http://localhost:5902
+2025-11-02 00:33:08,337 - __main__ - INFO -    External: https://dev.ueipab.edu.ve:5900/scalping/
+2025-11-02 00:33:08,337 - __main__ - INFO - ================================================================================
+2025-11-02 00:33:08,359 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5902
+ * Running on http://64.23.157.121:5902
+2025-11-02 00:33:08,361 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-11-02 00:37:36,718 - werkzeug - ERROR - 200.82.130.31 - - [02/Nov/2025 00:37:36] code 400, message Bad request version ('H\x19º!\x1a)m')
+2025-11-02 00:37:36,719 - werkzeug - INFO - 200.82.130.31 - - [02/Nov/2025 00:37:36] "[31m[1m\x16\x03\x01\x07i\x01\x00\x07e\x03\x03\x86s\x1fÆ\x1bæ»zòÓR\x00Út`F¯¡$×Mø?Ñ¡gù\x0fD\x9d\x18Ê àSr8S9ôn`3\x85\x85_Ó3y(ÉíÄ\x11\x09H\x19º!\x1a)m[0m" 400 -
+2025-11-02 00:37:36,837 - werkzeug - ERROR - 200.82.130.31 - - [02/Nov/2025 00:37:36] code 400, message Bad request version ('ël°.o\x00"\x13\x01\x13\x03\x13\x02À+À/Ì©Ì¨À,À0À')
+2025-11-02 00:37:36,837 - werkzeug - INFO - 200.82.130.31 - - [02/Nov/2025 00:37:36] "[31m[1m\x16\x03\x01\x07i\x01\x00\x07e\x03\x03\x89¥\x9cÀ\x09eWU\x04\x09ä¸>S\x95¹Ð\x16\x08U\x1f¤\x97\x92\\Ý.Ï\x81D~A ã\x88$äíR©þ\x02\x0bï§å8Í\x86VltÉè\x8c#µ\x11î\x1cël°.o\x00"\x13\x01\x13\x03\x13\x02À+À/Ì©Ì¨À,À0À[0m" 400 -
+2025-11-02 00:37:37,101 - werkzeug - ERROR - 200.82.130.31 - - [02/Nov/2025 00:37:37] code 400, message Bad request version ('½¼`')
+2025-11-02 00:37:37,102 - werkzeug - INFO - 200.82.130.31 - - [02/Nov/2025 00:37:37] "[31m[1m\x16\x03\x01\x02\x98\x01\x00\x02\x94\x03\x03Å\x9eÿ¤ªv\x11`ûÌyÃ\x06ðøØ\x02s\x8dÙË©m ó\x87m-jÜ×l \x1f½¼`[0m" 400 -

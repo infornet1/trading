@@ -1,0 +1,24 @@
+[Unit]
+Description=Scalping Strategy v2.0 - Web Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/dev/trading/scalping_v2
+ExecStart=/var/www/dev/trading/scalping_v2/venv/bin/python3 /var/www/dev/trading/scalping_v2/dashboard_web.py
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scalping-dashboard
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target

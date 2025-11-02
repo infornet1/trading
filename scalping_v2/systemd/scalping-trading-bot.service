@@ -1,0 +1,29 @@
+[Unit]
+Description=Scalping Strategy v2.0 Trading Bot
+After=network.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=webdev
+WorkingDirectory=/var/www/dev/trading/scalping_v2
+ExecStart=/bin/bash /var/www/dev/trading/scalping_v2/start_bot.sh
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=5min
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scalping-trading-bot
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

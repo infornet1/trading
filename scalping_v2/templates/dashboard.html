@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scalping Strategy v2.0 - Live Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>⚡ SCALPING STRATEGY v2.0</h1>
+                <p class="subtitle">High-Frequency Paper Trading Dashboard</p>
+            </div>
+            <div class="header-right">
+                <div class="status-indicator" id="botStatus">
+                    <span class="status-dot"></span>
+                    <span class="status-text">LOADING...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Quick Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Balance</div>
+                <div class="stat-value" id="balance">$100.00</div>
+                <div class="stat-change" id="balanceChange">+$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total P&L</div>
+                <div class="stat-value" id="totalPnl">$0.00</div>
+                <div class="stat-change" id="pnlPercent">+0.00%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Open Positions</div>
+                <div class="stat-value" id="positions">0/2</div>
+                <div class="stat-change" id="unrealizedPnl">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">BTC Price</div>
+                <div class="stat-value" id="btcPrice">$0.00</div>
+                <div class="stat-change" id="btcChange">--</div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="content-grid">
+            <!-- Left Column -->
+            <div class="content-left">
+                <!-- ADX Indicators -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📊 ADX Indicators</h2>
+                        <span class="market-state" id="marketState">LOADING</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="adx-metrics">
+                            <div class="metric">
+                                <div class="metric-label">ADX Value</div>
+                                <div class="metric-value-large" id="adxValue">0.00</div>
+                                <div class="metric-bar">
+                                    <div class="metric-bar-fill" id="adxBar" style="width: 0%"></div>
+                                </div>
+                                <div class="metric-subtext">Threshold: 25.0</div>
+                            </div>
+                            <div class="metrics-row">
+                                <div class="metric-small">
+                                    <div class="metric-label">+DI</div>
+                                    <div class="metric-value" id="plusDi">0.00</div>
+                                </div>
+                                <div class="metric-small">
+                                    <div class="metric-label">-DI</div>
+                                    <div class="metric-value" id="minusDi">0.00</div>
+                                </div>
+                            </div>
+                            <div class="metrics-row">
+                                <div class="metric-small">
+                                    <div class="metric-label">DI Spread</div>
+                                    <div class="metric-value" id="diSpread">0.00</div>
+                                </div>
+                                <div class="metric-small">
+                                    <div class="metric-label">ADX Slope</div>
+                                    <div class="metric-value" id="adxSlope">0.00</div>
+                                </div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Signal Confidence</div>
+                                <div class="metric-value" id="confidence">0.0%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Positions -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>🎯 Active Positions</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div id="positionsContainer">
+                            <div class="empty-state">No open positions</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Stats -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📈 Performance</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="perf-grid">
+                            <div class="perf-item">
+                                <div class="perf-label">Total Trades</div>
+                                <div class="perf-value" id="totalTrades">0</div>
+                            </div>
+                            <div class="perf-item">
+                                <div class="perf-label">Win Rate</div>
+                                <div class="perf-value" id="winRate">0.0%</div>
+                            </div>
+                            <div class="perf-item">
+                                <div class="perf-label">Wins / Losses</div>
+                                <div class="perf-value" id="winsLosses">0 / 0</div>
+                            </div>
+                            <div class="perf-item">
+                                <div class="perf-label">Profit Factor</div>
+                                <div class="perf-value" id="profitFactor">--</div>
+                            </div>
+                            <div class="perf-item">
+                                <div class="perf-label">Avg P&L</div>
+                                <div class="perf-value" id="avgPnl">$0.00</div>
+                            </div>
+                            <div class="perf-item">
+                                <div class="perf-label">Best Trade</div>
+                                <div class="perf-value" id="bestTrade">$0.00</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="content-right">
+                <!-- Risk Management -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>⚠️ Risk Management</h2>
+                        <span class="circuit-status" id="circuitStatus">OK</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="risk-item">
+                            <div class="risk-label">Daily P&L</div>
+                            <div class="risk-value" id="dailyPnl">$0.00</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="dailyPnlBar" style="width: 0%"></div>
+                            </div>
+                            <div class="risk-subtext">Limit: 5.0%</div>
+                        </div>
+                        <div class="risk-item">
+                            <div class="risk-label">Max Drawdown</div>
+                            <div class="risk-value" id="maxDrawdown">0.00%</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="drawdownBar" style="width: 0%"></div>
+                            </div>
+                            <div class="risk-subtext">Limit: 15.0%</div>
+                        </div>
+                        <div class="risk-item">
+                            <div class="risk-label">Margin Used</div>
+                            <div class="risk-value" id="marginUsed">$0.00</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="marginBar" style="width: 0%"></div>
+                            </div>
+                            <div class="risk-subtext" id="marginPercent">0% of balance</div>
+                        </div>
+                        <div class="risk-item">
+                            <div class="risk-label">Consecutive Trades</div>
+                            <div class="risk-value" id="consecutive">0W / 0L</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trade History -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📋 Trade History</h2>
+                        <select id="tradeFilter" class="filter-dropdown" onchange="filterTrades()">
+                            <option value="">All Trades</option>
+                            <option value="paper" selected>Paper Trading</option>
+                            <option value="live">Live Trading</option>
+                        </select>
+                    </div>
+                    <div class="panel-body">
+                        <div id="tradesContainer">
+                            <div class="empty-state">No trades yet</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-left">
+                <span id="lastUpdate">Last update: --</span>
+            </div>
+            <div class="footer-center">
+                <span id="nextUpdate">Next update in: <span id="countdown">5</span>s</span>
+            </div>
+            <div class="footer-right">
+                <span>ADX Strategy v2.0 | Port 5900</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+{
+  "strategy_name": "Bitcoin Scalping v2.0",
+  "strategy_type": "scalping",
+
+  "initial_capital": 100.0,
+  "leverage": 5,
+
+  "risk_per_trade": 2.0,
+  "daily_loss_limit": 5.0,
+  "max_drawdown": 15.0,
+  "max_positions": 2,
+  "max_concurrent_trades": 1,
+  "consecutive_loss_limit": 3,
+  "max_daily_trades": 50,
+
+  "symbol": "BTC-USDT",
+  "timeframe": "5m",
+  "signal_check_interval": 300,
+
+  "ema_fast": 8,
+  "ema_slow": 21,
+  "ema_micro": 5,
+  "rsi_period": 14,
+  "rsi_oversold": 35,
+  "rsi_overbought": 65,
+  "stoch_period": 14,
+  "stoch_smooth": 3,
+  "volume_ma_period": 20,
+  "atr_period": 14,
+
+  "target_profit_pct": 0.003,
+  "max_loss_pct": 0.0015,
+  "max_position_time": 300,
+
+  "min_volume_ratio": 1.2,
+  "min_confidence": 0.6,
+  "order_book_imbalance": 0.6,
+
+  "enable_short_bias": true,
+  "short_bias_multiplier": 1.5,
+
+  "sl_atr_multiplier": 2.0,
+  "tp_atr_multiplier": 4.0,
+
+  "trading_mode": "paper",
+  "enable_email_alerts": false,
+  "enable_console_dashboard": true,
+
+  "database": {
+    "type": "sqlite",
+    "path": "data/trades.db",
+    "trades_table": "scalping_trades",
+    "performance_table": "scalping_performance_snapshots"
+  },
+
+  "logging": {
+    "level": "INFO",
+    "file": "logs/live_trading.log",
+    "max_size_mb": 10,
+    "backup_count": 5
+  }
+}
