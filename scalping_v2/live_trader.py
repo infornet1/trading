@@ -35,6 +35,7 @@ from src.monitoring.system_monitor import SystemMonitor
 
 # Import scalping-specific components
 from src.signals.scalping_signal_generator import ScalpingSignalGenerator
+from src.notifications.email_notifier import ScalpingEmailNotifier
 
 
 # Custom JSON Encoder to handle numpy types and other non-serializable objects
@@ -287,6 +288,22 @@ class ScalpingTradingBot:
         self.alert_system = AlertSystem()
         logger.info("  ✅ Alert System initialized")
 
+        # Email Notifier
+        if cfg.get('enable_email_alerts', False):
+            try:
+                self.email_notifier = ScalpingEmailNotifier('email_config.json')
+                if self.email_notifier.enabled:
+                    logger.info("  ✅ Email Notifier initialized")
+                else:
+                    logger.warning("  ⚠️ Email Notifier disabled (check configuration)")
+                    self.email_notifier = None
+            except Exception as e:
+                logger.warning(f"  ⚠️ Email Notifier not initialized: {e}")
+                self.email_notifier = None
+        else:
+            self.email_notifier = None
+            logger.info("  ⏸️  Email Notifier disabled in config")
+
         self.system_monitor = SystemMonitor()
         logger.info("  ✅ System Monitor initialized")
 
@@ -514,6 +531,19 @@ class ScalpingTradingBot:
             logger.info(f"   Conditions: {', '.join(conditions)}")
             logger.info(f"   Stop Loss: ${stop_loss:.2f}")
             logger.info(f"   Take Profit: ${take_profit:.2f}")
+
+            # Send email notification for high-confidence signal
+            if self.email_notifier:
+                try:
+                    self.email_notifier.send_signal_notification(
+                        signal=signal,
+                        side=side,
+                        current_price=current_price,
+                        confidence=confidence * 100,  # Convert to percentage
+                        conditions=conditions
+                    )
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to send email notification: {e}")
 
             # Calculate position size with enhanced error handling
             try:

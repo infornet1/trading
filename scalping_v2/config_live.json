@@ -44,7 +44,7 @@
   "tp_atr_multiplier": 4.0,
 
   "trading_mode": "paper",
-  "enable_email_alerts": false,
+  "enable_email_alerts": true,
   "enable_console_dashboard": true,
 
   "database": {
