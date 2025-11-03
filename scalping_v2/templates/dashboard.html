@@ -338,6 +338,72 @@
             </div>
         </div>
 
+        <!-- Recent Signals Section -->
+        <div class="signals-section">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>🎯 Recent Signals (Last 24h)</h2>
+                    <div class="signal-filters">
+                        <select id="signalFilter" class="filter-dropdown" onchange="filterSignals()">
+                            <option value="all">All Signals</option>
+                            <option value="executed">Executed Only</option>
+                            <option value="rejected">Rejected Only</option>
+                        </select>
+                        <select id="signalHours" class="filter-dropdown" onchange="changeSignalPeriod()">
+                            <option value="1">Last Hour</option>
+                            <option value="6">Last 6 Hours</option>
+                            <option value="24" selected>Last 24 Hours</option>
+                            <option value="168">Last Week</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <!-- Signal Stats -->
+                    <div class="signal-stats">
+                        <div class="signal-stat">
+                            <div class="stat-label">Total Signals</div>
+                            <div class="stat-value" id="totalSignals">0</div>
+                        </div>
+                        <div class="signal-stat">
+                            <div class="stat-label">Executed</div>
+                            <div class="stat-value" id="executedSignals">0</div>
+                        </div>
+                        <div class="signal-stat">
+                            <div class="stat-label">Rejected</div>
+                            <div class="stat-value" id="rejectedSignals">0</div>
+                        </div>
+                        <div class="signal-stat">
+                            <div class="stat-label">Execution Rate</div>
+                            <div class="stat-value" id="executionRate">0%</div>
+                        </div>
+                    </div>
+
+                    <!-- Signals Table -->
+                    <div id="signalsTableContainer" class="signals-table-container">
+                        <table class="signals-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Side</th>
+                                    <th>Confidence</th>
+                                    <th>Price</th>
+                                    <th>Stop/Target</th>
+                                    <th>Conditions</th>
+                                    <th>Status</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody id="signalsTableBody">
+                                <tr>
+                                    <td colspan="8" class="empty-state">No signals detected yet</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Footer -->
         <footer class="footer">
             <div class="footer-left">

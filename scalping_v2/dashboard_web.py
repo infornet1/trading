@@ -12,8 +12,9 @@ from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
+import sqlite3
 
 # Setup logging
 logging.basicConfig(
@@ -245,6 +246,110 @@ def api_risk():
     }
 
     return jsonify(risk_data)
+
+
+@app.route('/api/signals')
+def api_signals():
+    """Get recent trading signals (executed and rejected)"""
+    try:
+        # Get query parameters
+        limit = int(request.args.get('limit', 20))
+        hours = int(request.args.get('hours', 24))
+        executed_only = request.args.get('executed_only', 'false').lower() == 'true'
+
+        # Calculate time threshold
+        time_threshold = (datetime.now() - timedelta(hours=hours)).isoformat()
+
+        # Connect to database
+        db_path = 'data/trades.db'
+        if not os.path.exists(db_path):
+            return jsonify({'signals': [], 'count': 0})
+
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row  # Enable column access by name
+        cursor = conn.cursor()
+
+        # Build query
+        query = '''
+            SELECT
+                id, timestamp, side, confidence, entry_price, stop_loss, take_profit,
+                position_size_usd, margin_required, risk_amount, risk_percent,
+                conditions, executed, execution_status, rejection_reason
+            FROM scalping_signals
+            WHERE timestamp >= ?
+        '''
+
+        params = [time_threshold]
+
+        if executed_only:
+            query += ' AND executed = 1'
+
+        query += ' ORDER BY timestamp DESC LIMIT ?'
+        params.append(limit)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        # Convert to list of dictionaries
+        signals = []
+        for row in rows:
+            signal = {
+                'id': row['id'],
+                'timestamp': row['timestamp'],
+                'side': row['side'],
+                'confidence': round(row['confidence'] * 100, 1),  # Convert to percentage
+                'entry_price': row['entry_price'],
+                'stop_loss': row['stop_loss'],
+                'take_profit': row['take_profit'],
+                'position_size_usd': row['position_size_usd'],
+                'margin_required': row['margin_required'],
+                'risk_amount': row['risk_amount'],
+                'risk_percent': row['risk_percent'],
+                'conditions': row['conditions'],
+                'executed': bool(row['executed']),
+                'execution_status': row['execution_status'],
+                'rejection_reason': row['rejection_reason']
+            }
+            signals.append(signal)
+
+        # Get statistics
+        cursor.execute('''
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN executed = 1 THEN 1 ELSE 0 END) as executed,
+                SUM(CASE WHEN executed = 0 THEN 1 ELSE 0 END) as rejected,
+                AVG(CASE WHEN executed = 1 THEN confidence ELSE NULL END) * 100 as avg_executed_confidence,
+                AVG(CASE WHEN executed = 0 THEN confidence ELSE NULL END) * 100 as avg_rejected_confidence
+            FROM scalping_signals
+            WHERE timestamp >= ?
+        ''', [time_threshold])
+
+        stats_row = cursor.fetchone()
+        stats = {
+            'total': stats_row['total'] or 0,
+            'executed': stats_row['executed'] or 0,
+            'rejected': stats_row['rejected'] or 0,
+            'execution_rate': round((stats_row['executed'] or 0) / max(stats_row['total'], 1) * 100, 1),
+            'avg_executed_confidence': round(stats_row['avg_executed_confidence'] or 0, 1),
+            'avg_rejected_confidence': round(stats_row['avg_rejected_confidence'] or 0, 1)
+        }
+
+        conn.close()
+
+        return jsonify({
+            'signals': signals,
+            'count': len(signals),
+            'stats': stats,
+            'period_hours': hours
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching signals: {e}", exc_info=True)
+        return jsonify({
+            'error': str(e),
+            'signals': [],
+            'count': 0
+        }), 500
 
 
 @app.route('/health')

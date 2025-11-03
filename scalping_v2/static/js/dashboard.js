@@ -723,3 +723,99 @@ fetchIndicators = async function() {
         }
     }
 };
+
+// ============================================================================
+// SIGNALS TRACKING FUNCTIONS
+// ============================================================================
+
+let allSignalsData = [];
+let currentFilter = 'all';
+let currentHours = 24;
+
+async function fetchSignals() {
+    try {
+        const response = await fetch(`api/signals?limit=50&hours=${currentHours}`);
+        const data = await response.json();
+
+        allSignalsData = data.signals || [];
+        updateSignalStats(data.stats || {});
+        displaySignals();
+    } catch (error) {
+        console.error('Error fetching signals:', error);
+        document.getElementById('signalsTableBody').innerHTML = `
+            <tr><td colspan="8" class="error-state">Error loading signals</td></tr>
+        `;
+    }
+}
+
+function updateSignalStats(stats) {
+    document.getElementById('totalSignals').textContent = stats.total || 0;
+    document.getElementById('executedSignals').textContent = stats.executed || 0;
+    document.getElementById('rejectedSignals').textContent = stats.rejected || 0;
+    document.getElementById('executionRate').textContent = `${stats.execution_rate || 0}%`;
+}
+
+function displaySignals() {
+    // Filter signals based on current filter
+    let filtered = allSignalsData;
+    if (currentFilter === 'executed') {
+        filtered = allSignalsData.filter(s => s.executed);
+    } else if (currentFilter === 'rejected') {
+        filtered = allSignalsData.filter(s => !s.executed);
+    }
+
+    const tbody = document.getElementById('signalsTableBody');
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No signals found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(signal => {
+        const time = new Date(signal.timestamp).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const sideClass = signal.side === 'LONG' ? 'signal-long' : 'signal-short';
+        const sideIcon = signal.side === 'LONG' ? '🟢' : '🔴';
+
+        const statusClass = signal.executed ? 'status-executed' : 'status-rejected';
+        const statusText = signal.execution_status || 'UNKNOWN';
+
+        const stopDist = ((signal.stop_loss - signal.entry_price) / signal.entry_price * 100).toFixed(2);
+        const targetDist = ((signal.take_profit - signal.entry_price) / signal.entry_price * 100).toFixed(2);
+
+        return `
+            <tr class="${sideClass}">
+                <td>${time}</td>
+                <td><span class="side-badge ${sideClass}">${sideIcon} ${signal.side}</span></td>
+                <td><span class="confidence-badge">${signal.confidence}%</span></td>
+                <td>$${signal.entry_price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="stop-target">
+                    <div>SL: $${signal.stop_loss.toFixed(2)} (${stopDist}%)</div>
+                    <div>TP: $${signal.take_profit.toFixed(2)} (${targetDist}%)</div>
+                </td>
+                <td class="conditions">${signal.conditions || 'N/A'}</td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td class="rejection-reason">${signal.rejection_reason || '-'}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterSignals() {
+    currentFilter = document.getElementById('signalFilter').value;
+    displaySignals();
+}
+
+function changeSignalPeriod() {
+    currentHours = parseInt(document.getElementById('signalHours').value);
+    fetchSignals();
+}
+
+// Fetch signals every 10 seconds
+setInterval(fetchSignals, 10000);
+
+// Initial fetch
+fetchSignals();

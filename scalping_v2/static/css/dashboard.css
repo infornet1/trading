@@ -1009,3 +1009,178 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* ============================================================================
+   SIGNALS TRACKING SECTION
+   ============================================================================ */
+
+.signals-section {
+    grid-column: 1 / -1;
+    margin-top: 20px;
+}
+
+.signal-filters {
+    display: flex;
+    gap: 10px;
+}
+
+.signal-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.signal-stat {
+    background: var(--card-bg);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.signal-stat .stat-label {
+    font-size: 0.85em;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+}
+
+.signal-stat .stat-value {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: var(--primary);
+}
+
+.signals-table-container {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.signals-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.signals-table thead {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.signals-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.signals-table td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.signals-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.side-badge {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.signal-long .side-badge {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.signal-short .side-badge {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.confidence-badge {
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+    font-weight: 600;
+    font-size: 0.85em;
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.status-executed {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.status-rejected {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.stop-target {
+    font-size: 0.85em;
+    line-height: 1.4;
+}
+
+.stop-target div {
+    white-space: nowrap;
+}
+
+.conditions {
+    font-size: 0.85em;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rejection-reason {
+    font-size: 0.85em;
+    color: var(--text-dim);
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.error-state {
+    text-align: center;
+    padding: 30px;
+    color: var(--danger);
+}
+
+@media (max-width: 1200px) {
+    .signal-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .signal-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .signals-table {
+        font-size: 0.8em;
+    }
+
+    .signals-table th,
+    .signals-table td {
+        padding: 8px;
+    }
+}

@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional
 import pandas as pd
 import logging
+import sqlite3
 from dotenv import load_dotenv
 
 # Load environment variables (use absolute path)
@@ -573,11 +574,17 @@ class ScalpingTradingBot:
                 # Validate position size
                 if not is_valid or position_size_usd <= 0:
                     logger.warning(f"⚠️  Position size invalid: ${position_size_usd:.2f}")
+                    self._store_signal_to_database(signal, side, current_price, position_result,
+                                                   executed=False, rejection_reason=f"Invalid position size: ${position_size_usd:.2f}")
                     return
 
-                # Additional safety check: don't use more than 90% of balance
-                if position_size_usd > self.trader.balance * 0.9:
-                    logger.warning(f"⚠️  Position size too large: ${position_size_usd:.2f} (>{self.trader.balance * 0.9:.2f})")
+                # Additional safety check: don't use more than 90% of balance FOR MARGIN
+                # With leverage, notional can be larger than balance, so check margin_required
+                margin_required = position_result.get('margin_required', 0)
+                if margin_required > self.trader.balance * 0.9:
+                    logger.warning(f"⚠️  Margin required too large: ${margin_required:.2f} (>{self.trader.balance * 0.9:.2f})")
+                    self._store_signal_to_database(signal, side, current_price, position_result,
+                                                   executed=False, rejection_reason=f"Margin too large: ${margin_required:.2f} > ${self.trader.balance * 0.9:.2f}")
                     return
 
                 logger.info(f"   Position Size: ${position_size_usd:.2f} ({quantity:.6f} BTC)")
@@ -587,25 +594,32 @@ class ScalpingTradingBot:
             except Exception as e:
                 logger.error(f"❌ Position sizing failed: {e}", exc_info=True)
                 self.health_metrics['signal_errors'] += 1
+                self._store_signal_to_database(signal, side, current_price, None,
+                                               executed=False, rejection_reason=f"Position sizing error: {str(e)}")
                 return
 
-            # Execute trade via paper trader
-            success = self.trader.open_position(
-                side=side,
-                quantity=quantity,
-                entry_price=current_price,
-                stop_loss=stop_loss,
-                take_profit=take_profit
+            # Execute trade via paper trader using execute_signal method
+            # Add 'side' to signal dictionary for PaperTrader
+            signal_with_side = {**signal, 'side': side}
+
+            trade_result = self.trader.execute_signal(
+                signal=signal_with_side,
+                current_price=current_price,
+                position_size_data=position_result
             )
 
-            if success:
+            if trade_result:
                 logger.info(f"✅ {side} position opened successfully")
+
+                # Store executed signal to database
+                self._store_signal_to_database(signal, side, current_price, position_result,
+                                               executed=True, rejection_reason=None)
 
                 # Send alert
                 self.alert_system.send_alert(
-                    alert_type=AlertType.SIGNAL_GENERATED,
+                    alert_type=AlertType.POSITION_OPENED,
                     level=AlertLevel.INFO,
-                    message=f"{side} signal executed - Confidence: {confidence*100:.1f}%",
+                    message=f"{side} position opened - Confidence: {confidence*100:.1f}%",
                     data={'side': side, 'price': current_price, 'confidence': confidence}
                 )
 
@@ -618,9 +632,14 @@ class ScalpingTradingBot:
                 })
             else:
                 logger.warning(f"⚠️  Failed to open {side} position")
+                self._store_signal_to_database(signal, side, current_price, position_result,
+                                               executed=False, rejection_reason="Trade execution failed")
 
         except Exception as e:
             logger.error(f"Error processing signal: {e}", exc_info=True)
+            # Store signal with error reason
+            self._store_signal_to_database(signal, side, current_price, None,
+                                           executed=False, rejection_reason=f"Unexpected error: {str(e)}")
 
     def _monitor_and_record_closed_positions(self):
         """Monitor for closed positions and record their results"""
@@ -647,6 +666,87 @@ class ScalpingTradingBot:
         except Exception as e:
             logger.debug(f"Closed position monitoring not available: {e}")
 
+    def _store_signal_to_database(self, signal: Dict, side: str, current_price: float,
+                                   position_result: Optional[Dict] = None,
+                                   executed: bool = False, rejection_reason: Optional[str] = None):
+        """
+        Store signal information to database for tracking and dashboard display
+
+        Args:
+            signal: Signal dictionary with confidence, conditions, etc.
+            side: LONG or SHORT
+            current_price: Current market price
+            position_result: Position sizing result (if calculated)
+            executed: Whether the trade was executed
+            rejection_reason: Reason if trade was rejected
+        """
+        try:
+            db_path = self.config.get('database', {}).get('path', 'data/trades.db')
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Extract signal data
+            confidence = signal.get('confidence', 0)
+            stop_loss = signal.get('stop_loss', 0)
+            take_profit = signal.get('take_profit', 0)
+            conditions = ', '.join(signal.get('conditions', []))
+
+            # Extract position sizing data if available
+            position_size_usd = position_result.get('position_size_usd', 0) if position_result else None
+            margin_required = position_result.get('margin_required', 0) if position_result else None
+            risk_amount = position_result.get('actual_risk_amount', 0) if position_result else None
+            risk_percent = position_result.get('actual_risk_percent', 0) if position_result else None
+
+            # Create indicators JSON
+            indicators_json = json.dumps({
+                'rsi': signal.get('rsi'),
+                'ema_fast': signal.get('ema_fast'),
+                'ema_slow': signal.get('ema_slow'),
+                'volume_ratio': signal.get('volume_ratio'),
+                'atr': signal.get('atr')
+            }, cls=NumpyEncoder)
+
+            # Determine execution status
+            if executed:
+                execution_status = 'EXECUTED'
+            elif rejection_reason:
+                execution_status = 'REJECTED'
+            else:
+                execution_status = 'PENDING'
+
+            # Insert signal into database
+            cursor.execute('''
+                INSERT INTO scalping_signals (
+                    timestamp, side, confidence, entry_price, stop_loss, take_profit,
+                    position_size_usd, margin_required, risk_amount, risk_percent,
+                    conditions, executed, execution_status, rejection_reason, indicators_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                datetime.now().isoformat(),
+                side,
+                confidence,
+                current_price,
+                stop_loss,
+                take_profit,
+                position_size_usd,
+                margin_required,
+                risk_amount,
+                risk_percent,
+                conditions,
+                1 if executed else 0,
+                execution_status,
+                rejection_reason,
+                indicators_json
+            ))
+
+            conn.commit()
+            conn.close()
+
+            logger.debug(f"📊 Signal stored to database: {side} {confidence*100:.1f}% - {execution_status}")
+
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to store signal to database: {e}")
+
     def _export_snapshot(self):
         """Export current state snapshot for web dashboard"""
         try:
@@ -659,7 +759,7 @@ class ScalpingTradingBot:
                     'pnl_percent': ((self.trader.balance - self.config.get('initial_capital', 100.0)) /
                                    self.config.get('initial_capital', 100.0)) * 100
                 },
-                'positions': [pos.to_dict() for pos in self.position_mgr.get_open_positions()],
+                'positions': [pos if isinstance(pos, dict) else pos.to_dict() for pos in self.position_mgr.get_open_positions()],
                 'orders': [],
                 'risk': {
                     'daily_pnl': self.risk_mgr.daily_pnl,
@@ -722,9 +822,12 @@ class ScalpingTradingBot:
                 logger.info(f"Closing {len(open_positions)} open positions...")
                 for position in open_positions:
                     try:
-                        self.trader.close_position(position.position_id, "shutdown")
+                        # Handle both dict and object positions
+                        pos_id = position['position_id'] if isinstance(position, dict) else position.position_id
+                        self.trader.close_position(pos_id, "shutdown")
                     except Exception as e:
-                        logger.error(f"Error closing position {position.position_id}: {e}")
+                        pos_id_str = position.get('position_id', 'unknown') if isinstance(position, dict) else getattr(position, 'position_id', 'unknown')
+                        logger.error(f"Error closing position {pos_id_str}: {e}")
 
         # Generate final report
         if self.perf_tracker:
