@@ -734,7 +734,15 @@ let currentHours = 24;
 
 async function fetchSignals() {
     try {
-        const response = await fetch(`api/signals?limit=50&hours=${currentHours}`);
+        // Build API URL with filters
+        let url = `api/signals?limit=50&hours=${currentHours}`;
+
+        // Add email_sent_only filter if selected
+        if (currentFilter === 'email') {
+            url += '&email_sent_only=true';
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
 
         allSignalsData = data.signals || [];
@@ -743,7 +751,7 @@ async function fetchSignals() {
     } catch (error) {
         console.error('Error fetching signals:', error);
         document.getElementById('signalsTableBody').innerHTML = `
-            <tr><td colspan="8" class="error-state">Error loading signals</td></tr>
+            <tr><td colspan="9" class="error-state">Error loading signals</td></tr>
         `;
     }
 }
@@ -752,6 +760,7 @@ function updateSignalStats(stats) {
     document.getElementById('totalSignals').textContent = stats.total || 0;
     document.getElementById('executedSignals').textContent = stats.executed || 0;
     document.getElementById('rejectedSignals').textContent = stats.rejected || 0;
+    document.getElementById('emailSentSignals').textContent = stats.email_sent || 0;
     document.getElementById('executionRate').textContent = `${stats.execution_rate || 0}%`;
 }
 
@@ -762,12 +771,15 @@ function displaySignals() {
         filtered = allSignalsData.filter(s => s.executed);
     } else if (currentFilter === 'rejected') {
         filtered = allSignalsData.filter(s => !s.executed);
+    } else if (currentFilter === 'email') {
+        // Email filter handled by API, all data already filtered
+        filtered = allSignalsData;
     }
 
     const tbody = document.getElementById('signalsTableBody');
 
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No signals found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No signals found</td></tr>';
         return;
     }
 
@@ -786,11 +798,17 @@ function displaySignals() {
         const stopDist = ((signal.stop_loss - signal.entry_price) / signal.entry_price * 100).toFixed(2);
         const targetDist = ((signal.take_profit - signal.entry_price) / signal.entry_price * 100).toFixed(2);
 
+        // Email badge
+        const emailBadge = signal.email_sent
+            ? '<span class="email-badge" title="Email notification sent (≥65% confidence)">📧</span>'
+            : '<span class="no-email-badge" title="No email sent (<65% confidence)">-</span>';
+
         return `
             <tr class="${sideClass}">
                 <td>${time}</td>
                 <td><span class="side-badge ${sideClass}">${sideIcon} ${signal.side}</span></td>
                 <td><span class="confidence-badge">${signal.confidence}%</span></td>
+                <td class="email-column">${emailBadge}</td>
                 <td>$${signal.entry_price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="stop-target">
                     <div>SL: $${signal.stop_loss.toFixed(2)} (${stopDist}%)</div>
@@ -806,7 +824,12 @@ function displaySignals() {
 
 function filterSignals() {
     currentFilter = document.getElementById('signalFilter').value;
-    displaySignals();
+    // Re-fetch from API if email filter selected (needs backend filtering)
+    if (currentFilter === 'email') {
+        fetchSignals();
+    } else {
+        displaySignals();
+    }
 }
 
 function changeSignalPeriod() {

@@ -348,6 +348,7 @@
                             <option value="all">All Signals</option>
                             <option value="executed">Executed Only</option>
                             <option value="rejected">Rejected Only</option>
+                            <option value="email">📧 Email Sent Only</option>
                         </select>
                         <select id="signalHours" class="filter-dropdown" onchange="changeSignalPeriod()">
                             <option value="1">Last Hour</option>
@@ -372,6 +373,10 @@
                             <div class="stat-label">Rejected</div>
                             <div class="stat-value" id="rejectedSignals">0</div>
                         </div>
+                        <div class="signal-stat email-highlight">
+                            <div class="stat-label">📧 Email Sent</div>
+                            <div class="stat-value" id="emailSentSignals">0</div>
+                        </div>
                         <div class="signal-stat">
                             <div class="stat-label">Execution Rate</div>
                             <div class="stat-value" id="executionRate">0%</div>
@@ -386,6 +391,7 @@
                                     <th>Time</th>
                                     <th>Side</th>
                                     <th>Confidence</th>
+                                    <th>📧</th>
                                     <th>Price</th>
                                     <th>Stop/Target</th>
                                     <th>Conditions</th>
@@ -395,7 +401,7 @@
                             </thead>
                             <tbody id="signalsTableBody">
                                 <tr>
-                                    <td colspan="8" class="empty-state">No signals detected yet</td>
+                                    <td colspan="9" class="empty-state">No signals detected yet</td>
                                 </tr>
                             </tbody>
                         </table>

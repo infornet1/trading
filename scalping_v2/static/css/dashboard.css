@@ -1050,6 +1050,22 @@ body {
     color: var(--primary);
 }
 
+/* Email Highlight Stat Card */
+.signal-stat.email-highlight {
+    background: linear-gradient(135deg, rgba(0, 170, 255, 0.1), rgba(0, 170, 255, 0.05));
+    border: 2px solid rgba(0, 170, 255, 0.3);
+    box-shadow: 0 0 10px rgba(0, 170, 255, 0.2);
+}
+
+.signal-stat.email-highlight .stat-label {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.signal-stat.email-highlight .stat-value {
+    color: var(--accent);
+}
+
 .signals-table-container {
     overflow-x: auto;
     border-radius: 8px;
@@ -1162,6 +1178,34 @@ body {
     text-align: center;
     padding: 30px;
     color: var(--danger);
+}
+
+/* Email Badge Styling */
+.email-column {
+    text-align: center;
+    width: 50px;
+}
+
+.email-badge {
+    display: inline-block;
+    font-size: 1.2em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0, 170, 255, 0.2);
+    cursor: help;
+    transition: all 0.2s ease;
+}
+
+.email-badge:hover {
+    background: rgba(0, 170, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.no-email-badge {
+    display: inline-block;
+    color: var(--text-dim);
+    font-size: 0.9em;
+    cursor: help;
 }
 
 @media (max-width: 1200px) {
