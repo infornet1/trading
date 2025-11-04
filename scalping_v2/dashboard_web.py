@@ -191,17 +191,67 @@ def api_indicators():
 
 @app.route('/api/trades')
 def api_trades():
-    """Get recent trades"""
+    """Get recent trades from database"""
     mode = request.args.get('mode', 'paper')
     limit = int(request.args.get('limit', 10))
 
-    snapshot = load_snapshot()
+    try:
+        # Query database directly for completed trades
+        db_path = 'data/trades.db'
+        if not os.path.exists(db_path):
+            return jsonify({'trades': []})
 
-    if not snapshot:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Get completed trades (those with exit_price)
+        cursor.execute('''
+            SELECT
+                side,
+                entry_price,
+                exit_price,
+                quantity,
+                pnl,
+                pnl_percent,
+                timestamp,
+                closed_at,
+                exit_reason,
+                hold_duration,
+                trading_mode
+            FROM trades
+            WHERE exit_price IS NOT NULL
+            ORDER BY closed_at DESC
+            LIMIT ?
+        ''', [limit])
+
+        rows = cursor.fetchall()
+
+        # Convert to list of dictionaries
+        trades = []
+        for row in rows:
+            trade = {
+                'side': row['side'],
+                'entry_price': row['entry_price'],
+                'exit_price': row['exit_price'],
+                'quantity': row['quantity'],
+                'pnl': row['pnl'],
+                'pnl_percent': row['pnl_percent'] if row['pnl_percent'] else (row['pnl'] / (row['entry_price'] * row['quantity']) * 100 if row['quantity'] else 0),
+                'timestamp': row['timestamp'],
+                'closed_at': row['closed_at'],
+                'exit_reason': row['exit_reason'],
+                'hold_duration': row['hold_duration'] if row['hold_duration'] else 0,
+                'trading_mode': row['trading_mode'] if row['trading_mode'] else 'paper'
+            }
+            trades.append(trade)
+
+        conn.close()
+
+        return jsonify({'trades': trades})
+
+    except Exception as e:
+        logger.error(f"Error fetching trades: {e}", exc_info=True)
         return jsonify({'trades': []})
-
-    trades = snapshot.get('recent_trades', [])
-    return jsonify({'trades': trades[:limit]})
 
 
 @app.route('/api/performance')
