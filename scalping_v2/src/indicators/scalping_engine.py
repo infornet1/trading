@@ -105,23 +105,30 @@ class BitcoinScalpingEngine:
             # Detect market regime
             market_regime = self._detect_market_regime(indicators, price_action)
 
-            # Generate trading signals (market regime aware)
-            signals = self._generate_signals(
-                current_price=current_price,
-                indicators=indicators,
-                price_action=price_action
-            )
+            # Check if we should block signals in choppy markets (configurable)
+            block_choppy = self.config.get('block_choppy_signals', False)
 
-            # Filter signals based on market regime
-            if market_regime == 'choppy':
-                # Reduce confidence in choppy markets or skip
-                for signal_type in signals:
-                    signals[signal_type]['confidence'] *= 0.7
-                    signals[signal_type]['regime_warning'] = 'choppy_market'
-            elif market_regime == 'ranging':
-                # Slightly reduce confidence in ranging markets
-                for signal_type in signals:
-                    signals[signal_type]['confidence'] *= 0.9
+            if block_choppy and market_regime == 'choppy':
+                logger.info(f"🚫 Blocking signals - choppy market regime detected")
+                signals = {}
+            else:
+                # Generate trading signals (market regime aware)
+                signals = self._generate_signals(
+                    current_price=current_price,
+                    indicators=indicators,
+                    price_action=price_action
+                )
+
+                # Filter signals based on market regime (if not blocking)
+                if market_regime == 'choppy':
+                    # Reduce confidence in choppy markets
+                    for signal_type in signals:
+                        signals[signal_type]['confidence'] *= 0.7
+                        signals[signal_type]['regime_warning'] = 'choppy_market'
+                elif market_regime == 'ranging':
+                    # Slightly reduce confidence in ranging markets
+                    for signal_type in signals:
+                        signals[signal_type]['confidence'] *= 0.9
 
             # Build result
             result = {

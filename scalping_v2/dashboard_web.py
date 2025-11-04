@@ -112,13 +112,50 @@ def api_status():
     # Calculate unrealized PnL from positions
     unrealized_pnl = sum(pos.get('unrealized_pnl', 0) for pos in positions)
 
+    # Calculate fees from completed trades
+    try:
+        import sqlite3
+        conn = sqlite3.connect('/var/www/dev/trading/scalping_v2/data/trades.db')
+        cursor = conn.cursor()
+
+        # Count completed trades
+        cursor.execute('SELECT COUNT(*) FROM trades WHERE exit_price IS NOT NULL')
+        total_trades = cursor.fetchone()[0] or 0
+
+        # Get average position size for fee estimation
+        cursor.execute('SELECT AVG(entry_price * quantity) FROM trades WHERE exit_price IS NOT NULL')
+        avg_position_size = cursor.fetchone()[0] or 1000
+
+        conn.close()
+
+        # BingX taker fees: 0.05% entry + 0.05% exit = 0.10% total per round trip
+        # Estimate: 0.001 * average position size * number of trades
+        estimated_fees = total_trades * (avg_position_size * 0.001)
+
+    except Exception as e:
+        logger.error(f"Error calculating fees: {e}")
+        total_trades = 0
+        estimated_fees = 0
+
+    # Calculate net P&L after fees
+    gross_pnl = account.get('pnl', 0)
+    net_pnl = gross_pnl - estimated_fees
+    balance = account.get('balance', 0)
+    net_return_percent = ((balance - estimated_fees - 1000) / 1000) * 100 if balance > 0 else 0
+
     # Add calculated fields to account
     account_data = {
-        'balance': account.get('balance', 0),
-        'equity': account.get('equity', account.get('balance', 0)),
-        'total_pnl': account.get('pnl', 0),
+        'balance': balance,
+        'equity': account.get('equity', balance),
+        'total_pnl': gross_pnl,
         'total_return_percent': account.get('pnl_percent', 0),
-        'unrealized_pnl': unrealized_pnl
+        'unrealized_pnl': unrealized_pnl,
+
+        # Fee-adjusted metrics (NEW)
+        'total_trades': total_trades,
+        'estimated_fees': round(estimated_fees, 2),
+        'net_pnl': round(net_pnl, 2),
+        'net_return_percent': round(net_return_percent, 2)
     }
 
     return jsonify({
@@ -132,6 +169,7 @@ def api_status():
         'btc_price': btc_price,
         'indicators': snapshot.get('indicators', {}),
         'price_action': snapshot.get('price_action', {}),
+        'active_filters': snapshot.get('active_filters', {}),
         'timestamp': snapshot.get('timestamp', datetime.now().isoformat())
     })
 

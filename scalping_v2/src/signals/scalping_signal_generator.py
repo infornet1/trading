@@ -37,7 +37,11 @@ class ScalpingSignalGenerator:
         self.last_signal_time = None
         self.last_signal_type = None
 
-        logger.info(f"✅ Scalping Signal Generator initialized - Symbol: {self.symbol}, Timeframe: {self.timeframe}")
+        # Signal cooldown to prevent rapid re-detection
+        self.signal_cooldown_seconds = config.get('signal_cooldown_seconds', 120)
+        self.last_signal_time_by_side = {}  # Track cooldown per side
+
+        logger.info(f"✅ Scalping Signal Generator initialized - Symbol: {self.symbol}, Timeframe: {self.timeframe}, Cooldown: {self.signal_cooldown_seconds}s")
 
     def generate_signals(self) -> Dict:
         """
@@ -74,6 +78,10 @@ class ScalpingSignalGenerator:
             signals = analysis.get('signals', {})
             has_signal = len(signals) > 0
 
+            # Apply cooldown filter to prevent rapid re-detection
+            signals = self._apply_cooldown_filter(signals)
+            has_signal = len(signals) > 0
+
             # Format response
             response = {
                 'timestamp': analysis.get('timestamp'),
@@ -104,6 +112,47 @@ class ScalpingSignalGenerator:
                 'error': f'Signal generation failed: {str(e)}',
                 'critical_error': True  # Flag for critical errors vs normal "no signal"
             }
+
+    def _apply_cooldown_filter(self, signals: Dict) -> Dict:
+        """
+        Filter signals based on cooldown period to prevent rapid re-detection
+
+        Args:
+            signals: Dictionary with 'long' and/or 'short' signal data
+
+        Returns:
+            Filtered signals dictionary (may be empty if all signals in cooldown)
+        """
+        if not signals or self.signal_cooldown_seconds <= 0:
+            return signals
+
+        current_time = datetime.now()
+        filtered_signals = {}
+
+        for side in ['long', 'short']:
+            if side in signals:
+                last_signal_time = self.last_signal_time_by_side.get(side)
+
+                # Check if cooldown period has elapsed
+                if last_signal_time is None:
+                    # First signal of this side
+                    filtered_signals[side] = signals[side]
+                    self.last_signal_time_by_side[side] = current_time
+                    logger.debug(f"✅ {side.upper()} signal accepted - first signal")
+                else:
+                    elapsed_seconds = (current_time - last_signal_time).total_seconds()
+
+                    if elapsed_seconds >= self.signal_cooldown_seconds:
+                        # Cooldown period has elapsed
+                        filtered_signals[side] = signals[side]
+                        self.last_signal_time_by_side[side] = current_time
+                        logger.debug(f"✅ {side.upper()} signal accepted - cooldown elapsed ({elapsed_seconds:.0f}s)")
+                    else:
+                        # Still in cooldown
+                        remaining = self.signal_cooldown_seconds - elapsed_seconds
+                        logger.info(f"🔒 {side.upper()} signal suppressed - cooldown active ({remaining:.0f}s remaining)")
+
+        return filtered_signals
 
     def _fetch_market_data(self) -> Optional[pd.DataFrame]:
         """

@@ -28,20 +28,25 @@
   "volume_ma_period": 20,
   "atr_period": 14,
 
-  "target_profit_pct": 0.003,
-  "max_loss_pct": 0.0015,
+  "target_profit_pct": 0.006,
+  "max_loss_pct": 0.003,
   "max_position_time": 180,
 
   "min_volume_ratio": 1.3,
-  "min_confidence": 0.65,
+  "min_confidence": 0.70,
   "avoid_choppy_markets": true,
+  "block_choppy_signals": true,
   "order_book_imbalance": 0.6,
 
   "enable_short_bias": true,
   "short_bias_multiplier": 1.5,
 
-  "sl_atr_multiplier": 2.0,
-  "tp_atr_multiplier": 4.0,
+  "sl_atr_multiplier": 3.0,
+  "tp_atr_multiplier": 6.0,
+
+  "signal_cooldown_seconds": 120,
+  "avoid_low_liquidity_hours": true,
+  "low_liquidity_hours_utc": [0, 1, 2, 3],
 
   "trading_mode": "paper",
   "enable_email_alerts": true,

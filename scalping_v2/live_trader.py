@@ -469,8 +469,32 @@ class ScalpingTradingBot:
                         data={'error': str(e), 'consecutive_errors': self.consecutive_errors}
                     )
 
+    def _is_trading_hours_ok(self) -> bool:
+        """
+        Check if current time is suitable for scalping (avoid low liquidity periods)
+
+        Returns:
+            True if within trading hours, False otherwise
+        """
+        if not self.config.get('avoid_low_liquidity_hours', False):
+            return True
+
+        current_hour_utc = datetime.utcnow().hour
+        low_liquidity_hours = self.config.get('low_liquidity_hours_utc', [0, 1, 2, 3])
+
+        if current_hour_utc in low_liquidity_hours:
+            logger.debug(f"🕐 Outside trading hours (low liquidity) - Current UTC hour: {current_hour_utc}")
+            return False
+
+        return True
+
     def _check_signals(self):
         """Check for trading signals and execute if valid"""
+
+        # Check trading hours (avoid low liquidity periods)
+        if not self._is_trading_hours_ok():
+            logger.debug("⏸️  Skipping signal check - outside trading hours")
+            return
 
         # Check if we can open new positions
         if not self.risk_mgr.can_open_position():
@@ -777,6 +801,19 @@ class ScalpingTradingBot:
                 market_state = self.signal_gen.get_current_market_state()
                 snapshot['indicators'] = market_state.get('indicators', {})
                 snapshot['price_action'] = market_state.get('price_action', {})
+
+            # Add active filter status for dashboard visibility
+            snapshot['active_filters'] = {
+                'signal_cooldown_active': self.config.get('signal_cooldown_seconds', 0) > 0,
+                'cooldown_seconds': self.config.get('signal_cooldown_seconds', 0),
+                'choppy_blocker_active': self.config.get('block_choppy_signals', False),
+                'time_filter_active': self.config.get('avoid_low_liquidity_hours', False),
+                'low_liquidity_hours': self.config.get('low_liquidity_hours_utc', []),
+                'min_confidence': self.config.get('min_confidence', 0.65) * 100,
+                'current_utc_hour': datetime.utcnow().hour,
+                'target_profit_pct': self.config.get('target_profit_pct', 0.003) * 100,
+                'stop_loss_pct': self.config.get('max_loss_pct', 0.0015) * 100
+            }
 
             # Write to file
             with open('logs/final_snapshot.json', 'w') as f:
