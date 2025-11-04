@@ -102,42 +102,26 @@ async function fetchIndicators() {
         const response = await fetch('api/indicators');
         const data = await response.json();
 
-        // EMA values
-        document.getElementById('adxValue').textContent = data.ema_5 ? data.ema_5.toFixed(2) : '--';
-        document.getElementById('plusDi').textContent = data.ema_8 ? data.ema_8.toFixed(2) : '--';
-        document.getElementById('minusDi').textContent = data.ema_21 ? data.ema_21.toFixed(2) : '--';
-
-        // RSI and Stochastic
-        document.getElementById('diSpread').textContent = data.rsi ? data.rsi.toFixed(2) : '--';
-        document.getElementById('adxSlope').textContent = data.stoch_k ? data.stoch_k.toFixed(2) : '--';
-        document.getElementById('confidence').textContent = data.volume_ratio ? (data.volume_ratio * 100).toFixed(1) + '%' : '--';
-
-        // Update indicator bar (use RSI 0-100 range)
-        if (data.rsi) {
-            const rsiPercent = data.rsi;
-            document.getElementById('adxBar').style.width = rsiPercent + '%';
-        }
-
-        // Update market state based on scalping conditions
+        // Update market state if element exists
         const marketState = document.getElementById('marketState');
-        if (data.signal) {
-            marketState.textContent = data.signal.toUpperCase();
-            marketState.classList.remove('trending', 'ranging', 'building');
-            if (data.signal === 'LONG' || data.signal === 'SHORT') {
-                marketState.classList.add('trending');
+        if (marketState) {
+            if (data.signal) {
+                marketState.textContent = data.signal.toUpperCase();
+                marketState.classList.remove('trending', 'ranging', 'building');
+                if (data.signal === 'LONG' || data.signal === 'SHORT') {
+                    marketState.classList.add('trending');
+                } else {
+                    marketState.classList.add('ranging');
+                }
             } else {
-                marketState.classList.add('ranging');
+                marketState.textContent = 'ANALYZING';
+                marketState.classList.remove('trending', 'ranging');
+                marketState.classList.add('building');
             }
-        } else {
-            marketState.textContent = 'ANALYZING';
-            marketState.classList.remove('trending', 'ranging');
-            marketState.classList.add('building');
         }
 
-        // Color code metrics
-        if (data.rsi) {
-            setColorClass('adxValue', data.rsi > 30 && data.rsi < 70 ? 1 : -1);
-        }
+        // Note: Detailed indicator updates are handled by ScalpingDashboard class
+        // This function is kept for backward compatibility and basic updates
 
     } catch (error) {
         console.error('Error fetching indicators:', error);
