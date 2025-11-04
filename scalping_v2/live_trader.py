@@ -12,7 +12,7 @@ import time
 import signal
 import json
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 import pandas as pd
 import logging
@@ -479,7 +479,7 @@ class ScalpingTradingBot:
         if not self.config.get('avoid_low_liquidity_hours', False):
             return True
 
-        current_hour_utc = datetime.utcnow().hour
+        current_hour_utc = datetime.now(timezone.utc).hour
         low_liquidity_hours = self.config.get('low_liquidity_hours_utc', [0, 1, 2, 3])
 
         if current_hour_utc in low_liquidity_hours:
@@ -810,7 +810,7 @@ class ScalpingTradingBot:
                 'time_filter_active': self.config.get('avoid_low_liquidity_hours', False),
                 'low_liquidity_hours': self.config.get('low_liquidity_hours_utc', []),
                 'min_confidence': self.config.get('min_confidence', 0.65) * 100,
-                'current_utc_hour': datetime.utcnow().hour,
+                'current_utc_hour': datetime.now(timezone.utc).hour,
                 'target_profit_pct': self.config.get('target_profit_pct', 0.003) * 100,
                 'stop_loss_pct': self.config.get('max_loss_pct', 0.0015) * 100
             }
