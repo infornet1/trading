@@ -1026,26 +1026,28 @@ body {
 
 .signal-stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 15px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
     margin-bottom: 20px;
 }
 
 .signal-stat {
     background: var(--card-bg);
-    padding: 15px;
+    padding: 12px;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .signal-stat .stat-label {
-    font-size: 0.85em;
+    font-size: 0.8em;
     color: var(--text-dim);
     margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .signal-stat .stat-value {
-    font-size: 1.8em;
+    font-size: 1.6em;
     font-weight: bold;
     color: var(--primary);
 }
@@ -1208,13 +1210,19 @@ body {
     cursor: help;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
+    .signal-stats {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
     .signal-stats {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
     .signal-stats {
         grid-template-columns: 1fr;
     }
