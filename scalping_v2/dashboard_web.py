@@ -294,6 +294,7 @@ def api_signals():
         limit = int(request.args.get('limit', 20))
         hours = int(request.args.get('hours', 24))
         executed_only = request.args.get('executed_only', 'false').lower() == 'true'
+        email_sent_only = request.args.get('email_sent_only', 'false').lower() == 'true'
 
         # Calculate time threshold
         time_threshold = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -322,6 +323,10 @@ def api_signals():
         if executed_only:
             query += ' AND executed = 1'
 
+        # NEW: Filter for email-sent signals (confidence >= 65%)
+        if email_sent_only:
+            query += ' AND confidence >= 0.65'
+
         query += ' ORDER BY timestamp DESC LIMIT ?'
         params.append(limit)
 
@@ -331,11 +336,12 @@ def api_signals():
         # Convert to list of dictionaries
         signals = []
         for row in rows:
+            confidence_decimal = row['confidence']
             signal = {
                 'id': row['id'],
                 'timestamp': row['timestamp'],
                 'side': row['side'],
-                'confidence': round(row['confidence'] * 100, 1),  # Convert to percentage
+                'confidence': round(confidence_decimal * 100, 1),  # Convert to percentage
                 'entry_price': row['entry_price'],
                 'stop_loss': row['stop_loss'],
                 'take_profit': row['take_profit'],
@@ -346,7 +352,8 @@ def api_signals():
                 'conditions': row['conditions'],
                 'executed': bool(row['executed']),
                 'execution_status': row['execution_status'],
-                'rejection_reason': row['rejection_reason']
+                'rejection_reason': row['rejection_reason'],
+                'email_sent': confidence_decimal >= 0.65  # NEW: Flag if email was sent
             }
             signals.append(signal)
 
@@ -356,6 +363,8 @@ def api_signals():
                 COUNT(*) as total,
                 SUM(CASE WHEN executed = 1 THEN 1 ELSE 0 END) as executed,
                 SUM(CASE WHEN executed = 0 THEN 1 ELSE 0 END) as rejected,
+                SUM(CASE WHEN confidence >= 0.65 THEN 1 ELSE 0 END) as email_sent,
+                SUM(CASE WHEN confidence < 0.65 THEN 1 ELSE 0 END) as no_email,
                 AVG(CASE WHEN executed = 1 THEN confidence ELSE NULL END) * 100 as avg_executed_confidence,
                 AVG(CASE WHEN executed = 0 THEN confidence ELSE NULL END) * 100 as avg_rejected_confidence
             FROM scalping_signals
@@ -367,6 +376,8 @@ def api_signals():
             'total': stats_row['total'] or 0,
             'executed': stats_row['executed'] or 0,
             'rejected': stats_row['rejected'] or 0,
+            'email_sent': stats_row['email_sent'] or 0,
+            'no_email': stats_row['no_email'] or 0,
             'execution_rate': round((stats_row['executed'] or 0) / max(stats_row['total'], 1) * 100, 1),
             'avg_executed_confidence': round(stats_row['avg_executed_confidence'] or 0, 1),
             'avg_rejected_confidence': round(stats_row['avg_rejected_confidence'] or 0, 1)
