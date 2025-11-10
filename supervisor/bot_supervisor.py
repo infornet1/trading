@@ -21,6 +21,14 @@ TRADING_ROOT = Path("/var/www/dev/trading")
 SUPERVISOR_LOG = TRADING_ROOT / "supervisor" / "logs" / "supervisor.log"
 SUPERVISOR_LOG.parent.mkdir(parents=True, exist_ok=True)
 
+# Import email notifier
+try:
+    from supervisor_email_notifier import SupervisorEmailNotifier
+    EMAIL_ENABLED = True
+except ImportError:
+    EMAIL_ENABLED = False
+    print("⚠️  Email notifier not available")
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +46,17 @@ class BotSupervisor:
 
     def __init__(self):
         self.trading_root = TRADING_ROOT
+
+        # Initialize email notifier
+        if EMAIL_ENABLED:
+            try:
+                self.email_notifier = SupervisorEmailNotifier()
+            except Exception as e:
+                logger.warning(f"Failed to initialize email notifier: {e}")
+                self.email_notifier = None
+        else:
+            self.email_notifier = None
+
         self.bots = {
             'scalping_v2': {
                 'name': 'Scalping v2',
@@ -151,10 +170,34 @@ class BotSupervisor:
             logger.info(f"   Started {bot['service']}")
 
             logger.info(f"✅ {bot['name']} restarted successfully")
+
+            # Send email notification
+            if self.email_notifier:
+                try:
+                    self.email_notifier.send_crash_alert(
+                        bot_name=bot['name'],
+                        restart_successful=True,
+                        error_details=f"Reason: {reason}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to send email notification: {e}")
+
             return True
 
         except subprocess.CalledProcessError as e:
             logger.error(f"❌ Failed to restart {bot['name']}: {e}")
+
+            # Send failure email
+            if self.email_notifier:
+                try:
+                    self.email_notifier.send_crash_alert(
+                        bot_name=bot['name'],
+                        restart_successful=False,
+                        error_details=f"Error: {str(e)}\nReason: {reason}"
+                    )
+                except Exception as e2:
+                    logger.warning(f"Failed to send email notification: {e2}")
+
             return False
 
     def cleanup_state(self, bot_key: str):
@@ -272,6 +315,15 @@ class BotSupervisor:
             json.dump(report, f, indent=2, default=str)
 
         logger.info(f"   Report saved: {report_file}")
+
+        # Send email report
+        if self.email_notifier:
+            try:
+                logger.info("📧 Sending daily email report...")
+                self.email_notifier.send_daily_report(report)
+                logger.info("   Email report sent successfully")
+            except Exception as e:
+                logger.warning(f"   Failed to send email report: {e}")
 
 
 def main():

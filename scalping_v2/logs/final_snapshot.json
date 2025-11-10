@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-11-10T17:00:59.138975",
+  "timestamp": "2025-11-10T17:49:21.425695",
   "account": {
     "balance": 1049.6858740451187,
     "equity": 1049.6858740451187,
@@ -17,31 +17,31 @@
   },
   "recent_trades": [],
   "system": {
-    "last_update": "2025-11-10T17:00:59.138995",
+    "last_update": "2025-11-10T17:49:21.425719",
     "update_count": 0
   },
   "indicators": {
-    "ema_micro": 105587.63,
-    "ema_fast": 105595.85,
-    "ema_slow": 105638.12,
-    "rsi": 38.65,
-    "stoch_k": 48.0,
-    "stoch_d": 52.95,
-    "volume_ratio": 0.48,
+    "ema_micro": 106001.41,
+    "ema_fast": 106023.9,
+    "ema_slow": 106039.22,
+    "rsi": 33.54,
+    "stoch_k": 9.24,
+    "stoch_d": 16.0,
+    "volume_ratio": 0.43,
     "volume_spike": false,
-    "atr": 83.04,
-    "atr_pct": 0.079,
-    "roc_1": -0.025,
-    "roc_5": -0.062
+    "atr": 119.89,
+    "atr_pct": 0.113,
+    "roc_1": -0.02,
+    "roc_5": -0.126
   },
   "price_action": {
-    "price_change_pct": -0.025,
-    "near_resistance": true,
+    "price_change_pct": -0.02,
+    "near_resistance": false,
     "near_support": true,
     "bullish_pattern": false,
     "bearish_pattern": false,
-    "recent_high": 105734.2,
-    "recent_low": 105517.8
+    "recent_high": 106243.6,
+    "recent_low": 105898.3
   },
   "active_filters": {
     "signal_cooldown_active": true,

@@ -1,0 +1,29 @@
+{
+  "timestamp": "2025-11-10T17:48:12.927784",
+  "market_conditions": {
+    "timestamp": "2025-11-10T17:48:13.894514",
+    "tradeable": true,
+    "regime": "trending",
+    "adx": 38.25755053371978,
+    "volatility": 0.13991875616962174,
+    "btc_price": 105337.2
+  },
+  "bots": {
+    "scalping_v2": {
+      "timestamp": "2025-11-10T17:48:14.161877",
+      "bot_key": "scalping_v2",
+      "running": true,
+      "healthy": true,
+      "last_update": null,
+      "issues": []
+    },
+    "adx_v2": {
+      "timestamp": "2025-11-10T17:48:14.309948",
+      "bot_key": "adx_v2",
+      "running": true,
+      "healthy": true,
+      "last_update": null,
+      "issues": []
+    }
+  }
+}

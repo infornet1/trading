@@ -42,10 +42,16 @@ cat > "$CRON_FILE" << 'EOF'
 15 */6 * * * /usr/bin/python3 /var/www/dev/trading/supervisor/state_manager.py adx_v2 --cleanup >> /var/www/dev/trading/supervisor/logs/cleanup.log 2>&1
 
 # ============================================================
-# DAILY REPORT - Every day at 8 AM
-# Generates comprehensive daily report
+# DAILY EMAIL REPORT - Every day at 8 AM
+# Generates comprehensive daily report and sends via email
 # ============================================================
 0 8 * * * /usr/bin/python3 /var/www/dev/trading/supervisor/bot_supervisor.py --report >> /var/www/dev/trading/supervisor/logs/reports.log 2>&1
+
+# ============================================================
+# WEEKLY DIGEST - Every Monday at 9 AM (optional, commented out)
+# Sends weekly performance summary
+# ============================================================
+# 0 9 * * 1 /usr/bin/python3 /var/www/dev/trading/supervisor/weekly_digest.py >> /var/www/dev/trading/supervisor/logs/weekly.log 2>&1
 
 # ============================================================
 # DISK SPACE CHECK - Every hour

@@ -27,3 +27,18 @@
 2025-11-10 16:52:39,580 - INFO - 🤖 BOT SUPERVISOR - Cycle complete
 2025-11-10 16:52:39,580 - INFO - ================================================================================
 
+2025-11-10 17:48:12,926 - INFO - 📊 Generating supervisor report...
+2025-11-10 17:48:12,927 - INFO - 🔍 Checking market conditions...
+2025-11-10 17:48:14,054 - INFO -    Market Regime: trending
+2025-11-10 17:48:14,056 - INFO -    ADX: 38.26
+2025-11-10 17:48:14,056 - INFO -    BTC Price: $105,337.20
+2025-11-10 17:48:14,056 - INFO -    Tradeable: True
+2025-11-10 17:48:14,056 - INFO - 🏥 Checking health: Scalping v2...
+2025-11-10 17:48:14,171 - INFO -    Running: True
+2025-11-10 17:48:14,171 - INFO -    Healthy: True
+2025-11-10 17:48:14,171 - INFO - 🏥 Checking health: ADX v2...
+2025-11-10 17:48:14,325 - INFO -    Running: True
+2025-11-10 17:48:14,325 - INFO -    Healthy: True
+2025-11-10 17:48:14,325 - INFO -    Report saved: /var/www/dev/trading/supervisor/reports/report_20251110.json
+2025-11-10 17:48:14,326 - INFO - 📧 Sending daily email report...
+2025-11-10 17:48:15,272 - INFO -    Email report sent successfully
