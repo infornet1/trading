@@ -1,0 +1,782 @@
+2025-10-12 10:33:23,580 - INFO - ================================================================================
+2025-10-12 10:33:23,581 - INFO - 🤖 AUTO LABEL MONITOR STARTED
+2025-10-12 10:33:23,581 - INFO - ================================================================================
+2025-10-12 10:33:23,581 - INFO - ⚙️  Configuration:
+2025-10-12 10:33:23,581 - INFO -    Database: signals.db
+2025-10-12 10:33:23,581 - INFO -    Timeout threshold: 1 hours
+2025-10-12 10:33:23,581 - INFO -    Check interval: 60 seconds (1.0 minutes)
+2025-10-12 10:33:23,581 - INFO - ================================================================================
+2025-10-12 10:33:23,581 - INFO - 
+2025-10-12 10:33:23,581 - INFO - 🔄 Check #1 - 2025-10-12 10:33:23
+2025-10-12 10:33:23,588 - INFO - ✅ Labeled 43 signals as TIMEOUT
+2025-10-12 10:33:23,588 - INFO - 📊 Current statistics:
+2025-10-12 10:33:23,589 - INFO -    PENDING: 43
+2025-10-12 10:33:23,589 - INFO -    WIN: 81
+2025-10-12 10:33:23,589 - INFO -    LOSS: 50
+2025-10-12 10:33:23,589 - INFO -    TIMEOUT: 787
+2025-10-12 10:33:23,589 - INFO -    Total labeled this session: 43
+2025-10-12 10:33:23,589 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:33:23,589 - INFO - 
+2025-10-12 10:34:23,590 - INFO - 🔄 Check #2 - 2025-10-12 10:34:23
+2025-10-12 10:34:23,591 - INFO - ✓ No signals to label
+2025-10-12 10:34:23,591 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:34:23,591 - INFO - 
+2025-10-12 10:35:23,591 - INFO - 🔄 Check #3 - 2025-10-12 10:35:23
+2025-10-12 10:35:23,595 - INFO - ✓ No signals to label
+2025-10-12 10:35:23,595 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:35:23,595 - INFO - 
+2025-10-12 10:36:23,595 - INFO - 🔄 Check #4 - 2025-10-12 10:36:23
+2025-10-12 10:36:23,596 - INFO - ✓ No signals to label
+2025-10-12 10:36:23,596 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:36:23,597 - INFO - 
+2025-10-12 10:37:23,597 - INFO - 🔄 Check #5 - 2025-10-12 10:37:23
+2025-10-12 10:37:23,601 - INFO - ✅ Labeled 3 signals as TIMEOUT
+2025-10-12 10:37:23,601 - INFO - 📊 Current statistics:
+2025-10-12 10:37:23,601 - INFO -    PENDING: 44
+2025-10-12 10:37:23,602 - INFO -    WIN: 81
+2025-10-12 10:37:23,602 - INFO -    LOSS: 50
+2025-10-12 10:37:23,602 - INFO -    TIMEOUT: 790
+2025-10-12 10:37:23,602 - INFO -    Total labeled this session: 46
+2025-10-12 10:37:23,602 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:37:23,602 - INFO - 
+2025-10-12 10:38:23,602 - INFO - 🔄 Check #6 - 2025-10-12 10:38:23
+2025-10-12 10:38:23,606 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 10:38:23,607 - INFO - 📊 Current statistics:
+2025-10-12 10:38:23,607 - INFO -    PENDING: 43
+2025-10-12 10:38:23,607 - INFO -    WIN: 81
+2025-10-12 10:38:23,607 - INFO -    LOSS: 50
+2025-10-12 10:38:23,607 - INFO -    TIMEOUT: 791
+2025-10-12 10:38:23,607 - INFO -    Total labeled this session: 47
+2025-10-12 10:38:23,607 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:38:23,607 - INFO - 
+2025-10-12 10:39:23,607 - INFO - 🔄 Check #7 - 2025-10-12 10:39:23
+2025-10-12 10:39:23,615 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 10:39:23,616 - INFO - 📊 Current statistics:
+2025-10-12 10:39:23,616 - INFO -    PENDING: 42
+2025-10-12 10:39:23,616 - INFO -    WIN: 81
+2025-10-12 10:39:23,616 - INFO -    LOSS: 50
+2025-10-12 10:39:23,616 - INFO -    TIMEOUT: 792
+2025-10-12 10:39:23,616 - INFO -    Total labeled this session: 48
+2025-10-12 10:39:23,616 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:39:23,616 - INFO - 
+2025-10-12 10:40:23,616 - INFO - 🔄 Check #8 - 2025-10-12 10:40:23
+2025-10-12 10:40:23,617 - INFO - ✓ No signals to label
+2025-10-12 10:40:23,618 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:40:23,618 - INFO - 
+2025-10-12 10:41:23,618 - INFO - 🔄 Check #9 - 2025-10-12 10:41:23
+2025-10-12 10:41:23,619 - INFO - ✓ No signals to label
+2025-10-12 10:41:23,620 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:41:23,620 - INFO - 
+2025-10-12 10:42:23,620 - INFO - 🔄 Check #10 - 2025-10-12 10:42:23
+2025-10-12 10:42:23,621 - INFO - ✓ No signals to label
+2025-10-12 10:42:23,621 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:42:23,621 - INFO - 
+2025-10-12 10:43:23,622 - INFO - 🔄 Check #11 - 2025-10-12 10:43:23
+2025-10-12 10:43:23,627 - INFO - ✅ Labeled 2 signals as TIMEOUT
+2025-10-12 10:43:23,628 - INFO - 📊 Current statistics:
+2025-10-12 10:43:23,628 - INFO -    PENDING: 42
+2025-10-12 10:43:23,628 - INFO -    WIN: 81
+2025-10-12 10:43:23,628 - INFO -    LOSS: 50
+2025-10-12 10:43:23,628 - INFO -    TIMEOUT: 794
+2025-10-12 10:43:23,628 - INFO -    Total labeled this session: 50
+2025-10-12 10:43:23,628 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:43:23,628 - INFO - 
+2025-10-12 10:44:23,628 - INFO - 🔄 Check #12 - 2025-10-12 10:44:23
+2025-10-12 10:44:23,629 - INFO - ✓ No signals to label
+2025-10-12 10:44:23,629 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:44:23,629 - INFO - 
+2025-10-12 10:45:23,630 - INFO - 🔄 Check #13 - 2025-10-12 10:45:23
+2025-10-12 10:45:23,631 - INFO - ✓ No signals to label
+2025-10-12 10:45:23,631 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:45:23,631 - INFO - 
+2025-10-12 10:46:23,631 - INFO - 🔄 Check #14 - 2025-10-12 10:46:23
+2025-10-12 10:46:23,636 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 10:46:23,637 - INFO - 📊 Current statistics:
+2025-10-12 10:46:23,637 - INFO -    PENDING: 43
+2025-10-12 10:46:23,637 - INFO -    WIN: 81
+2025-10-12 10:46:23,637 - INFO -    LOSS: 50
+2025-10-12 10:46:23,637 - INFO -    TIMEOUT: 795
+2025-10-12 10:46:23,637 - INFO -    Total labeled this session: 51
+2025-10-12 10:46:23,637 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:46:23,637 - INFO - 
+2025-10-12 10:47:23,637 - INFO - 🔄 Check #15 - 2025-10-12 10:47:23
+2025-10-12 10:47:23,641 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 10:47:23,642 - INFO - 📊 Current statistics:
+2025-10-12 10:47:23,642 - INFO -    PENDING: 42
+2025-10-12 10:47:23,642 - INFO -    WIN: 81
+2025-10-12 10:47:23,642 - INFO -    LOSS: 50
+2025-10-12 10:47:23,642 - INFO -    TIMEOUT: 796
+2025-10-12 10:47:23,642 - INFO -    Total labeled this session: 52
+2025-10-12 10:47:23,642 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:47:23,643 - INFO - 
+2025-10-12 10:48:23,643 - INFO - 🔄 Check #16 - 2025-10-12 10:48:23
+2025-10-12 10:48:23,644 - INFO - ✓ No signals to label
+2025-10-12 10:48:23,645 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:48:23,645 - INFO - 
+2025-10-12 10:49:23,645 - INFO - 🔄 Check #17 - 2025-10-12 10:49:23
+2025-10-12 10:49:23,649 - INFO - ✅ Labeled 2 signals as TIMEOUT
+2025-10-12 10:49:23,650 - INFO - 📊 Current statistics:
+2025-10-12 10:49:23,650 - INFO -    PENDING: 42
+2025-10-12 10:49:23,650 - INFO -    WIN: 81
+2025-10-12 10:49:23,650 - INFO -    LOSS: 50
+2025-10-12 10:49:23,650 - INFO -    TIMEOUT: 798
+2025-10-12 10:49:23,650 - INFO -    Total labeled this session: 54
+2025-10-12 10:49:23,650 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:49:23,650 - INFO - 
+2025-10-12 10:50:23,650 - INFO - 🔄 Check #18 - 2025-10-12 10:50:23
+2025-10-12 10:50:23,652 - INFO - ✓ No signals to label
+2025-10-12 10:50:23,652 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:50:23,652 - INFO - 
+2025-10-12 10:51:23,653 - INFO - 🔄 Check #19 - 2025-10-12 10:51:23
+2025-10-12 10:51:23,654 - INFO - ✓ No signals to label
+2025-10-12 10:51:23,654 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:51:23,654 - INFO - 
+2025-10-12 10:52:23,654 - INFO - 🔄 Check #20 - 2025-10-12 10:52:23
+2025-10-12 10:52:23,658 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 10:52:23,659 - INFO - 📊 Current statistics:
+2025-10-12 10:52:23,659 - INFO -    PENDING: 42
+2025-10-12 10:52:23,659 - INFO -    WIN: 81
+2025-10-12 10:52:23,659 - INFO -    LOSS: 50
+2025-10-12 10:52:23,659 - INFO -    TIMEOUT: 799
+2025-10-12 10:52:23,659 - INFO -    Total labeled this session: 55
+2025-10-12 10:52:23,659 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:52:23,659 - INFO - 
+2025-10-12 10:53:23,660 - INFO - 🔄 Check #21 - 2025-10-12 10:53:23
+2025-10-12 10:53:23,661 - INFO - ✓ No signals to label
+2025-10-12 10:53:23,661 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:53:23,661 - INFO - 
+2025-10-12 10:54:23,661 - INFO - 🔄 Check #22 - 2025-10-12 10:54:23
+2025-10-12 10:54:23,665 - INFO - ✅ Labeled 2 signals as TIMEOUT
+2025-10-12 10:54:23,666 - INFO - 📊 Current statistics:
+2025-10-12 10:54:23,666 - INFO -    PENDING: 40
+2025-10-12 10:54:23,667 - INFO -    WIN: 81
+2025-10-12 10:54:23,667 - INFO -    LOSS: 50
+2025-10-12 10:54:23,667 - INFO -    TIMEOUT: 801
+2025-10-12 10:54:23,667 - INFO -    Total labeled this session: 57
+2025-10-12 10:54:23,667 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:54:23,667 - INFO - 
+2025-10-12 10:55:23,667 - INFO - 🔄 Check #23 - 2025-10-12 10:55:23
+2025-10-12 10:55:23,671 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 10:55:23,672 - INFO - 📊 Current statistics:
+2025-10-12 10:55:23,672 - INFO -    PENDING: 40
+2025-10-12 10:55:23,672 - INFO -    WIN: 81
+2025-10-12 10:55:23,672 - INFO -    LOSS: 50
+2025-10-12 10:55:23,672 - INFO -    TIMEOUT: 802
+2025-10-12 10:55:23,672 - INFO -    Total labeled this session: 58
+2025-10-12 10:55:23,672 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:55:23,672 - INFO - 
+2025-10-12 10:56:23,673 - INFO - 🔄 Check #24 - 2025-10-12 10:56:23
+2025-10-12 10:56:23,674 - INFO - ✓ No signals to label
+2025-10-12 10:56:23,674 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:56:23,674 - INFO - 
+2025-10-12 10:57:23,675 - INFO - 🔄 Check #25 - 2025-10-12 10:57:23
+2025-10-12 10:57:23,679 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 10:57:23,680 - INFO - 📊 Current statistics:
+2025-10-12 10:57:23,680 - INFO -    PENDING: 41
+2025-10-12 10:57:23,680 - INFO -    WIN: 81
+2025-10-12 10:57:23,680 - INFO -    LOSS: 50
+2025-10-12 10:57:23,680 - INFO -    TIMEOUT: 803
+2025-10-12 10:57:23,680 - INFO -    Total labeled this session: 59
+2025-10-12 10:57:23,680 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:57:23,680 - INFO - 
+2025-10-12 10:58:23,680 - INFO - 🔄 Check #26 - 2025-10-12 10:58:23
+2025-10-12 10:58:23,684 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 10:58:23,684 - INFO - 📊 Current statistics:
+2025-10-12 10:58:23,684 - INFO -    PENDING: 40
+2025-10-12 10:58:23,684 - INFO -    WIN: 81
+2025-10-12 10:58:23,684 - INFO -    LOSS: 50
+2025-10-12 10:58:23,684 - INFO -    TIMEOUT: 804
+2025-10-12 10:58:23,684 - INFO -    Total labeled this session: 60
+2025-10-12 10:58:23,685 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:58:23,685 - INFO - 
+2025-10-12 10:59:23,685 - INFO - 🔄 Check #27 - 2025-10-12 10:59:23
+2025-10-12 10:59:23,688 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 10:59:23,689 - INFO - 📊 Current statistics:
+2025-10-12 10:59:23,689 - INFO -    PENDING: 39
+2025-10-12 10:59:23,689 - INFO -    WIN: 81
+2025-10-12 10:59:23,689 - INFO -    LOSS: 50
+2025-10-12 10:59:23,689 - INFO -    TIMEOUT: 805
+2025-10-12 10:59:23,689 - INFO -    Total labeled this session: 61
+2025-10-12 10:59:23,689 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 10:59:23,689 - INFO - 
+2025-10-12 11:00:23,690 - INFO - 🔄 Check #28 - 2025-10-12 11:00:23
+2025-10-12 11:00:23,695 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:00:23,696 - INFO - 📊 Current statistics:
+2025-10-12 11:00:23,696 - INFO -    PENDING: 39
+2025-10-12 11:00:23,696 - INFO -    WIN: 81
+2025-10-12 11:00:23,696 - INFO -    LOSS: 50
+2025-10-12 11:00:23,696 - INFO -    TIMEOUT: 806
+2025-10-12 11:00:23,696 - INFO -    Total labeled this session: 62
+2025-10-12 11:00:23,696 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:00:23,696 - INFO - 
+2025-10-12 11:01:23,696 - INFO - 🔄 Check #29 - 2025-10-12 11:01:23
+2025-10-12 11:01:23,700 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:01:23,701 - INFO - 📊 Current statistics:
+2025-10-12 11:01:23,701 - INFO -    PENDING: 41
+2025-10-12 11:01:23,701 - INFO -    WIN: 81
+2025-10-12 11:01:23,701 - INFO -    LOSS: 50
+2025-10-12 11:01:23,701 - INFO -    TIMEOUT: 807
+2025-10-12 11:01:23,701 - INFO -    Total labeled this session: 63
+2025-10-12 11:01:23,701 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:01:23,701 - INFO - 
+2025-10-12 11:02:23,702 - INFO - 🔄 Check #30 - 2025-10-12 11:02:23
+2025-10-12 11:02:23,703 - INFO - ✓ No signals to label
+2025-10-12 11:02:23,703 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:02:23,703 - INFO - 
+2025-10-12 11:03:23,703 - INFO - 🔄 Check #31 - 2025-10-12 11:03:23
+2025-10-12 11:03:23,710 - INFO - ✅ Labeled 3 signals as TIMEOUT
+2025-10-12 11:03:23,711 - INFO - 📊 Current statistics:
+2025-10-12 11:03:23,711 - INFO -    PENDING: 39
+2025-10-12 11:03:23,711 - INFO -    WIN: 81
+2025-10-12 11:03:23,711 - INFO -    LOSS: 50
+2025-10-12 11:03:23,711 - INFO -    TIMEOUT: 810
+2025-10-12 11:03:23,711 - INFO -    Total labeled this session: 66
+2025-10-12 11:03:23,711 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:03:23,711 - INFO - 
+2025-10-12 11:04:23,711 - INFO - 🔄 Check #32 - 2025-10-12 11:04:23
+2025-10-12 11:04:23,712 - INFO - ✓ No signals to label
+2025-10-12 11:04:23,713 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:04:23,713 - INFO - 
+2025-10-12 11:05:23,713 - INFO - 🔄 Check #33 - 2025-10-12 11:05:23
+2025-10-12 11:05:23,714 - INFO - ✓ No signals to label
+2025-10-12 11:05:23,714 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:05:23,714 - INFO - 
+2025-10-12 11:06:23,715 - INFO - 🔄 Check #34 - 2025-10-12 11:06:23
+2025-10-12 11:06:23,716 - INFO - ✓ No signals to label
+2025-10-12 11:06:23,716 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:06:23,716 - INFO - 
+2025-10-12 11:07:23,716 - INFO - 🔄 Check #35 - 2025-10-12 11:07:23
+2025-10-12 11:07:23,720 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:07:23,721 - INFO - 📊 Current statistics:
+2025-10-12 11:07:23,721 - INFO -    PENDING: 39
+2025-10-12 11:07:23,721 - INFO -    WIN: 81
+2025-10-12 11:07:23,721 - INFO -    LOSS: 50
+2025-10-12 11:07:23,721 - INFO -    TIMEOUT: 811
+2025-10-12 11:07:23,721 - INFO -    Total labeled this session: 67
+2025-10-12 11:07:23,721 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:07:23,721 - INFO - 
+2025-10-12 11:08:23,721 - INFO - 🔄 Check #36 - 2025-10-12 11:08:23
+2025-10-12 11:08:23,726 - INFO - ✅ Labeled 2 signals as TIMEOUT
+2025-10-12 11:08:23,726 - INFO - 📊 Current statistics:
+2025-10-12 11:08:23,726 - INFO -    PENDING: 38
+2025-10-12 11:08:23,726 - INFO -    WIN: 81
+2025-10-12 11:08:23,726 - INFO -    LOSS: 50
+2025-10-12 11:08:23,726 - INFO -    TIMEOUT: 813
+2025-10-12 11:08:23,727 - INFO -    Total labeled this session: 69
+2025-10-12 11:08:23,727 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:08:23,727 - INFO - 
+2025-10-12 11:09:23,727 - INFO - 🔄 Check #37 - 2025-10-12 11:09:23
+2025-10-12 11:09:23,728 - INFO - ✓ No signals to label
+2025-10-12 11:09:23,728 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:09:23,728 - INFO - 
+2025-10-12 11:10:23,728 - INFO - 🔄 Check #38 - 2025-10-12 11:10:23
+2025-10-12 11:10:23,730 - INFO - ✓ No signals to label
+2025-10-12 11:10:23,730 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:10:23,730 - INFO - 
+2025-10-12 11:11:23,730 - INFO - 🔄 Check #39 - 2025-10-12 11:11:23
+2025-10-12 11:11:23,734 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:11:23,735 - INFO - 📊 Current statistics:
+2025-10-12 11:11:23,735 - INFO -    PENDING: 38
+2025-10-12 11:11:23,735 - INFO -    WIN: 81
+2025-10-12 11:11:23,735 - INFO -    LOSS: 50
+2025-10-12 11:11:23,735 - INFO -    TIMEOUT: 814
+2025-10-12 11:11:23,735 - INFO -    Total labeled this session: 70
+2025-10-12 11:11:23,735 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:11:23,735 - INFO - 
+2025-10-12 11:12:23,736 - INFO - 🔄 Check #40 - 2025-10-12 11:12:23
+2025-10-12 11:12:23,737 - INFO - ✓ No signals to label
+2025-10-12 11:12:23,737 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:12:23,737 - INFO - 
+2025-10-12 11:13:23,737 - INFO - 🔄 Check #41 - 2025-10-12 11:13:23
+2025-10-12 11:13:23,741 - INFO - ✅ Labeled 3 signals as TIMEOUT
+2025-10-12 11:13:23,741 - INFO - 📊 Current statistics:
+2025-10-12 11:13:23,741 - INFO -    PENDING: 38
+2025-10-12 11:13:23,741 - INFO -    WIN: 81
+2025-10-12 11:13:23,741 - INFO -    LOSS: 50
+2025-10-12 11:13:23,741 - INFO -    TIMEOUT: 817
+2025-10-12 11:13:23,741 - INFO -    Total labeled this session: 73
+2025-10-12 11:13:23,742 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:13:23,742 - INFO - 
+2025-10-12 11:14:23,742 - INFO - 🔄 Check #42 - 2025-10-12 11:14:23
+2025-10-12 11:14:23,746 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:14:23,747 - INFO - 📊 Current statistics:
+2025-10-12 11:14:23,747 - INFO -    PENDING: 38
+2025-10-12 11:14:23,748 - INFO -    WIN: 81
+2025-10-12 11:14:23,748 - INFO -    LOSS: 50
+2025-10-12 11:14:23,748 - INFO -    TIMEOUT: 818
+2025-10-12 11:14:23,748 - INFO -    Total labeled this session: 74
+2025-10-12 11:14:23,748 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:14:23,748 - INFO - 
+2025-10-12 11:15:23,748 - INFO - 🔄 Check #43 - 2025-10-12 11:15:23
+2025-10-12 11:15:23,749 - INFO - ✓ No signals to label
+2025-10-12 11:15:23,749 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:15:23,749 - INFO - 
+2025-10-12 11:16:23,750 - INFO - 🔄 Check #44 - 2025-10-12 11:16:23
+2025-10-12 11:16:23,751 - INFO - ✓ No signals to label
+2025-10-12 11:16:23,751 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:16:23,751 - INFO - 
+2025-10-12 11:17:23,751 - INFO - 🔄 Check #45 - 2025-10-12 11:17:23
+2025-10-12 11:17:23,753 - INFO - ✓ No signals to label
+2025-10-12 11:17:23,753 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:17:23,753 - INFO - 
+2025-10-12 11:18:23,753 - INFO - 🔄 Check #46 - 2025-10-12 11:18:23
+2025-10-12 11:18:23,757 - INFO - ✅ Labeled 3 signals as TIMEOUT
+2025-10-12 11:18:23,757 - INFO - 📊 Current statistics:
+2025-10-12 11:18:23,757 - INFO -    PENDING: 36
+2025-10-12 11:18:23,758 - INFO -    WIN: 81
+2025-10-12 11:18:23,758 - INFO -    LOSS: 50
+2025-10-12 11:18:23,758 - INFO -    TIMEOUT: 821
+2025-10-12 11:18:23,758 - INFO -    Total labeled this session: 77
+2025-10-12 11:18:23,758 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:18:23,758 - INFO - 
+2025-10-12 11:19:23,758 - INFO - 🔄 Check #47 - 2025-10-12 11:19:23
+2025-10-12 11:19:23,759 - INFO - ✓ No signals to label
+2025-10-12 11:19:23,759 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:19:23,759 - INFO - 
+2025-10-12 11:20:23,760 - INFO - 🔄 Check #48 - 2025-10-12 11:20:23
+2025-10-12 11:20:23,766 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:20:23,767 - INFO - 📊 Current statistics:
+2025-10-12 11:20:23,767 - INFO -    PENDING: 37
+2025-10-12 11:20:23,767 - INFO -    WIN: 81
+2025-10-12 11:20:23,767 - INFO -    LOSS: 50
+2025-10-12 11:20:23,767 - INFO -    TIMEOUT: 822
+2025-10-12 11:20:23,767 - INFO -    Total labeled this session: 78
+2025-10-12 11:20:23,767 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:20:23,767 - INFO - 
+2025-10-12 11:21:23,767 - INFO - 🔄 Check #49 - 2025-10-12 11:21:23
+2025-10-12 11:21:23,768 - INFO - ✓ No signals to label
+2025-10-12 11:21:23,768 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:21:23,768 - INFO - 
+2025-10-12 11:22:23,769 - INFO - 🔄 Check #50 - 2025-10-12 11:22:23
+2025-10-12 11:22:23,770 - INFO - ✓ No signals to label
+2025-10-12 11:22:23,770 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:22:23,770 - INFO - 
+2025-10-12 11:23:23,770 - INFO - 🔄 Check #51 - 2025-10-12 11:23:23
+2025-10-12 11:23:23,775 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:23:23,776 - INFO - 📊 Current statistics:
+2025-10-12 11:23:23,776 - INFO -    PENDING: 36
+2025-10-12 11:23:23,776 - INFO -    WIN: 81
+2025-10-12 11:23:23,776 - INFO -    LOSS: 50
+2025-10-12 11:23:23,776 - INFO -    TIMEOUT: 823
+2025-10-12 11:23:23,776 - INFO -    Total labeled this session: 79
+2025-10-12 11:23:23,776 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:23:23,776 - INFO - 
+2025-10-12 11:24:23,777 - INFO - 🔄 Check #52 - 2025-10-12 11:24:23
+2025-10-12 11:24:23,781 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:24:23,782 - INFO - 📊 Current statistics:
+2025-10-12 11:24:23,782 - INFO -    PENDING: 37
+2025-10-12 11:24:23,782 - INFO -    WIN: 81
+2025-10-12 11:24:23,782 - INFO -    LOSS: 50
+2025-10-12 11:24:23,782 - INFO -    TIMEOUT: 824
+2025-10-12 11:24:23,782 - INFO -    Total labeled this session: 80
+2025-10-12 11:24:23,782 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:24:23,782 - INFO - 
+2025-10-12 11:25:23,782 - INFO - 🔄 Check #53 - 2025-10-12 11:25:23
+2025-10-12 11:25:23,783 - INFO - ✓ No signals to label
+2025-10-12 11:25:23,784 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:25:23,784 - INFO - 
+2025-10-12 11:26:23,784 - INFO - 🔄 Check #54 - 2025-10-12 11:26:23
+2025-10-12 11:26:23,785 - INFO - ✓ No signals to label
+2025-10-12 11:26:23,785 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:26:23,785 - INFO - 
+2025-10-12 11:27:23,786 - INFO - 🔄 Check #55 - 2025-10-12 11:27:23
+2025-10-12 11:27:23,789 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:27:23,790 - INFO - 📊 Current statistics:
+2025-10-12 11:27:23,790 - INFO -    PENDING: 39
+2025-10-12 11:27:23,790 - INFO -    WIN: 81
+2025-10-12 11:27:23,790 - INFO -    LOSS: 50
+2025-10-12 11:27:23,790 - INFO -    TIMEOUT: 825
+2025-10-12 11:27:23,790 - INFO -    Total labeled this session: 81
+2025-10-12 11:27:23,790 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:27:23,790 - INFO - 
+2025-10-12 11:28:23,790 - INFO - 🔄 Check #56 - 2025-10-12 11:28:23
+2025-10-12 11:28:23,793 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:28:23,794 - INFO - 📊 Current statistics:
+2025-10-12 11:28:23,794 - INFO -    PENDING: 38
+2025-10-12 11:28:23,794 - INFO -    WIN: 81
+2025-10-12 11:28:23,794 - INFO -    LOSS: 50
+2025-10-12 11:28:23,794 - INFO -    TIMEOUT: 826
+2025-10-12 11:28:23,794 - INFO -    Total labeled this session: 82
+2025-10-12 11:28:23,794 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:28:23,794 - INFO - 
+2025-10-12 11:29:23,795 - INFO - 🔄 Check #57 - 2025-10-12 11:29:23
+2025-10-12 11:29:23,798 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:29:23,799 - INFO - 📊 Current statistics:
+2025-10-12 11:29:23,799 - INFO -    PENDING: 37
+2025-10-12 11:29:23,799 - INFO -    WIN: 81
+2025-10-12 11:29:23,799 - INFO -    LOSS: 50
+2025-10-12 11:29:23,799 - INFO -    TIMEOUT: 827
+2025-10-12 11:29:23,799 - INFO -    Total labeled this session: 83
+2025-10-12 11:29:23,799 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:29:23,799 - INFO - 
+2025-10-12 11:30:23,799 - INFO - 🔄 Check #58 - 2025-10-12 11:30:23
+2025-10-12 11:30:23,803 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:30:23,804 - INFO - 📊 Current statistics:
+2025-10-12 11:30:23,804 - INFO -    PENDING: 38
+2025-10-12 11:30:23,805 - INFO -    WIN: 81
+2025-10-12 11:30:23,805 - INFO -    LOSS: 50
+2025-10-12 11:30:23,805 - INFO -    TIMEOUT: 828
+2025-10-12 11:30:23,805 - INFO -    Total labeled this session: 84
+2025-10-12 11:30:23,805 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:30:23,805 - INFO - 
+2025-10-12 11:31:23,805 - INFO - 🔄 Check #59 - 2025-10-12 11:31:23
+2025-10-12 11:31:23,810 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:31:23,810 - INFO - 📊 Current statistics:
+2025-10-12 11:31:23,810 - INFO -    PENDING: 38
+2025-10-12 11:31:23,811 - INFO -    WIN: 81
+2025-10-12 11:31:23,811 - INFO -    LOSS: 50
+2025-10-12 11:31:23,811 - INFO -    TIMEOUT: 829
+2025-10-12 11:31:23,811 - INFO -    Total labeled this session: 85
+2025-10-12 11:31:23,811 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:31:23,811 - INFO - 
+2025-10-12 11:32:23,811 - INFO - 🔄 Check #60 - 2025-10-12 11:32:23
+2025-10-12 11:32:23,812 - INFO - ✓ No signals to label
+2025-10-12 11:32:23,812 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:32:23,812 - INFO - 
+2025-10-12 11:33:23,812 - INFO - 🔄 Check #61 - 2025-10-12 11:33:23
+2025-10-12 11:33:23,815 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:33:23,816 - INFO - 📊 Current statistics:
+2025-10-12 11:33:23,816 - INFO -    PENDING: 37
+2025-10-12 11:33:23,816 - INFO -    WIN: 81
+2025-10-12 11:33:23,816 - INFO -    LOSS: 50
+2025-10-12 11:33:23,816 - INFO -    TIMEOUT: 830
+2025-10-12 11:33:23,816 - INFO -    Total labeled this session: 86
+2025-10-12 11:33:23,816 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:33:23,817 - INFO - 
+2025-10-12 11:34:23,817 - INFO - 🔄 Check #62 - 2025-10-12 11:34:23
+2025-10-12 11:34:23,821 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:34:23,822 - INFO - 📊 Current statistics:
+2025-10-12 11:34:23,822 - INFO -    PENDING: 36
+2025-10-12 11:34:23,822 - INFO -    WIN: 81
+2025-10-12 11:34:23,822 - INFO -    LOSS: 50
+2025-10-12 11:34:23,822 - INFO -    TIMEOUT: 831
+2025-10-12 11:34:23,822 - INFO -    Total labeled this session: 87
+2025-10-12 11:34:23,822 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:34:23,822 - INFO - 
+2025-10-12 11:35:23,822 - INFO - 🔄 Check #63 - 2025-10-12 11:35:23
+2025-10-12 11:35:23,824 - INFO - ✓ No signals to label
+2025-10-12 11:35:23,824 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:35:23,824 - INFO - 
+2025-10-12 11:36:23,824 - INFO - 🔄 Check #64 - 2025-10-12 11:36:23
+2025-10-12 11:36:23,829 - INFO - ✅ Labeled 2 signals as TIMEOUT
+2025-10-12 11:36:23,830 - INFO - 📊 Current statistics:
+2025-10-12 11:36:23,830 - INFO -    PENDING: 35
+2025-10-12 11:36:23,830 - INFO -    WIN: 81
+2025-10-12 11:36:23,830 - INFO -    LOSS: 50
+2025-10-12 11:36:23,830 - INFO -    TIMEOUT: 833
+2025-10-12 11:36:23,830 - INFO -    Total labeled this session: 89
+2025-10-12 11:36:23,830 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:36:23,830 - INFO - 
+2025-10-12 11:37:23,830 - INFO - 🔄 Check #65 - 2025-10-12 11:37:23
+2025-10-12 11:37:23,835 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:37:23,836 - INFO - 📊 Current statistics:
+2025-10-12 11:37:23,836 - INFO -    PENDING: 37
+2025-10-12 11:37:23,836 - INFO -    WIN: 81
+2025-10-12 11:37:23,836 - INFO -    LOSS: 50
+2025-10-12 11:37:23,836 - INFO -    TIMEOUT: 834
+2025-10-12 11:37:23,836 - INFO -    Total labeled this session: 90
+2025-10-12 11:37:23,836 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:37:23,836 - INFO - 
+2025-10-12 11:38:23,836 - INFO - 🔄 Check #66 - 2025-10-12 11:38:23
+2025-10-12 11:38:23,837 - INFO - ✓ No signals to label
+2025-10-12 11:38:23,837 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:38:23,837 - INFO - 
+2025-10-12 11:39:23,841 - INFO - 🔄 Check #67 - 2025-10-12 11:39:23
+2025-10-12 11:39:23,842 - INFO - ✓ No signals to label
+2025-10-12 11:39:23,842 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:39:23,842 - INFO - 
+2025-10-12 11:40:23,842 - INFO - 🔄 Check #68 - 2025-10-12 11:40:23
+2025-10-12 11:40:23,843 - INFO - ✓ No signals to label
+2025-10-12 11:40:23,843 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:40:23,843 - INFO - 
+2025-10-12 11:41:23,843 - INFO - 🔄 Check #69 - 2025-10-12 11:41:23
+2025-10-12 11:41:23,845 - INFO - ✓ No signals to label
+2025-10-12 11:41:23,845 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:41:23,845 - INFO - 
+2025-10-12 11:42:23,845 - INFO - 🔄 Check #70 - 2025-10-12 11:42:23
+2025-10-12 11:42:23,846 - INFO - ✓ No signals to label
+2025-10-12 11:42:23,846 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:42:23,846 - INFO - 
+2025-10-12 11:43:23,847 - INFO - 🔄 Check #71 - 2025-10-12 11:43:23
+2025-10-12 11:43:23,851 - INFO - ✅ Labeled 2 signals as TIMEOUT
+2025-10-12 11:43:23,852 - INFO - 📊 Current statistics:
+2025-10-12 11:43:23,852 - INFO -    PENDING: 40
+2025-10-12 11:43:23,852 - INFO -    WIN: 81
+2025-10-12 11:43:23,852 - INFO -    LOSS: 50
+2025-10-12 11:43:23,852 - INFO -    TIMEOUT: 836
+2025-10-12 11:43:23,852 - INFO -    Total labeled this session: 92
+2025-10-12 11:43:23,852 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:43:23,852 - INFO - 
+2025-10-12 11:44:23,853 - INFO - 🔄 Check #72 - 2025-10-12 11:44:23
+2025-10-12 11:44:23,857 - INFO - ✅ Labeled 2 signals as TIMEOUT
+2025-10-12 11:44:23,858 - INFO - 📊 Current statistics:
+2025-10-12 11:44:23,858 - INFO -    PENDING: 38
+2025-10-12 11:44:23,858 - INFO -    WIN: 81
+2025-10-12 11:44:23,858 - INFO -    LOSS: 50
+2025-10-12 11:44:23,858 - INFO -    TIMEOUT: 838
+2025-10-12 11:44:23,858 - INFO -    Total labeled this session: 94
+2025-10-12 11:44:23,858 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:44:23,858 - INFO - 
+2025-10-12 11:45:23,859 - INFO - 🔄 Check #73 - 2025-10-12 11:45:23
+2025-10-12 11:45:23,860 - INFO - ✓ No signals to label
+2025-10-12 11:45:23,860 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:45:23,860 - INFO - 
+2025-10-12 11:46:23,861 - INFO - 🔄 Check #74 - 2025-10-12 11:46:23
+2025-10-12 11:46:23,862 - INFO - ✓ No signals to label
+2025-10-12 11:46:23,862 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:46:23,862 - INFO - 
+2025-10-12 11:47:23,862 - INFO - 🔄 Check #75 - 2025-10-12 11:47:23
+2025-10-12 11:47:23,864 - INFO - ✓ No signals to label
+2025-10-12 11:47:23,864 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:47:23,864 - INFO - 
+2025-10-12 11:48:23,864 - INFO - 🔄 Check #76 - 2025-10-12 11:48:23
+2025-10-12 11:48:23,869 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:48:23,870 - INFO - 📊 Current statistics:
+2025-10-12 11:48:23,870 - INFO -    PENDING: 39
+2025-10-12 11:48:23,870 - INFO -    WIN: 81
+2025-10-12 11:48:23,871 - INFO -    LOSS: 50
+2025-10-12 11:48:23,871 - INFO -    TIMEOUT: 839
+2025-10-12 11:48:23,871 - INFO -    Total labeled this session: 95
+2025-10-12 11:48:23,871 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:48:23,871 - INFO - 
+2025-10-12 11:49:23,871 - INFO - 🔄 Check #77 - 2025-10-12 11:49:23
+2025-10-12 11:49:23,876 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:49:23,877 - INFO - 📊 Current statistics:
+2025-10-12 11:49:23,877 - INFO -    PENDING: 40
+2025-10-12 11:49:23,877 - INFO -    WIN: 81
+2025-10-12 11:49:23,877 - INFO -    LOSS: 50
+2025-10-12 11:49:23,877 - INFO -    TIMEOUT: 840
+2025-10-12 11:49:23,877 - INFO -    Total labeled this session: 96
+2025-10-12 11:49:23,877 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:49:23,877 - INFO - 
+2025-10-12 11:50:23,878 - INFO - 🔄 Check #78 - 2025-10-12 11:50:23
+2025-10-12 11:50:23,879 - INFO - ✓ No signals to label
+2025-10-12 11:50:23,879 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:50:23,879 - INFO - 
+2025-10-12 11:51:23,879 - INFO - 🔄 Check #79 - 2025-10-12 11:51:23
+2025-10-12 11:51:23,887 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:51:23,888 - INFO - 📊 Current statistics:
+2025-10-12 11:51:23,888 - INFO -    PENDING: 40
+2025-10-12 11:51:23,888 - INFO -    WIN: 81
+2025-10-12 11:51:23,888 - INFO -    LOSS: 50
+2025-10-12 11:51:23,888 - INFO -    TIMEOUT: 841
+2025-10-12 11:51:23,888 - INFO -    Total labeled this session: 97
+2025-10-12 11:51:23,888 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:51:23,888 - INFO - 
+2025-10-12 11:52:23,889 - INFO - 🔄 Check #80 - 2025-10-12 11:52:23
+2025-10-12 11:52:23,890 - INFO - ✓ No signals to label
+2025-10-12 11:52:23,890 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:52:23,890 - INFO - 
+2025-10-12 11:53:23,890 - INFO - 🔄 Check #81 - 2025-10-12 11:53:23
+2025-10-12 11:53:23,892 - INFO - ✓ No signals to label
+2025-10-12 11:53:23,892 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:53:23,892 - INFO - 
+2025-10-12 11:54:23,892 - INFO - 🔄 Check #82 - 2025-10-12 11:54:23
+2025-10-12 11:54:23,894 - INFO - ✓ No signals to label
+2025-10-12 11:54:23,894 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:54:23,894 - INFO - 
+2025-10-12 11:55:23,894 - INFO - 🔄 Check #83 - 2025-10-12 11:55:23
+2025-10-12 11:55:23,900 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:55:23,901 - INFO - 📊 Current statistics:
+2025-10-12 11:55:23,902 - INFO -    PENDING: 42
+2025-10-12 11:55:23,902 - INFO -    WIN: 81
+2025-10-12 11:55:23,902 - INFO -    LOSS: 50
+2025-10-12 11:55:23,902 - INFO -    TIMEOUT: 842
+2025-10-12 11:55:23,902 - INFO -    Total labeled this session: 98
+2025-10-12 11:55:23,902 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:55:23,902 - INFO - 
+2025-10-12 11:56:23,902 - INFO - 🔄 Check #84 - 2025-10-12 11:56:23
+2025-10-12 11:56:23,908 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:56:23,909 - INFO - 📊 Current statistics:
+2025-10-12 11:56:23,909 - INFO -    PENDING: 41
+2025-10-12 11:56:23,909 - INFO -    WIN: 81
+2025-10-12 11:56:23,910 - INFO -    LOSS: 50
+2025-10-12 11:56:23,910 - INFO -    TIMEOUT: 843
+2025-10-12 11:56:23,910 - INFO -    Total labeled this session: 99
+2025-10-12 11:56:23,910 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:56:23,910 - INFO - 
+2025-10-12 11:57:23,910 - INFO - 🔄 Check #85 - 2025-10-12 11:57:23
+2025-10-12 11:57:23,915 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 11:57:23,916 - INFO - 📊 Current statistics:
+2025-10-12 11:57:23,916 - INFO -    PENDING: 40
+2025-10-12 11:57:23,916 - INFO -    WIN: 81
+2025-10-12 11:57:23,916 - INFO -    LOSS: 50
+2025-10-12 11:57:23,916 - INFO -    TIMEOUT: 844
+2025-10-12 11:57:23,916 - INFO -    Total labeled this session: 100
+2025-10-12 11:57:23,916 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:57:23,916 - INFO - 
+2025-10-12 11:58:23,916 - INFO - 🔄 Check #86 - 2025-10-12 11:58:23
+2025-10-12 11:58:23,917 - INFO - ✓ No signals to label
+2025-10-12 11:58:23,917 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:58:23,917 - INFO - 
+2025-10-12 11:59:23,918 - INFO - 🔄 Check #87 - 2025-10-12 11:59:23
+2025-10-12 11:59:23,919 - INFO - ✓ No signals to label
+2025-10-12 11:59:23,919 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 11:59:23,919 - INFO - 
+2025-10-12 12:00:23,920 - INFO - 🔄 Check #88 - 2025-10-12 12:00:23
+2025-10-12 12:00:23,923 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 12:00:23,924 - INFO - 📊 Current statistics:
+2025-10-12 12:00:23,924 - INFO -    PENDING: 43
+2025-10-12 12:00:23,924 - INFO -    WIN: 81
+2025-10-12 12:00:23,924 - INFO -    LOSS: 50
+2025-10-12 12:00:23,924 - INFO -    TIMEOUT: 845
+2025-10-12 12:00:23,924 - INFO -    Total labeled this session: 101
+2025-10-12 12:00:23,924 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:00:23,924 - INFO - 
+2025-10-12 12:01:23,925 - INFO - 🔄 Check #89 - 2025-10-12 12:01:23
+2025-10-12 12:01:23,931 - INFO - ✅ Labeled 3 signals as TIMEOUT
+2025-10-12 12:01:23,932 - INFO - 📊 Current statistics:
+2025-10-12 12:01:23,932 - INFO -    PENDING: 40
+2025-10-12 12:01:23,932 - INFO -    WIN: 81
+2025-10-12 12:01:23,932 - INFO -    LOSS: 50
+2025-10-12 12:01:23,932 - INFO -    TIMEOUT: 848
+2025-10-12 12:01:23,932 - INFO -    Total labeled this session: 104
+2025-10-12 12:01:23,932 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:01:23,932 - INFO - 
+2025-10-12 12:02:23,932 - INFO - 🔄 Check #90 - 2025-10-12 12:02:23
+2025-10-12 12:02:23,934 - INFO - ✓ No signals to label
+2025-10-12 12:02:23,934 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:02:23,934 - INFO - 
+2025-10-12 12:03:23,934 - INFO - 🔄 Check #91 - 2025-10-12 12:03:23
+2025-10-12 12:03:23,939 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 12:03:23,940 - INFO - 📊 Current statistics:
+2025-10-12 12:03:23,940 - INFO -    PENDING: 40
+2025-10-12 12:03:23,940 - INFO -    WIN: 81
+2025-10-12 12:03:23,940 - INFO -    LOSS: 50
+2025-10-12 12:03:23,940 - INFO -    TIMEOUT: 849
+2025-10-12 12:03:23,940 - INFO -    Total labeled this session: 105
+2025-10-12 12:03:23,940 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:03:23,940 - INFO - 
+2025-10-12 12:04:23,941 - INFO - 🔄 Check #92 - 2025-10-12 12:04:23
+2025-10-12 12:04:23,942 - INFO - ✓ No signals to label
+2025-10-12 12:04:23,942 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:04:23,942 - INFO - 
+2025-10-12 12:05:23,942 - INFO - 🔄 Check #93 - 2025-10-12 12:05:23
+2025-10-12 12:05:23,943 - INFO - ✓ No signals to label
+2025-10-12 12:05:23,943 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:05:23,943 - INFO - 
+2025-10-12 12:06:23,943 - INFO - 🔄 Check #94 - 2025-10-12 12:06:23
+2025-10-12 12:06:23,945 - INFO - ✓ No signals to label
+2025-10-12 12:06:23,945 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:06:23,945 - INFO - 
+2025-10-12 12:07:23,945 - INFO - 🔄 Check #95 - 2025-10-12 12:07:23
+2025-10-12 12:07:23,951 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 12:07:23,952 - INFO - 📊 Current statistics:
+2025-10-12 12:07:23,952 - INFO -    PENDING: 40
+2025-10-12 12:07:23,952 - INFO -    WIN: 81
+2025-10-12 12:07:23,952 - INFO -    LOSS: 50
+2025-10-12 12:07:23,952 - INFO -    TIMEOUT: 850
+2025-10-12 12:07:23,952 - INFO -    Total labeled this session: 106
+2025-10-12 12:07:23,952 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:07:23,952 - INFO - 
+2025-10-12 12:08:23,952 - INFO - 🔄 Check #96 - 2025-10-12 12:08:23
+2025-10-12 12:08:23,955 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 12:08:23,956 - INFO - 📊 Current statistics:
+2025-10-12 12:08:23,956 - INFO -    PENDING: 40
+2025-10-12 12:08:23,956 - INFO -    WIN: 81
+2025-10-12 12:08:23,956 - INFO -    LOSS: 50
+2025-10-12 12:08:23,956 - INFO -    TIMEOUT: 851
+2025-10-12 12:08:23,956 - INFO -    Total labeled this session: 107
+2025-10-12 12:08:23,956 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:08:23,956 - INFO - 
+2025-10-12 12:09:23,957 - INFO - 🔄 Check #97 - 2025-10-12 12:09:23
+2025-10-12 12:09:23,961 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 12:09:23,962 - INFO - 📊 Current statistics:
+2025-10-12 12:09:23,962 - INFO -    PENDING: 40
+2025-10-12 12:09:23,962 - INFO -    WIN: 81
+2025-10-12 12:09:23,962 - INFO -    LOSS: 50
+2025-10-12 12:09:23,962 - INFO -    TIMEOUT: 852
+2025-10-12 12:09:23,962 - INFO -    Total labeled this session: 108
+2025-10-12 12:09:23,962 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:09:23,962 - INFO - 
+2025-10-12 12:10:23,963 - INFO - 🔄 Check #98 - 2025-10-12 12:10:23
+2025-10-12 12:10:23,964 - INFO - ✓ No signals to label
+2025-10-12 12:10:23,964 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:10:23,964 - INFO - 
+2025-10-12 12:11:23,965 - INFO - 🔄 Check #99 - 2025-10-12 12:11:23
+2025-10-12 12:11:23,966 - INFO - ✓ No signals to label
+2025-10-12 12:11:23,966 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:11:23,966 - INFO - 
+2025-10-12 12:12:23,966 - INFO - 🔄 Check #100 - 2025-10-12 12:12:23
+2025-10-12 12:12:23,967 - INFO - ✓ No signals to label
+2025-10-12 12:12:23,967 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:12:23,967 - INFO - 
+2025-10-12 12:13:23,968 - INFO - 🔄 Check #101 - 2025-10-12 12:13:23
+2025-10-12 12:13:23,971 - INFO - ✅ Labeled 3 signals as TIMEOUT
+2025-10-12 12:13:23,972 - INFO - 📊 Current statistics:
+2025-10-12 12:13:23,972 - INFO -    PENDING: 38
+2025-10-12 12:13:23,972 - INFO -    WIN: 81
+2025-10-12 12:13:23,972 - INFO -    LOSS: 50
+2025-10-12 12:13:23,972 - INFO -    TIMEOUT: 855
+2025-10-12 12:13:23,972 - INFO -    Total labeled this session: 111
+2025-10-12 12:13:23,972 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:13:23,972 - INFO - 
+2025-10-12 12:14:23,973 - INFO - 🔄 Check #102 - 2025-10-12 12:14:23
+2025-10-12 12:14:23,976 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 12:14:23,977 - INFO - 📊 Current statistics:
+2025-10-12 12:14:23,977 - INFO -    PENDING: 39
+2025-10-12 12:14:23,977 - INFO -    WIN: 81
+2025-10-12 12:14:23,977 - INFO -    LOSS: 50
+2025-10-12 12:14:23,978 - INFO -    TIMEOUT: 856
+2025-10-12 12:14:23,978 - INFO -    Total labeled this session: 112
+2025-10-12 12:14:23,978 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:14:23,978 - INFO - 
+2025-10-12 12:15:23,978 - INFO - 🔄 Check #103 - 2025-10-12 12:15:23
+2025-10-12 12:15:23,980 - INFO - ✓ No signals to label
+2025-10-12 12:15:23,980 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:15:23,980 - INFO - 
+2025-10-12 12:16:23,980 - INFO - 🔄 Check #104 - 2025-10-12 12:16:23
+2025-10-12 12:16:23,984 - INFO - ✅ Labeled 1 signals as TIMEOUT
+2025-10-12 12:16:23,985 - INFO - 📊 Current statistics:
+2025-10-12 12:16:23,985 - INFO -    PENDING: 38
+2025-10-12 12:16:23,985 - INFO -    WIN: 81
+2025-10-12 12:16:23,985 - INFO -    LOSS: 50
+2025-10-12 12:16:23,985 - INFO -    TIMEOUT: 857
+2025-10-12 12:16:23,985 - INFO -    Total labeled this session: 113
+2025-10-12 12:16:23,985 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:16:23,985 - INFO - 
+2025-10-12 12:17:23,985 - INFO - 🔄 Check #105 - 2025-10-12 12:17:23
+2025-10-12 12:17:23,987 - INFO - ✓ No signals to label
+2025-10-12 12:17:23,987 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:17:23,987 - INFO - 
+2025-10-12 12:18:23,987 - INFO - 🔄 Check #106 - 2025-10-12 12:18:23
+2025-10-12 12:18:23,988 - INFO - ✓ No signals to label
+2025-10-12 12:18:23,988 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:18:23,988 - INFO - 
+2025-10-12 12:19:23,988 - INFO - 🔄 Check #107 - 2025-10-12 12:19:23
+2025-10-12 12:19:23,991 - INFO - ✅ Labeled 2 signals as TIMEOUT
+2025-10-12 12:19:23,992 - INFO - 📊 Current statistics:
+2025-10-12 12:19:23,992 - INFO -    PENDING: 37
+2025-10-12 12:19:23,992 - INFO -    WIN: 81
+2025-10-12 12:19:23,992 - INFO -    LOSS: 50
+2025-10-12 12:19:23,992 - INFO -    TIMEOUT: 859
+2025-10-12 12:19:23,993 - INFO -    Total labeled this session: 115
+2025-10-12 12:19:23,993 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:19:23,993 - INFO - 
+2025-10-12 12:20:23,993 - INFO - 🔄 Check #108 - 2025-10-12 12:20:23
+2025-10-12 12:20:23,994 - INFO - ✓ No signals to label
+2025-10-12 12:20:23,994 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:20:23,994 - INFO - 
+2025-10-12 12:21:23,994 - INFO - 🔄 Check #109 - 2025-10-12 12:21:23
+2025-10-12 12:21:23,996 - INFO - ✓ No signals to label
+2025-10-12 12:21:23,996 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:21:23,996 - INFO - 
+2025-10-12 12:22:23,996 - INFO - 🔄 Check #110 - 2025-10-12 12:22:23
+2025-10-12 12:22:23,998 - INFO - ✓ No signals to label
+2025-10-12 12:22:23,998 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:22:23,998 - INFO - 
+2025-10-12 12:23:23,998 - INFO - 🔄 Check #111 - 2025-10-12 12:23:23
+2025-10-12 12:23:24,000 - INFO - ✓ No signals to label
+2025-10-12 12:23:24,000 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:23:24,000 - INFO - 
+2025-10-12 12:24:24,000 - INFO - 🔄 Check #112 - 2025-10-12 12:24:24
+2025-10-12 12:24:24,004 - INFO - ✅ Labeled 2 signals as TIMEOUT
+2025-10-12 12:24:24,004 - INFO - 📊 Current statistics:
+2025-10-12 12:24:24,005 - INFO -    PENDING: 39
+2025-10-12 12:24:24,005 - INFO -    WIN: 81
+2025-10-12 12:24:24,005 - INFO -    LOSS: 50
+2025-10-12 12:24:24,005 - INFO -    TIMEOUT: 861
+2025-10-12 12:24:24,005 - INFO -    Total labeled this session: 117
+2025-10-12 12:24:24,005 - INFO - ⏳ Next check in 60 seconds...
+2025-10-12 12:24:24,005 - INFO - 
+2025-10-12 12:25:08,273 - INFO - Received signal 15, shutting down gracefully...

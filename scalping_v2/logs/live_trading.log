@@ -1,0 +1,604 @@
+INFO:__main__:================================================================================
+INFO:__main__:📊 SCALPING STRATEGY v2.0 - PAPER TRADING MODE
+INFO:__main__:================================================================================
+INFO:__main__:✅ Configuration loaded from config_live.json
+INFO:__main__:✅ Configuration validated successfully
+INFO:__main__:Initializing components...
+INFO:src.api.bingx_api:BingX API initialized: https://open-api.bingx.com
+INFO:__main__:  ✅ BingX API initialized
+INFO:src.indicators.scalping_engine:✅ Scalping Engine initialized - EMA: 8/21, RSI: 14
+INFO:src.signals.scalping_signal_generator:✅ Scalping Signal Generator initialized - Symbol: BTC-USDT, Timeframe: 1m, Cooldown: 120s
+INFO:__main__:  ✅ Scalping Signal Generator initialized
+INFO:src.risk.risk_manager:Risk Manager initialized: $1000.0, daily limit: 3.0%
+INFO:__main__:  ✅ Risk Manager initialized
+INFO:src.risk.position_sizer:Position Sizer initialized: $1000.0 @ 5x leverage
+INFO:src.risk.position_sizer:  Slippage buffer: 50%, Max position value: 10.0%
+INFO:__main__:  ✅ Position Sizer initialized
+INFO:src.execution.order_executor:✅ Paper trading mode - No real orders will be placed
+INFO:__main__:  ✅ Order Executor initialized (PAPER MODE)
+INFO:src.execution.position_manager:Position Manager initialized
+INFO:__main__:  ✅ Position Manager initialized
+INFO:src.execution.paper_trader:✅ Trade database initialized
+INFO:src.execution.paper_trader:💾 Restored balance from database: $1049.69 (9 trades, $49.69 P&L)
+INFO:src.execution.paper_trader:📊 Paper Trader initialized: $1049.69 @ 5× leverage
+INFO:__main__:  ✅ Paper Trader initialized
+INFO:src.monitoring.dashboard:Dashboard initialized
+INFO:__main__:  ✅ Dashboard initialized
+INFO:src.monitoring.performance_tracker:Performance Tracker initialized
+INFO:__main__:  ✅ Performance Tracker initialized
+INFO:src.monitoring.alerts:Alert System initialized
+INFO:__main__:  ✅ Alert System initialized
+INFO:src.notifications.email_notifier:✅ Email notifier initialized - Server: smtp.gmail.com:587
+INFO:__main__:  ✅ Email Notifier initialized
+INFO:src.monitoring.system_monitor:System Monitor initialized
+INFO:__main__:  ✅ System Monitor initialized
+INFO:__main__:✅ Scalping Trading Bot initialized successfully
+INFO:__main__:================================================================================
+INFO:__main__:🚀 STARTING SCALPING BOT
+INFO:__main__:   Mode: PAPER
+INFO:__main__:   Symbol: BTC-USDT
+INFO:__main__:   Timeframe: 1m
+INFO:__main__:   Initial Capital: $1000.00
+INFO:__main__:   Signal Check Interval: 30s
+INFO:__main__:================================================================================
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+[H[2J[3JINFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+[H[2J[3J
+================================================================================
+                  SCALPING STRATEGY v2.0 - REAL-TIME DASHBOARD                  
+================================================================================
+Last Update: 2025-11-10 15:03:08
+Update Count: 0
+================================================================================
+
+
+┌─ ACCOUNT STATUS ────────────────────────────────────────────────────────────┐
+│ Balance:          $  1,049.69     Equity:         $  1,049.69 │
+│ Available:        $  1,049.69     Margin Used:    $      0.00 │
+│ Unrealized P&L:   $      0.00     Total P&L:      $    +49.69 │
+│ Total Return:          4.97%     Max Drawdown:        0.00% │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ OPEN POSITIONS (0) ──────────────────────────────────────────────────────────┐
+│ No open positions
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RISK CONTROLS ───────────────────────────────────────────────────────────────┐
+│ Daily P&L:        $    +0.00 ( +0.00% / 3.00% limit)
+│   Remaining:           3.00%
+│
+│ Drawdown:              0.00% / 10.00% limit
+│
+│ Positions:         0 / 1 (max)
+│ Consecutive Loss:  0 / 3 (max)
+│
+│ Circuit Breaker:  ✅ Inactive
+│ Can Trade:        ✅ YES
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RECENT TRADES (Last 9) ─────────────────────────────────────────────────────────┐
+│ ❌ N/A                       SHORT $   52.08 (-4.73%)
+│    Entry: $ 99,937.72 → Exit: $100,882.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-07 12:20:24
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   36.58 (+3.44%)
+│    Entry: $104,441.16 → Exit: $103,723.12  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 06:20:07
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   30.62 (+2.96%)
+│    Entry: $105,231.73 → Exit: $104,608.79  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 03:18:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.52 (+1.43%)
+│    Entry: $106,865.39 → Exit: $106,560.35  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:51
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.51 (+1.45%)
+│    Entry: $106,865.96 → Exit: $106,556.93  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.76 (+2.11%)
+│    Entry: $106,927.44 → Exit: $106,476.22  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:44
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.67 (+2.14%)
+│    Entry: $106,918.58 → Exit: $106,460.17  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:11
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   17.31 (-1.77%)
+│    Entry: $106,552.08 → Exit: $106,175.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:49
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   18.59 (-1.86%)
+│    Entry: $106,542.34 → Exit: $106,145.92  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:16
+│ ────────────────────────────────────────────────────────────────────────────
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ SYSTEM STATUS ───────────────────────────────────────────────────────────────┐
+│ Components:
+│   Paper Trader:     ✅ Online
+│   Position Manager: ✅ Online
+│   Order Executor:   ✅ Online
+│   Risk Manager:     ✅ Online
+└──────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+
+
+================================================================================
+                  SCALPING STRATEGY v2.0 - REAL-TIME DASHBOARD                  
+================================================================================
+Last Update: 2025-11-10 15:04:09
+Update Count: 1
+================================================================================
+
+
+┌─ ACCOUNT STATUS ────────────────────────────────────────────────────────────┐
+│ Balance:          $  1,049.69     Equity:         $  1,049.69 │
+│ Available:        $  1,049.69     Margin Used:    $      0.00 │
+│ Unrealized P&L:   $      0.00     Total P&L:      $    +49.69 │
+│ Total Return:          4.97%     Max Drawdown:        0.00% │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ OPEN POSITIONS (0) ──────────────────────────────────────────────────────────┐
+│ No open positions
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RISK CONTROLS ───────────────────────────────────────────────────────────────┐
+│ Daily P&L:        $    +0.00 ( +0.00% / 3.00% limit)
+│   Remaining:           3.00%
+│
+│ Drawdown:              0.00% / 10.00% limit
+│
+│ Positions:         0 / 1 (max)
+│ Consecutive Loss:  0 / 3 (max)
+│
+│ Circuit Breaker:  ✅ Inactive
+│ Can Trade:        ✅ YES
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RECENT TRADES (Last 9) ─────────────────────────────────────────────────────────┐
+│ ❌ N/A                       SHORT $   52.08 (-4.73%)
+│    Entry: $ 99,937.72 → Exit: $100,882.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-07 12:20:24
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   36.58 (+3.44%)
+│    Entry: $104,441.16 → Exit: $103,723.12  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 06:20:07
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   30.62 (+2.96%)
+│    Entry: $105,231.73 → Exit: $104,608.79  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 03:18:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.52 (+1.43%)
+│    Entry: $106,865.39 → Exit: $106,560.35  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:51
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.51 (+1.45%)
+│    Entry: $106,865.96 → Exit: $106,556.93  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.76 (+2.11%)
+│    Entry: $106,927.44 → Exit: $106,476.22  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:44
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.67 (+2.14%)
+│    Entry: $106,918.58 → Exit: $106,460.17  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:11
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   17.31 (-1.77%)
+│    Entry: $106,552.08 → Exit: $106,175.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:49
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   18.59 (-1.86%)
+│    Entry: $106,542.34 → Exit: $106,145.92  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:16
+│ ────────────────────────────────────────────────────────────────────────────
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ SYSTEM STATUS ───────────────────────────────────────────────────────────────┐
+│ Components:
+│   Paper Trader:     ✅ Online
+│   Position Manager: ✅ Online
+│   Order Executor:   ✅ Online
+│   Risk Manager:     ✅ Online
+└──────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 99 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+[H[2J[3JINFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+[H[2J[3J
+
+================================================================================
+                  SCALPING STRATEGY v2.0 - REAL-TIME DASHBOARD                  
+================================================================================
+Last Update: 2025-11-10 15:05:11
+Update Count: 2
+================================================================================
+
+
+┌─ ACCOUNT STATUS ────────────────────────────────────────────────────────────┐
+│ Balance:          $  1,049.69     Equity:         $  1,049.69 │
+│ Available:        $  1,049.69     Margin Used:    $      0.00 │
+│ Unrealized P&L:   $      0.00     Total P&L:      $    +49.69 │
+│ Total Return:          4.97%     Max Drawdown:        0.00% │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ OPEN POSITIONS (0) ──────────────────────────────────────────────────────────┐
+│ No open positions
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RISK CONTROLS ───────────────────────────────────────────────────────────────┐
+│ Daily P&L:        $    +0.00 ( +0.00% / 3.00% limit)
+│   Remaining:           3.00%
+│
+│ Drawdown:              0.00% / 10.00% limit
+│
+│ Positions:         0 / 1 (max)
+│ Consecutive Loss:  0 / 3 (max)
+│
+│ Circuit Breaker:  ✅ Inactive
+│ Can Trade:        ✅ YES
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RECENT TRADES (Last 9) ─────────────────────────────────────────────────────────┐
+│ ❌ N/A                       SHORT $   52.08 (-4.73%)
+│    Entry: $ 99,937.72 → Exit: $100,882.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-07 12:20:24
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   36.58 (+3.44%)
+│    Entry: $104,441.16 → Exit: $103,723.12  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 06:20:07
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   30.62 (+2.96%)
+│    Entry: $105,231.73 → Exit: $104,608.79  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 03:18:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.52 (+1.43%)
+│    Entry: $106,865.39 → Exit: $106,560.35  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:51
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.51 (+1.45%)
+│    Entry: $106,865.96 → Exit: $106,556.93  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.76 (+2.11%)
+│    Entry: $106,927.44 → Exit: $106,476.22  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:44
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.67 (+2.14%)
+│    Entry: $106,918.58 → Exit: $106,460.17  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:11
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   17.31 (-1.77%)
+│    Entry: $106,552.08 → Exit: $106,175.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:49
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   18.59 (-1.86%)
+│    Entry: $106,542.34 → Exit: $106,145.92  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:16
+│ ────────────────────────────────────────────────────────────────────────────
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ SYSTEM STATUS ───────────────────────────────────────────────────────────────┐
+│ Components:
+│   Paper Trader:     ✅ Online
+│   Position Manager: ✅ Online
+│   Order Executor:   ✅ Online
+│   Risk Manager:     ✅ Online
+└──────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+
+
+================================================================================
+                  SCALPING STRATEGY v2.0 - REAL-TIME DASHBOARD                  
+================================================================================
+Last Update: 2025-11-10 15:06:12
+Update Count: 3
+================================================================================
+
+
+┌─ ACCOUNT STATUS ────────────────────────────────────────────────────────────┐
+│ Balance:          $  1,049.69     Equity:         $  1,049.69 │
+│ Available:        $  1,049.69     Margin Used:    $      0.00 │
+│ Unrealized P&L:   $      0.00     Total P&L:      $    +49.69 │
+│ Total Return:          4.97%     Max Drawdown:        0.00% │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ OPEN POSITIONS (0) ──────────────────────────────────────────────────────────┐
+│ No open positions
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RISK CONTROLS ───────────────────────────────────────────────────────────────┐
+│ Daily P&L:        $    +0.00 ( +0.00% / 3.00% limit)
+│   Remaining:           3.00%
+│
+│ Drawdown:              0.00% / 10.00% limit
+│
+│ Positions:         0 / 1 (max)
+│ Consecutive Loss:  0 / 3 (max)
+│
+│ Circuit Breaker:  ✅ Inactive
+│ Can Trade:        ✅ YES
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RECENT TRADES (Last 9) ─────────────────────────────────────────────────────────┐
+│ ❌ N/A                       SHORT $   52.08 (-4.73%)
+│    Entry: $ 99,937.72 → Exit: $100,882.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-07 12:20:24
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   36.58 (+3.44%)
+│    Entry: $104,441.16 → Exit: $103,723.12  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 06:20:07
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   30.62 (+2.96%)
+│    Entry: $105,231.73 → Exit: $104,608.79  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 03:18:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.52 (+1.43%)
+│    Entry: $106,865.39 → Exit: $106,560.35  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:51
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.51 (+1.45%)
+│    Entry: $106,865.96 → Exit: $106,556.93  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.76 (+2.11%)
+│    Entry: $106,927.44 → Exit: $106,476.22  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:44
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.67 (+2.14%)
+│    Entry: $106,918.58 → Exit: $106,460.17  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:11
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   17.31 (-1.77%)
+│    Entry: $106,552.08 → Exit: $106,175.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:49
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   18.59 (-1.86%)
+│    Entry: $106,542.34 → Exit: $106,145.92  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:16
+│ ────────────────────────────────────────────────────────────────────────────
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ SYSTEM STATUS ───────────────────────────────────────────────────────────────┐
+│ Components:
+│   Paper Trader:     ✅ Online
+│   Position Manager: ✅ Online
+│   Order Executor:   ✅ Online
+│   Risk Manager:     ✅ Online
+└──────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+[H[2J[3JINFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:__main__:
+⚠️  Received signal 15, shutting down...
+INFO:__main__:================================================================================
+INFO:__main__:🛑 SHUTTING DOWN SCALPING BOT
+INFO:__main__:================================================================================
+INFO:__main__:
+================================================================================
+INFO:__main__:📊 FINAL PERFORMANCE REPORT
+INFO:__main__:================================================================================
+INFO:__main__:Trading Duration: 0:04:27.524804
+INFO:__main__:Final Balance: $1049.69
+INFO:__main__:Total P&L: $0.00
+INFO:__main__:Total Trades: 0
+INFO:__main__:Win Rate: 0.0%
+INFO:__main__:Max Drawdown: 0.00%
+INFO:__main__:================================================================================
+INFO:src.api.bingx_api:Fetched 100 1m candles for BTC-USDT
+INFO:src.indicators.scalping_engine:🚫 Blocking signals - choppy market regime detected
+INFO:__main__:✅ Shutdown complete
+
+
+================================================================================
+                  SCALPING STRATEGY v2.0 - REAL-TIME DASHBOARD                  
+================================================================================
+Last Update: 2025-11-10 15:07:13
+Update Count: 4
+================================================================================
+
+
+┌─ ACCOUNT STATUS ────────────────────────────────────────────────────────────┐
+│ Balance:          $  1,049.69     Equity:         $  1,049.69 │
+│ Available:        $  1,049.69     Margin Used:    $      0.00 │
+│ Unrealized P&L:   $      0.00     Total P&L:      $    +49.69 │
+│ Total Return:          4.97%     Max Drawdown:        0.00% │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ OPEN POSITIONS (0) ──────────────────────────────────────────────────────────┐
+│ No open positions
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RISK CONTROLS ───────────────────────────────────────────────────────────────┐
+│ Daily P&L:        $    +0.00 ( +0.00% / 3.00% limit)
+│   Remaining:           3.00%
+│
+│ Drawdown:              0.00% / 10.00% limit
+│
+│ Positions:         0 / 1 (max)
+│ Consecutive Loss:  0 / 3 (max)
+│
+│ Circuit Breaker:  ✅ Inactive
+│ Can Trade:        ✅ YES
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ RECENT TRADES (Last 9) ─────────────────────────────────────────────────────────┐
+│ ❌ N/A                       SHORT $   52.08 (-4.73%)
+│    Entry: $ 99,937.72 → Exit: $100,882.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-07 12:20:24
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   36.58 (+3.44%)
+│    Entry: $104,441.16 → Exit: $103,723.12  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 06:20:07
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   30.62 (+2.96%)
+│    Entry: $105,231.73 → Exit: $104,608.79  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-04 03:18:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.52 (+1.43%)
+│    Entry: $106,865.39 → Exit: $106,560.35  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:51
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   14.51 (+1.45%)
+│    Entry: $106,865.96 → Exit: $106,556.93  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:34:18
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.76 (+2.11%)
+│    Entry: $106,927.44 → Exit: $106,476.22  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:44
+│ ────────────────────────────────────────────────────────────────────────────
+│ ✅ N/A                       SHORT +$   20.67 (+2.14%)
+│    Entry: $106,918.58 → Exit: $106,460.17  Reason: TAKE_PROFIT
+│    Hold: 0.1m  Closed: 2025-11-03 19:33:11
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   17.31 (-1.77%)
+│    Entry: $106,552.08 → Exit: $106,175.84  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:49
+│ ────────────────────────────────────────────────────────────────────────────
+│ ❌ N/A                       LONG  $   18.59 (-1.86%)
+│    Entry: $106,542.34 → Exit: $106,145.92  Reason: STOP_LOSS
+│    Hold: 0.1m  Closed: 2025-11-03 19:10:16
+│ ────────────────────────────────────────────────────────────────────────────
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ SYSTEM STATUS ───────────────────────────────────────────────────────────────┐
+│ Components:
+│   Paper Trader:     ✅ Online
+│   Position Manager: ✅ Online
+│   Order Executor:   ✅ Online
+│   Risk Manager:     ✅ Online
+└──────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+

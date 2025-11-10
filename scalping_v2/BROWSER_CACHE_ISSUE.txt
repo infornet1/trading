@@ -1,0 +1,91 @@
+═══════════════════════════════════════════════════════════════════════════
+                    🎯 ROOT CAUSE FINALLY IDENTIFIED
+═══════════════════════════════════════════════════════════════════════════
+
+PROBLEM: You saw "$134.17" (ADX data) instead of "$100" (Scalping data)
+
+ROOT CAUSE: Flask's url_for() was generating ABSOLUTE paths without the 
+/scalping/ prefix, so your browser loaded ADX files from the root path!
+
+══════════════════════════════════════════════════════════════════════════
+
+WHAT WAS HAPPENING:
+
+1. You load: https://dev.ueipab.edu.ve:5900/scalping/
+2. Flask renders HTML with: <script src="/static/js/dashboard.js">
+                            ^^^^^ No /scalping/ prefix!
+3. Your browser requests: https://dev.ueipab.edu.ve:5900/static/js/dashboard.js
+4. Nginx matches: location / → Routes to port 5901 (ADX)
+5. ADX JavaScript loads, fetches ADX API, shows $134.17
+
+══════════════════════════════════════════════════════════════════════════
+
+THE FIX (3 parts):
+
+1. Flask Configuration (dashboard_web.py):
+   - Added: app.config['APPLICATION_ROOT'] = '/scalping'
+   - Added: ProxyFix middleware to handle X-Forwarded-Prefix header
+
+2. Nginx Configuration (dashboard-5900):
+   - Added: proxy_set_header X-Forwarded-Prefix /scalping;
+   - This tells Flask to generate URLs with /scalping/ prefix
+
+3. Result:
+   Flask now generates: <script src="/scalping/static/js/dashboard.js">
+                                 ^^^^^^^^^ Prefix included!
+
+══════════════════════════════════════════════════════════════════════════
+
+VERIFICATION (Server-side - ALL PASSING):
+
+✅ HTML Title: "Scalping Strategy v2.0"
+✅ Generated Paths: /scalping/static/js/dashboard.js (with prefix!)
+✅ JavaScript Content: "// Scalping Strategy v2.0"
+✅ API Balance: $100.0
+✅ Indicator Labels: RSI (14), EMA 5, EMA 8, EMA 21, Stochastic
+
+══════════════════════════════════════════════════════════════════════════
+
+ACTION REQUIRED FROM YOU:
+
+Your browser has cached the OLD HTML (with wrong paths) and the ADX 
+JavaScript files. You MUST clear the cache:
+
+METHOD 1: Hard Refresh (Recommended)
+  - Windows/Linux: Ctrl + Shift + R
+  - Mac: Cmd + Shift + R
+
+METHOD 2: Clear Cache (If hard refresh doesn't work)
+  1. Open browser DevTools (F12)
+  2. Go to "Application" or "Storage" tab
+  3. Find "Clear storage" or "Clear site data"
+  4. Select dev.ueipab.edu.ve
+  5. Click "Clear data"
+  6. Reload the page
+
+METHOD 3: Incognito/Private Window
+  - Open https://dev.ueipab.edu.ve:5900/scalping/ in incognito mode
+  - This bypasses all cache
+
+══════════════════════════════════════════════════════════════════════════
+
+WHAT YOU SHOULD SEE AFTER CLEARING CACHE:
+
+Header: "⚡ SCALPING STRATEGY v2.0"
+Balance: $100.00  (NOT $134.17)
+Indicators: RSI (14), EMA 5, EMA 8, EMA 21, Stochastic K, Volume Ratio
+All values: "--" (will populate after first 5-minute signal check)
+
+══════════════════════════════════════════════════════════════════════════
+
+FILES MODIFIED IN THIS FIX:
+
+1. /var/www/dev/trading/scalping_v2/dashboard_web.py
+   - Line 12: Added ProxyFix import
+   - Line 30: Added APPLICATION_ROOT config
+   - Line 32: Added ProxyFix middleware
+
+2. /etc/nginx/sites-available/dashboard-5900
+   - Line 25: Added X-Forwarded-Prefix header
+
+═══════════════════════════════════════════════════════════════════════════

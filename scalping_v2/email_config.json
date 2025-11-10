@@ -1,0 +1,14 @@
+{
+  "smtp_server": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_use_tls": true,
+  "sender_email": "finanzas@ueipab.edu.ve",
+  "smtp_username": "finanzas@ueipab.edu.ve",
+  "smtp_password": "hcoe hawe gwwn mcvc",
+  "recipient_email": "perdomo.gustavo@gmail.com",
+  "send_on_signal": true,
+  "send_on_trade_open": true,
+  "send_on_trade_close": true,
+  "send_on_error": false,
+  "alert_cooldown_minutes": 5
+}

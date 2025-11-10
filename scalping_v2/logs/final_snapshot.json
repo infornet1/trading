@@ -1,0 +1,62 @@
+{
+  "timestamp": "2025-11-10T17:00:59.138975",
+  "account": {
+    "balance": 1049.6858740451187,
+    "equity": 1049.6858740451187,
+    "pnl": 49.68587404511868,
+    "pnl_percent": 4.968587404511868
+  },
+  "positions": [],
+  "orders": [],
+  "risk": {
+    "daily_pnl": 0.0,
+    "can_trade": [
+      true,
+      null
+    ]
+  },
+  "recent_trades": [],
+  "system": {
+    "last_update": "2025-11-10T17:00:59.138995",
+    "update_count": 0
+  },
+  "indicators": {
+    "ema_micro": 105587.63,
+    "ema_fast": 105595.85,
+    "ema_slow": 105638.12,
+    "rsi": 38.65,
+    "stoch_k": 48.0,
+    "stoch_d": 52.95,
+    "volume_ratio": 0.48,
+    "volume_spike": false,
+    "atr": 83.04,
+    "atr_pct": 0.079,
+    "roc_1": -0.025,
+    "roc_5": -0.062
+  },
+  "price_action": {
+    "price_change_pct": -0.025,
+    "near_resistance": true,
+    "near_support": true,
+    "bullish_pattern": false,
+    "bearish_pattern": false,
+    "recent_high": 105734.2,
+    "recent_low": 105517.8
+  },
+  "active_filters": {
+    "signal_cooldown_active": true,
+    "cooldown_seconds": 120,
+    "choppy_blocker_active": true,
+    "time_filter_active": true,
+    "low_liquidity_hours": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "min_confidence": 70.0,
+    "current_utc_hour": 21,
+    "target_profit_pct": 0.6,
+    "stop_loss_pct": 0.3
+  }
+}

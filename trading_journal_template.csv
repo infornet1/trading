@@ -1,0 +1,3 @@
+Date,Time,Direction,Entry_Price,Exit_Price,Position_Size,Risk_Amount,Profit_Loss,Percent_Gain,Fee_Paid,Net_PL,Reason_Entry,RSI_Entry,Support_Resistance,Stop_Loss,Take_Profit,Time_In_Trade,Emotion_Before,Emotion_After,Mistakes_Made,Lessons_Learned,Daily_PL,Weekly_PL
+2025-10-11,14:30,LONG,50000,50250,0.02,10,5,0.5,0.20,4.80,RSI<25+Support,24,49950,49850,50250,15min,Calm,Happy,None,Followed plan,+4.80,+4.80
+2025-10-11,15:00,EXAMPLE,50000,49850,0.02,10,-3,-0.3,0.20,-3.20,Hit stop loss,30,50000,49850,50500,10min,Anxious,Frustrated,Entered too fast,Wait for better confirmation,-1.60,+1.60

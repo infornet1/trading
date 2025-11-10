@@ -1,0 +1,13 @@
+{
+  "exchange": "coingecko",
+  "symbol": "BTCUSD",
+  "interval": 5,
+  "rsi_period": 14,
+  "rsi_oversold": 30,
+  "rsi_overbought": 70,
+  "ema_fast": 5,
+  "ema_slow": 15,
+  "support_resistance_periods": 50,
+  "price_change_alert": 0.5,
+  "volume_spike_multiplier": 2.0
+}

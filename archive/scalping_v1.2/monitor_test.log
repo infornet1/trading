@@ -1,0 +1,2 @@
+2025-10-11 08:19:58,576 - BTCEmailNotifier - INFO - Email service initialized - Server: smtp.gmail.com:587
+2025-10-11 08:19:58,577 - SignalTracker - INFO - Database initialized at signals.db

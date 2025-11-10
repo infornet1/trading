@@ -1,0 +1,235 @@
+🚀 Starting Signal Tracker Dashboard...
+📊 Dashboard URL: http://localhost:5800
+📊 External Access: http://YOUR_SERVER_IP:5800
+⌨️  Press Ctrl+C to stop
+
+ * Serving Flask app 'dashboard'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5800
+ * Running on http://64.23.157.121:5800
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 727-185-976
+127.0.0.1 - - [11/Oct/2025 08:18:18] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [11/Oct/2025 08:18:26] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:18:28] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:18:28] "GET /api/signals/recent/1000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:18:54] "GET / HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:18:54] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:18:54] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:19:24] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:19:24] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:19:50] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:19:50] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:19:55] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:19:55] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:20:25] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:20:25] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:20:55] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:20:55] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:21:25] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:21:25] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:21:55] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:21:55] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:22:25] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:22:25] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:22:56] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:22:56] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:23:26] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:23:26] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:23:56] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:23:56] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:24:26] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:24:26] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:24:56] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:24:56] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:25:26] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:25:26] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:25:56] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:25:56] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:26:26] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:26:26] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:26:56] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:26:56] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:27:26] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:27:26] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:27:56] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:27:56] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:28:26] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:28:26] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:28:56] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:28:56] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:29:27] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:29:27] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:29:57] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:29:57] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:30:27] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:30:27] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:30:57] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:30:57] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:31:26] "GET / HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:31:26] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:31:26] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:31:39] "GET / HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:31:39] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:31:39] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:31:42] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:31:42] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:32:09] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:32:09] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:32:40] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:32:40] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:33:10] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:33:10] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+ * Detected change in '/var/www/dev/trading/bybit_trader.py', reloading
+🚀 Starting Signal Tracker Dashboard...
+📊 Dashboard URL: http://localhost:5800
+📊 External Access: http://YOUR_SERVER_IP:5800
+⌨️  Press Ctrl+C to stop
+
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 727-185-976
+ * Detected change in '/var/www/dev/trading/bybit_trader.py', reloading
+🚀 Starting Signal Tracker Dashboard...
+📊 Dashboard URL: http://localhost:5800
+📊 External Access: http://YOUR_SERVER_IP:5800
+⌨️  Press Ctrl+C to stop
+
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 727-185-976
+200.82.130.245 - - [11/Oct/2025 08:33:33] "GET / HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:33:34] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:33:34] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:34:04] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:34:04] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:34:34] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:34:34] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:35:04] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:35:04] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:35:34] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:35:34] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:36:04] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:36:04] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:36:34] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:36:34] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:37:04] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:37:04] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:37:34] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:37:34] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:38:04] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:38:04] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:38:34] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:38:34] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:39:04] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:39:04] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:39:34] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:39:34] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+ * Detected change in '/var/www/dev/trading/bybit_trader.py', reloading
+🚀 Starting Signal Tracker Dashboard...
+📊 Dashboard URL: http://localhost:5800
+📊 External Access: http://YOUR_SERVER_IP:5800
+⌨️  Press Ctrl+C to stop
+
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 727-185-976
+ * Detected change in '/var/www/dev/trading/bybit_trader.py', reloading
+🚀 Starting Signal Tracker Dashboard...
+📊 Dashboard URL: http://localhost:5800
+📊 External Access: http://YOUR_SERVER_IP:5800
+⌨️  Press Ctrl+C to stop
+
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 727-185-976
+200.82.130.245 - - [11/Oct/2025 08:40:04] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:40:04] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:40:34] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:40:34] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:40:52] "GET / HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:40:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:40:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:41:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:41:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:41:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:41:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:42:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:42:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:42:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:42:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:43:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:43:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:43:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:43:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:44:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:44:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:44:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:44:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:45:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:45:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:45:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:45:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:46:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:46:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:46:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:46:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:47:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:47:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:47:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:47:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:48:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:48:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:48:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:48:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:49:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:49:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:49:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:49:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:50:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:50:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:50:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:50:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:51:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:51:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:51:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:51:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:52:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:52:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:52:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:52:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:53:23] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:53:23] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:53:53] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:53:53] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:54:00] "GET / HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:54:00] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:54:00] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:54:30] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:54:30] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:55:00] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:55:00] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:55:33] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:55:33] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:56:03] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:56:03] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:56:33] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:56:33] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:57:03] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:57:03] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:57:33] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:57:33] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:58:03] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:58:03] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:58:33] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:58:33] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:59:03] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:59:03] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:59:33] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 08:59:33] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 09:00:03] "GET /api/stats/1 HTTP/1.1" 200 -
+200.82.130.245 - - [11/Oct/2025 09:00:03] "GET /api/signals/recent/2000 HTTP/1.1" 200 -
