@@ -1,0 +1,58 @@
+2025-11-12 10:15:01,606 - INFO - ================================================================================
+2025-11-12 10:15:01,606 - INFO - 🤖 BOT SUPERVISOR - Starting supervision cycle
+2025-11-12 10:15:01,606 - INFO - ================================================================================
+2025-11-12 10:15:01,606 - INFO - 🔍 Checking market conditions...
+2025-11-12 10:15:03,115 - INFO -    Market Regime: ranging
+2025-11-12 10:15:03,115 - INFO -    ADX: 22.10
+2025-11-12 10:15:03,115 - INFO -    BTC Price: $104,880.10
+2025-11-12 10:15:03,115 - INFO -    Tradeable: False
+2025-11-12 10:15:03,116 - INFO - 
+--- Scalping v2 ---
+2025-11-12 10:15:03,116 - INFO - Should run: False - Market not tradeable (regime: ranging)
+2025-11-12 10:15:03,116 - INFO - 🏥 Checking health: Scalping v2...
+2025-11-12 10:15:03,210 - INFO -    Running: True
+2025-11-12 10:15:03,210 - INFO -    Healthy: True
+2025-11-12 10:15:03,210 - INFO - ℹ️  Bot is running but market conditions not ideal
+2025-11-12 10:15:03,211 - INFO -    Bot will internally block signals - no action needed
+2025-11-12 10:15:03,211 - INFO - 
+--- ADX v2 ---
+2025-11-12 10:15:03,211 - INFO - Should run: False - Market not tradeable (regime: ranging)
+2025-11-12 10:15:03,211 - INFO - 🏥 Checking health: ADX v2...
+2025-11-12 10:15:03,304 - INFO -    Running: True
+2025-11-12 10:15:03,305 - INFO -    Healthy: True
+2025-11-12 10:15:03,305 - INFO - ℹ️  Bot is running but market conditions not ideal
+2025-11-12 10:15:03,305 - INFO -    Bot will internally block signals - no action needed
+2025-11-12 10:15:03,305 - INFO - 
+================================================================================
+2025-11-12 10:15:03,305 - INFO - 🤖 BOT SUPERVISOR - Cycle complete
+2025-11-12 10:15:03,305 - INFO - ================================================================================
+
+2025-11-12 10:30:01,430 - INFO - ================================================================================
+2025-11-12 10:30:01,430 - INFO - 🤖 BOT SUPERVISOR - Starting supervision cycle
+2025-11-12 10:30:01,430 - INFO - ================================================================================
+2025-11-12 10:30:01,430 - INFO - 🔍 Checking market conditions...
+2025-11-12 10:30:02,555 - INFO -    Market Regime: ranging
+2025-11-12 10:30:02,555 - INFO -    ADX: 18.67
+2025-11-12 10:30:02,555 - INFO -    BTC Price: $104,746.50
+2025-11-12 10:30:02,555 - INFO -    Tradeable: False
+2025-11-12 10:30:02,555 - INFO - 
+--- Scalping v2 ---
+2025-11-12 10:30:02,555 - INFO - Should run: False - Market not tradeable (regime: ranging)
+2025-11-12 10:30:02,555 - INFO - 🏥 Checking health: Scalping v2...
+2025-11-12 10:30:02,687 - INFO -    Running: True
+2025-11-12 10:30:02,687 - INFO -    Healthy: True
+2025-11-12 10:30:02,687 - INFO - ℹ️  Bot is running but market conditions not ideal
+2025-11-12 10:30:02,688 - INFO -    Bot will internally block signals - no action needed
+2025-11-12 10:30:02,688 - INFO - 
+--- ADX v2 ---
+2025-11-12 10:30:02,688 - INFO - Should run: False - Market not tradeable (regime: ranging)
+2025-11-12 10:30:02,688 - INFO - 🏥 Checking health: ADX v2...
+2025-11-12 10:30:02,810 - INFO -    Running: True
+2025-11-12 10:30:02,810 - INFO -    Healthy: True
+2025-11-12 10:30:02,810 - INFO - ℹ️  Bot is running but market conditions not ideal
+2025-11-12 10:30:02,810 - INFO -    Bot will internally block signals - no action needed
+2025-11-12 10:30:02,810 - INFO - 
+================================================================================
+2025-11-12 10:30:02,810 - INFO - 🤖 BOT SUPERVISOR - Cycle complete
+2025-11-12 10:30:02,810 - INFO - ================================================================================
+
