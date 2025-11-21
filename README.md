@@ -516,30 +516,32 @@ For questions about the implementation plan, refer to the detailed documentation
 
 ---
 
-**Last Updated:** 2025-11-15 18:05:00
-**Current Phase:** Multi-Strategy Deployment with Active Supervision
+**Last Updated:** 2025-11-20 19:00:00
+**Current Phase:** Multi-Strategy Deployment with Intelligent Supervision
 **Active Strategies:**
-- ✅ Scalping v2.0 (Paper Trading - Profitable)
-- ⚠️ ADX v2.0 (Paper Trading - Underperforming)
-**Supervisor System:** ✅ Active (100% uptime, auto-monitoring every 5 mins)
+- ✅ Scalping v2.0 (Paper Trading - Circuit Breaker Auto-Reset)
+- ✅ ADX v2.0 (Paper Trading - Circuit Breaker Auto-Reset)
+**Supervisor System:** ✅ Active with Auto Circuit Breaker Reset (100% uptime, monitoring every 15 mins)
 
-## Latest Trading Update (2025-11-15 18:05:00)
+## Latest Trading Update (2025-11-20 19:00:00)
 
 ### 🤖 Bot Supervisor System Status:
 - **Status:** ✅ ACTIVE & HEALTHY
 - **Quick Check:** Every 5 minutes → ✅ All services running
-- **Main Supervisor:** Every 15 minutes → ✅ Both bots monitored
+- **Main Supervisor:** Every 15 minutes → ✅ Both bots monitored + circuit breaker auto-reset
 - **Daily Reports:** 8:00 AM automated email summaries
 - **Uptime:** 100% (auto-restart on failures)
-- **Last Check:** 18:00 - Market: TRENDING (ADX: 39.05), BTC: $95,226
+- **Circuit Breaker Auto-Reset:** ✅ Active for paper trading mode (NEW!)
+- **Last Check:** 18:55 - Market: TRENDING (ADX: 42.41), BTC: $88,015
 
 ### 📊 SCALPING v2.0 - Account Status:
-- **Balance:** $1,131.68 USD ⭐
-- **Total Return:** +13.17% (+$131.68 profit)
+- **Balance:** $977.37 USD
+- **Total Return:** -2.26% (-$22.63 loss)
 - **Starting Capital:** $1,000
 - **Current Positions:** 0 (No open trades)
-- **Uptime:** 8 days 1 hour (Since Nov 7, 16:26)
-- **Status:** ✅ PERFORMING WELL
+- **Circuit Breaker:** ✅ RESET by supervisor (was: -13.82% loss)
+- **Uptime:** 13 days (Restarted Nov 20, 18:54 - auto circuit reset)
+- **Status:** ✅ ACTIVE - Monitoring choppy markets
 
 ### 📈 ADX v2.0 - Account Status:
 - **Balance:** $114.75 USD
@@ -547,21 +549,43 @@ For questions about the implementation plan, refer to the detailed documentation
 - **Starting Capital:** $160.00
 - **Peak Balance:** $160.00
 - **Current Positions:** 0 (No open trades)
-- **Uptime:** 1 hour 38 minutes (Restarted Nov 15, 16:27)
-- **Status:** ⚠️ UNDERPERFORMING
+- **Circuit Breaker:** ✅ RESET by supervisor (was: 6 consecutive losses)
+- **Uptime:** 30 minutes (Restarted Nov 20, 18:54 - auto circuit reset)
+- **Status:** ✅ ACTIVE - Waiting for strong trend signals
 
 ### Current BTC Market (BingX):
-- **Price:** $95,586 - $95,639
-- **ADX:** 28.45 - 39.05 (TRENDING market)
+- **Price:** $87,900 - $88,015
+- **ADX:** 42.41 (STRONG TRENDING market)
 - **Market Regime:** Trending
 - **Tradeable:** ✅ Yes
+
+### Circuit Breaker Auto-Reset Feature (NEW! 2025-11-20):
+**What happened:**
+- Both bots hit circuit breakers and stopped trading
+- **Scalping v2:** Daily loss limit (-13.82%)
+- **ADX v2:** Consecutive loss limit (6 losses)
+
+**Supervisor action:**
+- ✅ Detected paper trading mode for both bots
+- ✅ Automatically restarted both bots to reset circuit breakers
+- ✅ Sent 4 email notifications (restart + circuit breaker alerts)
+- ✅ Both bots resumed trading immediately
+
+**Why this matters:**
+- Paper trading can now continue uninterrupted for data collection
+- Live trading circuit breakers still require manual intervention (safety!)
+- Full transparency via email notifications
+
+**Documentation:** See `supervisor/CIRCUIT_BREAKER_AUTO_RESET.md`
 
 ### SCALPING v2.0 Recent Trades (Last 2 Winners):
 1. **2025-11-14 18:38** - LONG @ $94,358 → TAKE_PROFIT @ $95,275 = +$52.46 (+4.86%) ⭐
 2. **2025-11-13 16:08** - SHORT @ $99,009 → TAKE_PROFIT @ $98,412 = +$31.67 (+3.02%) ⭐
+3. **2025-11-17 12:15** - LONG @ $95,755 → STOP_LOSS @ $93,107 = -$156.45 (-13.82%) ❌ *Triggered circuit breaker*
 
 ### SCALPING v2.0 Current State:
-- **RSI:** 57.37 (neutral)
+- **Circuit Breaker:** Inactive (auto-reset by supervisor)
+- **RSI:** 47.52 (neutral)
 - **Stochastic:** 53.94/56.64
 - **Signal Cooldown:** ACTIVE (120s between signals)
 - **Choppy Market Blocker:** ACTIVE (filtering low-quality signals)
@@ -605,9 +629,11 @@ For questions about the implementation plan, refer to the detailed documentation
 - 📍 **Strategy intact:** Properly monitoring, just waiting for strong trend confirmation
 
 **Supervisor System:**
-- ✅ **Perfect reliability:** Every 5-min health check passing
+- ✅ **Perfect reliability:** Every 15-min supervision cycle passing
 - ✅ **Auto-recovery ready:** Bots will restart on crash
+- ✅ **Circuit Breaker Reset:** Auto-reset for paper trading (NEW!)
 - ✅ **Daily reporting:** 8 AM email summaries with full status
+- ✅ **Email notifications:** Immediate alerts for circuit breaker resets
 - ✅ **Maintenance automated:** Database cleanup every 6 hours
 
 ### Why No Recent Signals?

@@ -222,6 +222,48 @@ class BotSupervisor:
         except Exception as e:
             logger.error(f"Error cleaning up state: {e}")
 
+    def reset_circuit_breaker(self, bot_key: str, circuit_info: dict):
+        """Reset circuit breaker for paper trading bots"""
+        bot = self.bots[bot_key]
+        logger.warning(f"🔄 Resetting circuit breaker: {bot['name']}")
+
+        try:
+            trading_mode = circuit_info.get('trading_mode', 'unknown')
+            reason = circuit_info.get('circuit_breaker_reason', 'Unknown')
+            consecutive_losses = circuit_info.get('consecutive_losses', 0)
+            balance = circuit_info.get('balance', 0)
+
+            logger.info(f"   Trading Mode: {trading_mode}")
+            logger.info(f"   Trigger Reason: {reason}")
+            logger.info(f"   Consecutive Losses: {consecutive_losses}")
+            logger.info(f"   Current Balance: ${balance:.2f}")
+
+            # Restart the bot (which will reset the in-memory circuit breaker)
+            logger.info(f"   Restarting bot to reset circuit breaker...")
+            restart_success = self.restart_bot(bot_key, f"Circuit breaker reset (paper mode): {reason}")
+
+            if restart_success:
+                logger.info(f"✅ Circuit breaker reset successful")
+
+                # Send email notification
+                if self.email_notifier:
+                    try:
+                        self.email_notifier.send_circuit_breaker_reset_alert(
+                            bot_name=bot['name'],
+                            trading_mode=trading_mode,
+                            reason=reason,
+                            consecutive_losses=consecutive_losses,
+                            balance=balance
+                        )
+                        logger.info(f"   Email notification sent")
+                    except Exception as e:
+                        logger.warning(f"Failed to send email notification: {e}")
+            else:
+                logger.error(f"❌ Failed to reset circuit breaker")
+
+        except Exception as e:
+            logger.error(f"Error resetting circuit breaker: {e}")
+
     def should_bot_run(self, bot_key: str, market_conditions: Dict) -> Tuple[bool, str]:
         """
         Determine if bot should be running given market conditions
@@ -275,7 +317,18 @@ class BotSupervisor:
 
                 elif not health['healthy']:
                     logger.warning(f"⚠️  Bot is running but unhealthy!")
-                    if 'stuck' in str(health['issues']).lower() or 'frozen' in str(health['issues']).lower():
+
+                    # Check for circuit breaker in paper trading mode
+                    circuit_breaker_info = health.get('circuit_breaker', {})
+                    if circuit_breaker_info.get('should_reset', False):
+                        logger.warning(f"🔄 Circuit breaker detected in paper trading mode")
+                        logger.info(f"   Reason: {circuit_breaker_info.get('circuit_breaker_reason')}")
+                        logger.info(f"   Auto-resetting circuit breaker...")
+
+                        # Reset circuit breaker
+                        self.reset_circuit_breaker(bot_key, circuit_breaker_info)
+
+                    elif 'stuck' in str(health['issues']).lower() or 'frozen' in str(health['issues']).lower():
                         self.restart_bot(bot_key, f"Bot unhealthy: {', '.join(health['issues'])}")
                     else:
                         logger.info(f"   Monitoring issues: {', '.join(health['issues'])}")

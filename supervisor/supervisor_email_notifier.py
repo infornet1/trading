@@ -398,6 +398,102 @@ BOT HEALTH STATUS
 
         return self.send_email(subject, html)
 
+    def send_circuit_breaker_reset_alert(self, bot_name: str, trading_mode: str,
+                                          reason: str, consecutive_losses: int, balance: float):
+        """Send alert when circuit breaker is reset for paper trading bot"""
+
+        subject = f"🔄 Bot Supervisor: Circuit Breaker Reset - {bot_name}"
+
+        html = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; }}
+                .header {{ background: #FF9800; color: white; padding: 20px; border-radius: 5px; }}
+                .info-box {{ background: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px; }}
+                .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 10px 0; }}
+                .detail-row {{ padding: 8px 0; border-bottom: 1px solid #eee; }}
+                .label {{ font-weight: bold; color: #555; }}
+                .value {{ color: #333; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h2>🔄 Circuit Breaker Auto-Reset</h2>
+                <p style="margin: 5px 0;">Bot: {bot_name}</p>
+            </div>
+
+            <div class="warning">
+                <strong>⚠️ Paper Trading Mode Detected</strong><br>
+                The supervisor has automatically reset the circuit breaker because this bot is running in paper trading mode.
+            </div>
+
+            <div class="info-box">
+                <h3>Circuit Breaker Details</h3>
+                <div class="detail-row">
+                    <span class="label">Trading Mode:</span>
+                    <span class="value" style="color: #2196F3; font-weight: bold;">{trading_mode.upper()}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Trigger Reason:</span>
+                    <span class="value">{reason}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Consecutive Losses:</span>
+                    <span class="value">{consecutive_losses}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Current Balance:</span>
+                    <span class="value" style="color: {'#d32f2f' if balance < 100 else '#4CAF50'};">${balance:.2f}</span>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3>Action Taken</h3>
+                <p>✅ Bot service restarted to reset circuit breaker state</p>
+                <p>✅ Bot will resume trading immediately (if market conditions permit)</p>
+            </div>
+
+            <div class="warning">
+                <strong>📝 Note:</strong> This auto-reset only applies to paper trading mode.
+                In live trading mode, circuit breakers require manual intervention for safety.
+            </div>
+
+            <p style="color: #666; font-size: 0.9em; margin-top: 30px;">
+                Alert sent: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br>
+                System: Bot Supervisor v2.0
+            </p>
+        </body>
+        </html>
+        """
+
+        text = f"""
+CIRCUIT BREAKER AUTO-RESET ALERT
+{'='*60}
+
+Bot: {bot_name}
+Trading Mode: {trading_mode.upper()}
+
+CIRCUIT BREAKER DETAILS:
+  Trigger Reason: {reason}
+  Consecutive Losses: {consecutive_losses}
+  Current Balance: ${balance:.2f}
+
+ACTION TAKEN:
+  ✅ Bot service restarted
+  ✅ Circuit breaker reset
+  ✅ Bot resuming trading
+
+NOTE: This auto-reset only applies to paper trading mode.
+Live trading circuit breakers require manual intervention.
+
+Alert sent: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+System: Bot Supervisor v2.0
+{'='*60}
+        """
+
+        return self.send_email(subject, html, text)
+
     def send_test_email(self):
         """Send a test email to verify configuration"""
 

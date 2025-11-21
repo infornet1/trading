@@ -125,6 +125,29 @@ def check_bot_health(bot_key):
             except Exception as e:
                 issues.append(f"Process check error: {str(e)}")
 
+        # 5. Check circuit breaker status
+        circuit_breaker_info = None
+        try:
+            # Call circuit breaker checker
+            result = subprocess.run(
+                [sys.executable, str(TRADING_ROOT / 'supervisor' / 'circuit_breaker_checker.py'), bot_key],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode == 0:
+                circuit_breaker_info = json.loads(result.stdout)
+
+                # Add issue if circuit breaker is active
+                if circuit_breaker_info.get('circuit_breaker_active'):
+                    cb_reason = circuit_breaker_info.get('circuit_breaker_reason', 'Unknown')
+                    trading_mode = circuit_breaker_info.get('trading_mode', 'unknown')
+                    issues.append(f"Circuit breaker active ({trading_mode} mode): {cb_reason}")
+
+        except Exception as e:
+            issues.append(f"Circuit breaker check error: {str(e)}")
+
         # Determine health
         healthy = len(issues) == 0
 
@@ -134,7 +157,8 @@ def check_bot_health(bot_key):
             'running': running,
             'healthy': healthy,
             'last_update': last_update.isoformat() if last_update else None,
-            'issues': issues
+            'issues': issues,
+            'circuit_breaker': circuit_breaker_info
         }
 
         print(json.dumps(health_report))

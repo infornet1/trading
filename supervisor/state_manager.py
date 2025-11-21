@@ -1,14 +1,60 @@
 #!/usr/bin/env python3
 """
-State Manager - Cleans up stuck states, old logs, etc.
+State Manager - Cleans up stuck states, old logs, circuit breakers, etc.
 """
 
 import sys
 import os
 import sqlite3
 import shutil
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
+
+
+def check_circuit_breaker_status(bot_key):
+    """Check if circuit breaker is active and should be reset"""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(Path("/var/www/dev/trading/supervisor/circuit_breaker_checker.py")), bot_key],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+        else:
+            return {'should_reset': False}
+    except Exception as e:
+        print(f"Error checking circuit breaker: {e}")
+        return {'should_reset': False}
+
+
+def reset_circuit_breaker_in_db(bot_key, db_path):
+    """
+    Reset circuit breaker state in database (if stored there)
+
+    Note: For this implementation, circuit breaker state is in-memory in the bots.
+    The reset will take effect when the bot restarts OR we need to signal the bot.
+
+    For now, we'll create a flag file that the bot can check on next iteration.
+    """
+    flag_file = db_path.parent.parent / 'logs' / 'reset_circuit_breaker.flag'
+
+    try:
+        with open(flag_file, 'w') as f:
+            json.dump({
+                'reset_requested': True,
+                'timestamp': datetime.now().isoformat(),
+                'reason': 'Supervisor auto-reset for paper trading mode'
+            }, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Failed to create reset flag: {e}")
+        return False
 
 
 def cleanup_bot_state(bot_key):
@@ -69,8 +115,28 @@ def cleanup_bot_state(bot_key):
                 temp_file.unlink()
                 print(f"    Removed: {temp_file.name}")
 
-        # 4. Reset error flags (if any exist in config)
-        # This would depend on your specific implementation
+        # 4. Reset circuit breaker (if in paper trading mode)
+        try:
+            print("  Checking circuit breaker status...")
+            circuit_status = check_circuit_breaker_status(bot_key)
+
+            if circuit_status.get('should_reset', False):
+                print(f"    Circuit breaker active: {circuit_status.get('circuit_breaker_reason')}")
+                print(f"    Trading mode: {circuit_status.get('trading_mode')}")
+                print(f"    Attempting reset via database...")
+
+                if reset_circuit_breaker_in_db(bot_key, bot['db']):
+                    print(f"    ✅ Circuit breaker reset in database")
+                else:
+                    print(f"    ⚠️  Circuit breaker reset requires bot restart")
+            else:
+                if circuit_status.get('circuit_breaker_active'):
+                    print(f"    Circuit breaker active but NOT auto-resetting (Live mode)")
+                else:
+                    print(f"    Circuit breaker inactive - no action needed")
+
+        except Exception as e:
+            print(f"    Circuit breaker check failed: {e}")
 
         print(f"✅ Cleanup complete for {bot_key}")
         return 0
