@@ -1,8 +1,8 @@
 # Bitcoin Trading System - Multi-Strategy Platform
 
 **Current Version:** Multi-Strategy Deployment
-**Last Updated:** 2025-11-02
-**Status:** Production - Multiple Strategies Running
+**Last Updated:** 2025-12-09
+**Status:** PAUSED - All bots and services stopped for break
 
 ---
 
@@ -18,10 +18,11 @@ This project contains THREE trading strategies for Bitcoin:
 
 ## Quick Start
 
-### Current Status:
+### Current Status (2025-12-09):
 - ❌ SCALPING v1.2: **ARCHIVED** (Final results: 49.5% win rate, reference only)
-- ⚠️ ADX v2.0: **ACTIVE - UNDERPERFORMING** (44% win rate, -$45.25 / -28.28%, 34 trades)
-- ✅ SCALPING v2.0: **ACTIVE - PERFORMING WELL** (+$131.68 / +13.17%, 8+ days uptime) ⭐
+- ⏸️ ADX v2.0: **PAUSED** (Services stopped, was: 44% win rate, -28.28%)
+- ⏸️ SCALPING v2.0: **PAUSED** (Services stopped, was: -2.26% return)
+- ⏸️ Supervisor System: **PAUSED** (Cron jobs removed)
 
 ### Repository Structure:
 ```
@@ -516,140 +517,37 @@ For questions about the implementation plan, refer to the detailed documentation
 
 ---
 
-**Last Updated:** 2025-11-20 19:00:00
-**Current Phase:** Multi-Strategy Deployment with Intelligent Supervision
-**Active Strategies:**
-- ✅ Scalping v2.0 (Paper Trading - Circuit Breaker Auto-Reset)
-- ✅ ADX v2.0 (Paper Trading - Circuit Breaker Auto-Reset)
-**Supervisor System:** ✅ Active with Auto Circuit Breaker Reset (100% uptime, monitoring every 15 mins)
+**Last Updated:** 2025-12-09
+**Current Phase:** PAUSED - Taking a break from paper trading
 
-## Latest Trading Update (2025-11-20 19:00:00)
+## Latest Status Update (2025-12-09)
 
-### 🤖 Bot Supervisor System Status:
-- **Status:** ✅ ACTIVE & HEALTHY
-- **Quick Check:** Every 5 minutes → ✅ All services running
-- **Main Supervisor:** Every 15 minutes → ✅ Both bots monitored + circuit breaker auto-reset
-- **Daily Reports:** 8:00 AM automated email summaries
-- **Uptime:** 100% (auto-restart on failures)
-- **Circuit Breaker Auto-Reset:** ✅ Active for paper trading mode (NEW!)
-- **Last Check:** 18:55 - Market: TRENDING (ADX: 42.41), BTC: $88,015
+### ⏸️ ALL SYSTEMS PAUSED
 
-### 📊 SCALPING v2.0 - Account Status:
-- **Balance:** $977.37 USD
-- **Total Return:** -2.26% (-$22.63 loss)
-- **Starting Capital:** $1,000
-- **Current Positions:** 0 (No open trades)
-- **Circuit Breaker:** ✅ RESET by supervisor (was: -13.82% loss)
-- **Uptime:** 13 days (Restarted Nov 20, 18:54 - auto circuit reset)
-- **Status:** ✅ ACTIVE - Monitoring choppy markets
+All trading bots and supervisor services have been stopped for a break.
 
-### 📈 ADX v2.0 - Account Status:
-- **Balance:** $114.75 USD
-- **Total Return:** -28.28% (-$45.25 loss)
-- **Starting Capital:** $160.00
-- **Peak Balance:** $160.00
-- **Current Positions:** 0 (No open trades)
-- **Circuit Breaker:** ✅ RESET by supervisor (was: 6 consecutive losses)
-- **Uptime:** 30 minutes (Restarted Nov 20, 18:54 - auto circuit reset)
-- **Status:** ✅ ACTIVE - Waiting for strong trend signals
+**What was stopped:**
+- ⏸️ `scalping-trading-bot.service` - Stopped & Disabled
+- ⏸️ `adx-trading-bot.service` - Stopped & Disabled
+- ⏸️ Supervisor cron jobs - Removed
 
-### Current BTC Market (BingX):
-- **Price:** $87,900 - $88,015
-- **ADX:** 42.41 (STRONG TRENDING market)
-- **Market Regime:** Trending
-- **Tradeable:** ✅ Yes
+**Final Account Status Before Pause:**
 
-### Circuit Breaker Auto-Reset Feature (NEW! 2025-11-20):
-**What happened:**
-- Both bots hit circuit breakers and stopped trading
-- **Scalping v2:** Daily loss limit (-13.82%)
-- **ADX v2:** Consecutive loss limit (6 losses)
+| Bot | Balance | Return | Trades |
+|-----|---------|--------|--------|
+| Scalping v2.0 | $977.37 | -2.26% | Multiple |
+| ADX v2.0 | $114.75 | -28.28% | 34 trades |
 
-**Supervisor action:**
-- ✅ Detected paper trading mode for both bots
-- ✅ Automatically restarted both bots to reset circuit breakers
-- ✅ Sent 4 email notifications (restart + circuit breaker alerts)
-- ✅ Both bots resumed trading immediately
+**To Resume Trading:**
+```bash
+# Re-enable services
+sudo systemctl enable scalping-trading-bot adx-trading-bot.service
+sudo systemctl start scalping-trading-bot adx-trading-bot.service
 
-**Why this matters:**
-- Paper trading can now continue uninterrupted for data collection
-- Live trading circuit breakers still require manual intervention (safety!)
-- Full transparency via email notifications
-
-**Documentation:** See `supervisor/CIRCUIT_BREAKER_AUTO_RESET.md`
-
-### SCALPING v2.0 Recent Trades (Last 2 Winners):
-1. **2025-11-14 18:38** - LONG @ $94,358 → TAKE_PROFIT @ $95,275 = +$52.46 (+4.86%) ⭐
-2. **2025-11-13 16:08** - SHORT @ $99,009 → TAKE_PROFIT @ $98,412 = +$31.67 (+3.02%) ⭐
-3. **2025-11-17 12:15** - LONG @ $95,755 → STOP_LOSS @ $93,107 = -$156.45 (-13.82%) ❌ *Triggered circuit breaker*
-
-### SCALPING v2.0 Current State:
-- **Circuit Breaker:** Inactive (auto-reset by supervisor)
-- **RSI:** 47.52 (neutral)
-- **Stochastic:** 53.94/56.64
-- **Signal Cooldown:** ACTIVE (120s between signals)
-- **Choppy Market Blocker:** ACTIVE (filtering low-quality signals)
-- **Trading Filters:** All active (70% min confidence, time filter, liquidity filter)
-
-### ADX v2.0 Performance Summary (34 Total Trades):
-- **Wins:** 15 trades (44.1% win rate)
-- **Losses:** 19 trades (55.9%)
-- **Total P&L:** -$45.25 USD
-- **Consecutive Losses:** 6 (circuit breaker monitoring)
-- **Last Signal:** 6+ hours ago (waiting for ADX confirmation)
-
-### ADX v2.0 Risk Management Status:
-- ✅ **Daily Loss Limit:** 5.0% remaining (0.0% used)
-- ✅ **Drawdown:** 0.0% (no open positions)
-- ✅ **Max Positions:** 0/1 (Can open 1 position)
-- ✅ **Trading Status:** ENABLED - Ready for signals
-- ⚠️ **Consecutive Losses:** 6 (monitoring)
-
-### System Health (All Services):
-- ✅ Scalping Bot Service: Active (8d 1h uptime)
-- ✅ ADX Bot Service: Active (1h 38m uptime)
-- ✅ Scalping Dashboard: Online (port 5902)
-- ✅ ADX Dashboard: Online (port 5901)
-- ✅ Supervisor System: Monitoring every 5 mins
-- ✅ Auto-restart: Enabled for all services
-- ✅ Daily Email Reports: Active
-
-### Key Observations:
-
-**Scalping v2.0:**
-- ✅ **Profitable strategy:** +13.17% return over 8 days
-- ✅ **Quality over quantity:** Choppy market blocker preventing bad signals
-- ✅ **Recent trades excellent:** Both recent trades hit take profit targets
-- 📊 **Conservative approach:** Waiting for high-confidence setups (70%+)
-
-**ADX v2.0:**
-- ⚠️ **Underperforming:** 44% win rate, -28% total return
-- 🔍 **Patient waiting:** No signals in 6+ hours (good - waiting for ADX > 25)
-- ✅ **Risk controls working:** Still allowing trades despite 6 consecutive losses
-- 📍 **Strategy intact:** Properly monitoring, just waiting for strong trend confirmation
-
-**Supervisor System:**
-- ✅ **Perfect reliability:** Every 15-min supervision cycle passing
-- ✅ **Auto-recovery ready:** Bots will restart on crash
-- ✅ **Circuit Breaker Reset:** Auto-reset for paper trading (NEW!)
-- ✅ **Daily reporting:** 8 AM email summaries with full status
-- ✅ **Email notifications:** Immediate alerts for circuit breaker resets
-- ✅ **Maintenance automated:** Database cleanup every 6 hours
-
-### Why No Recent Signals?
-Both strategies are running conservatively:
-
-**SCALPING v2.0:**
-- Choppy market blocker ACTIVE (preventing low-quality signals)
-- Volume low (0.39x average) - waiting for better liquidity
-- Signal cooldown enforcing 120s minimum between trades
-
-**ADX v2.0:**
-1. **ADX > 25** required (Strong trend) ✅ Current: 28-39
-2. **+DI/-DI crossover** (Direction confirmation) ⏳ Waiting
-3. **Trend strength validation** (Not just price movement) ⏳ Waiting
-
-Both bots are correctly prioritizing quality over quantity! 🎯
+# Re-install supervisor cron jobs
+cd /var/www/dev/trading/supervisor
+./install_cron.sh
+```
 
 ---
 
@@ -804,4 +702,4 @@ journalctl -u adx-trading-bot.service -n 100 --no-pager
 
 ---
 
-**ADX v2.0 is live and trading!** 🚀
+**Status: PAUSED** - All systems stopped for break (2025-12-09)
