@@ -1,0 +1,117 @@
+{
+  "config": {
+    "strategy_name": "LP + Perps Hedge Backtest",
+    "lp_position": {
+      "initial_capital_usd": 10000,
+      "lower_bound": 58000,
+      "upper_bound": 72000,
+      "fee_tier": 0.003,
+      "assumed_pool_tvl": 50000000,
+      "gas_cost_per_tx": 0.5
+    },
+    "hedge": {
+      "leverage": 2,
+      "buffer_percent": 0.5,
+      "hedge_coverage_percent": 70,
+      "commission_rate_taker": 0.00075,
+      "commission_rate_maker": 0.0005,
+      "slippage_percent": 0.02,
+      "default_funding_rate": 0.0001,
+      "max_position_percent": 30
+    },
+    "backtest": {
+      "symbol": "BTCUSDT",
+      "interval": "1h",
+      "start_date": "2025-01-01",
+      "end_date": "2025-12-31",
+      "data_source": "binance"
+    },
+    "output": {
+      "save_results": true,
+      "results_dir": "results",
+      "plot_equity_curves": true
+    }
+  },
+  "run_date": "20260312_191706",
+  "results": {
+    "hodl": {
+      "strategy": "HODL 50/50",
+      "initial_capital": 10000,
+      "final_equity": 9715.9083620192,
+      "total_return_pct": -2.8409163798080006
+    },
+    "lp_only": {
+      "strategy": "LP Only",
+      "initial_capital": 10000,
+      "final_equity": 10000.0,
+      "total_return_pct": 0.0,
+      "lp_fees_earned": 0.0,
+      "pct_time_in_range": 0.0
+    },
+    "lp_hedge": {
+      "strategy": "LP + Hedge",
+      "initial_capital": 10000,
+      "final_equity": 10000.0,
+      "total_return_pct": 0.0,
+      "lp_fees_earned": 0.0,
+      "hedge_pnl": 0.0,
+      "funding_paid": 0.0,
+      "total_costs": 0.0,
+      "hedge_activations": 0,
+      "hours_hedged": 0,
+      "hours_in_range": 0,
+      "total_hours": 8733.0,
+      "pct_time_in_range": 0.0,
+      "pct_time_hedged": 0.0,
+      "perps_summary": {
+        "total_trades": 0,
+        "total_pnl": 0.0,
+        "total_fees": 0.0,
+        "total_funding": 0.0,
+        "net_hedge_result": 0.0
+      },
+      "cost_summary": {
+        "total_costs": 0.0,
+        "gas_costs": 0.0,
+        "gas_transactions": 0,
+        "trading_fees": 0.0,
+        "funding_costs": 0.0
+      }
+    }
+  },
+  "metrics": {
+    "hodl": {
+      "total_return_pct": -2.84,
+      "annualized_return_pct": -2.85,
+      "max_drawdown_pct": 19.96,
+      "sharpe_ratio": -0.02,
+      "sortino_ratio": -0.02,
+      "profit_factor": 1.0,
+      "volatility_pct": 22.58,
+      "best_return_pct": 2.6724,
+      "worst_return_pct": -2.4172
+    },
+    "lp_only": {
+      "total_return_pct": 0.0,
+      "annualized_return_pct": 0.0,
+      "max_drawdown_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "sortino_ratio": 0.0,
+      "profit_factor": Infinity,
+      "volatility_pct": 0.0,
+      "best_return_pct": 0.0,
+      "worst_return_pct": 0.0
+    },
+    "lp_hedge": {
+      "total_return_pct": 0.0,
+      "annualized_return_pct": 0.0,
+      "max_drawdown_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "sortino_ratio": 0.0,
+      "profit_factor": Infinity,
+      "volatility_pct": 0.0,
+      "best_return_pct": 0.0,
+      "worst_return_pct": 0.0
+    }
+  }
+}

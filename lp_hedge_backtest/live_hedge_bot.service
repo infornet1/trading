@@ -1,0 +1,15 @@
+[Unit]
+Description=Uniswap v3 LP Perps Hedge Bot (Bot Aragan)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/dev/trading/lp_hedge_backtest
+EnvironmentFile=/var/www/dev/trading/lp_hedge_backtest/.env
+ExecStart=/var/www/dev/trading/lp_hedge_backtest/venv/bin/python3 /var/www/dev/trading/lp_hedge_backtest/live_hedge_bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

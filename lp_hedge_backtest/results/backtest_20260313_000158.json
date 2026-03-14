@@ -1,0 +1,137 @@
+{
+  "config": {
+    "strategy_name": "LP + Perps Hedge v2 - Uniswap v3 Arbitrum ETH/USDC 0.05%",
+    "lp_position": {
+      "initial_capital_usd": 10000,
+      "lower_bound": 2700,
+      "upper_bound": 3300,
+      "fee_tier": 0.0005,
+      "assumed_pool_tvl": 8000000,
+      "daily_pool_volume": 8500000,
+      "gas_cost_per_tx": 0.1
+    },
+    "hedge": {
+      "leverage": 2,
+      "trigger_offset_percent": 0.5,
+      "hedge_coverage_percent": 50,
+      "commission_rate_taker": 0.00075,
+      "commission_rate_maker": 0.0005,
+      "slippage_percent": 0.02,
+      "default_funding_rate": 0.0001,
+      "max_position_percent": 30,
+      "take_profit_at_lower_bound": true
+    },
+    "regime": {
+      "adx_period": 14,
+      "adx_lateral_threshold": 20,
+      "adx_trend_threshold": 30,
+      "ema_fast_period": 10,
+      "ma_slow_period": 25,
+      "require_lateral_for_lp": true
+    },
+    "rebalance": {
+      "enabled": true,
+      "out_of_range_hours_trigger": 24,
+      "range_width_percent": 10,
+      "gas_cost_rebalance": 0.2,
+      "min_rebalance_distance_percent": 3
+    },
+    "backtest": {
+      "symbol": "ETHUSDT",
+      "interval": "1h",
+      "start_date": "2025-01-01",
+      "end_date": "2025-12-31",
+      "data_source": "bingx"
+    },
+    "output": {
+      "save_results": true,
+      "results_dir": "results",
+      "plot_equity_curves": true
+    }
+  },
+  "run_date": "20260313_000158",
+  "results": {
+    "hodl": {
+      "strategy": "HODL 50/50",
+      "initial_capital": 10000,
+      "final_equity": 9438.63956168977,
+      "total_return_pct": -5.6136043831023
+    },
+    "lp_only": {
+      "strategy": "LP Only",
+      "initial_capital": 10000,
+      "final_equity": 44044.5161903261,
+      "total_return_pct": 340.445161903261,
+      "lp_fees_earned": 4243.3982115502695,
+      "pct_time_in_range": 75.19752662315355,
+      "rebalance_count": 42
+    },
+    "lp_hedge": {
+      "strategy": "LP + Hedge v2",
+      "initial_capital": 10000,
+      "final_equity": 46071.69735329726,
+      "total_return_pct": 360.7169735329726,
+      "lp_fees_earned": 4243.399240090754,
+      "hedge_pnl": 2082.8517900593592,
+      "funding_paid": 55.70661830363793,
+      "total_costs": 265.5550078305707,
+      "hedge_activations": 54,
+      "hours_hedged": 847.0,
+      "hours_in_range": 6567.0,
+      "total_hours": 8733.0,
+      "pct_time_in_range": 75.19752662315355,
+      "pct_time_hedged": 9.698843467307912,
+      "rebalance_count": 42,
+      "regime_pauses": 2837,
+      "perps_summary": {
+        "total_trades": 54,
+        "total_pnl": 2082.85,
+        "total_fees": 418.02,
+        "total_funding": 55.71,
+        "net_hedge_result": 2027.15
+      },
+      "cost_summary": {
+        "total_costs": 265.56,
+        "gas_costs": 0.84,
+        "gas_transactions": 8.400000000000002,
+        "trading_fees": 209.01,
+        "funding_costs": 55.71
+      }
+    }
+  },
+  "metrics": {
+    "hodl": {
+      "total_return_pct": -5.61,
+      "annualized_return_pct": -5.63,
+      "max_drawdown_pct": 32.54,
+      "sharpe_ratio": -0.01,
+      "sortino_ratio": -0.01,
+      "profit_factor": 1.0,
+      "volatility_pct": 33.43,
+      "best_return_pct": 4.2346,
+      "worst_return_pct": -5.3852
+    },
+    "lp_only": {
+      "total_return_pct": 340.45,
+      "annualized_return_pct": 342.47,
+      "max_drawdown_pct": 39.41,
+      "sharpe_ratio": 2.55,
+      "sortino_ratio": 3.64,
+      "profit_factor": 1.16,
+      "volatility_pct": 66.88,
+      "best_return_pct": 10.3011,
+      "worst_return_pct": -11.4905
+    },
+    "lp_hedge": {
+      "total_return_pct": 360.72,
+      "annualized_return_pct": 362.9,
+      "max_drawdown_pct": 29.42,
+      "sharpe_ratio": 2.88,
+      "sortino_ratio": 4.69,
+      "profit_factor": 1.19,
+      "volatility_pct": 59.1,
+      "best_return_pct": 9.6533,
+      "worst_return_pct": -5.792
+    }
+  }
+}
