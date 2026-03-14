@@ -87,3 +87,39 @@ sudo systemctl restart live_hedge_bot.service
 - **BTC: NEVER short** — long only. ETH: long + short OK.
 - **Hedge size:** 10% of pool value on Hyperliquid
 - **Pool APR tracking:** use `revert.finance`
+
+---
+
+## 💰 Capital Management Notes (March 14, 2026)
+
+### Available Capital: $1,269.84 USDC — NOT deployed in LP
+
+**Context:** $1,269.84 USDC available but with hard return deadlines:
+- 50% ($634.92) → due back **March 25, 2026** (11 days)
+- 50% ($634.92) → due back **March 28, 2026** (14 days)
+
+**Decision: Do NOT open LP pool with this capital.**
+
+Reasons:
+- LP strategy requires weeks/months to accumulate fees offsetting IL + gas
+- 11-14 day horizon is too short — break-even needs 5-10 days with no buffer
+- If price exits range even 3-4 days, fees = $0 during that period
+- Principal belongs to a third party — reputational risk outweighs potential gain (~$5-26)
+
+**Recommended action:** Deposit in **Morpho or Aave v3 on Arbitrum** (via Rabby Wallet lending tab)
+- ~6-12% APY, instant withdrawal, zero IL risk
+- Estimated yield: ~$3-6 over 11-14 days
+- Withdraw $634.92 on Mar 25, remaining $634.92 on Mar 28
+
+### Revert.finance Clarification
+`revert.finance` is **not** a USDC yield platform. Its actual use cases:
+1. **Analytics** — track APR, fees earned, IL on active LP positions (use this for pool #5364575)
+2. **Auto-Compoundor** — reinvests LP fees back into the position automatically
+3. **Revert Lend** — borrow USDC using Uniswap v3 NFT as collateral (not relevant here)
+
+### Future Capital Allocation (when capital has no deadline)
+Suggested setup based on market analysis (Mar 14, 2026):
+- **BTC/USDC pool** on Arbitrum, range **$65,568 — $74,022** (12.9% wide)
+- BTC ADX = 12.8 (falling) → lateral market, ideal for LP
+- $65,568 support: 3 confirmed touches
+- Split: 85% to pool, 15% to Hyperliquid hedge reserve (LONG only — never short BTC)
