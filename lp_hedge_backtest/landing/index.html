@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIZNAGO FURY — LP + Hedge Backtester</title>
+  <meta name="description" content="Backtest concentrated liquidity LP positions with perpetuals hedge on BTC/USDT. Compare HODL, LP Only, and LP + Hedge strategies with full performance metrics." />
+  <link rel="stylesheet" href="global.css" />
+</head>
+<body>
+
+  <!-- ============================================================
+       NAVBAR
+  ============================================================ -->
+  <nav class="navbar">
+    <img src="assets/Gemini_Generated_Image_i12tnji12tnji12t.png"
+         alt="VIZNAGO FURY"
+         class="navbar-logo" />
+    <div class="navbar-title">LP + Perps Hedge Backtester</div>
+    <span class="navbar-badge">v1.0 BETA</span>
+  </nav>
+
+
+  <!-- ============================================================
+       HERO
+  ============================================================ -->
+  <section class="hero">
+    <div class="hero-inner">
+
+      <!-- Left: copy -->
+      <div>
+        <div class="hero-label">DeFi Strategy Research</div>
+        <h1>
+          <span class="text-gradient">LP + Perps Hedge</span><br />
+          Backtest Engine
+        </h1>
+        <p class="hero-desc">
+          Simulate concentrated liquidity positions (Uniswap v3 style) on BTC/USDT
+          and automatically hedge impermanent loss by opening SHORT perps when price
+          exits your LP range.
+        </p>
+        <div class="hero-actions">
+          <a href="#strategies" class="btn btn-primary">
+            &#9654;&nbsp; Explore Strategies
+          </a>
+          <a href="#how-it-works" class="btn btn-outline">
+            &#128196;&nbsp; How It Works
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: visual -->
+      <div class="hero-visual">
+        <img src="assets/Gemini_Generated_Image_akv9umakv9umakv9.png"
+             alt="VIZNAGO FURY Platform"
+             class="hero-logo-banner" />
+
+        <div class="hero-stats-row">
+          <div class="hero-stat">
+            <div class="hero-stat-value">3</div>
+            <div class="hero-stat-label">Strategies</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">9+</div>
+            <div class="hero-stat-label">Metrics</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">BTC/USDT</div>
+            <div class="hero-stat-label">Pair</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+
+  <!-- ============================================================
+       STRATEGIES
+  ============================================================ -->
+  <section id="strategies">
+    <div class="container">
+      <div class="section-label">Core Comparison</div>
+      <h2 class="section-title text-gradient">Three Strategies, One Truth</h2>
+      <p class="section-desc text-muted">
+        Run all three approaches on the same price data and see exactly where fees,
+        impermanent loss, and hedging costs net out.
+      </p>
+
+      <div class="strategy-grid">
+
+        <!-- HODL -->
+        <div class="strategy-card strategy-card--hodl">
+          <div class="strategy-number">STRATEGY 01</div>
+          <span class="strategy-icon">&#128181;</span>
+          <h3 class="strategy-name">HODL 50/50</h3>
+          <p class="strategy-desc">
+            Hold 50% BTC + 50% USDT. No active management. Pure price exposure as the baseline benchmark.
+          </p>
+          <ul class="strategy-pill-list">
+            <li class="strategy-pill pos">Zero gas / protocol costs</li>
+            <li class="strategy-pill pos">Full upside on BTC price</li>
+            <li class="strategy-pill neg">No yield on idle USDT</li>
+            <li class="strategy-pill neg">50% portfolio in stablecoin</li>
+          </ul>
+        </div>
+
+        <!-- LP Only -->
+        <div class="strategy-card strategy-card--lp">
+          <div class="strategy-number">STRATEGY 02</div>
+          <span class="strategy-icon">&#128200;</span>
+          <h3 class="strategy-name">LP Only</h3>
+          <p class="strategy-desc">
+            Provide concentrated liquidity in a BTC/USDT pool. Earn trading fees while
+            being exposed to impermanent loss when price moves outside your range.
+          </p>
+          <ul class="strategy-pill-list">
+            <li class="strategy-pill pos">Earn LP fees continuously</li>
+            <li class="strategy-pill pos">Amplified capital efficiency vs v2</li>
+            <li class="strategy-pill neg">Impermanent loss when out-of-range</li>
+            <li class="strategy-pill neg">Active range management required</li>
+          </ul>
+        </div>
+
+        <!-- LP + Hedge -->
+        <div class="strategy-card strategy-card--hedge">
+          <div class="strategy-number">STRATEGY 03</div>
+          <span class="strategy-icon">&#128737;</span>
+          <h3 class="strategy-name">LP + Hedge</h3>
+          <p class="strategy-desc">
+            Combine LP fee income with a perpetuals SHORT that activates when price drops
+            below your range — capturing downside protection while keeping fee yield.
+          </p>
+          <ul class="strategy-pill-list">
+            <li class="strategy-pill pos">LP fees + SHORT perp gains</li>
+            <li class="strategy-pill pos">IL offset by hedge P&amp;L</li>
+            <li class="strategy-pill pos">Configurable hedge ratio</li>
+            <li class="strategy-pill neg">Funding rate cost on SHORT</li>
+          </ul>
+          <span class="strategy-tag strategy-tag--best">&#9733; Focus Strategy</span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+
+  <!-- ============================================================
+       HOW IT WORKS
+  ============================================================ -->
+  <section id="how-it-works">
+    <div class="container">
+      <div class="section-label">Pipeline</div>
+      <h2 class="section-title text-gradient">How The Backtest Works</h2>
+      <p class="section-desc text-muted">
+        Four deterministic steps from raw price data to a full performance report.
+      </p>
+
+      <div class="steps-grid">
+        <div class="step">
+          <div class="step-num">01</div>
+          <h4 class="step-title">Fetch Price Data</h4>
+          <p class="step-desc">Pull OHLCV candles from Binance for your chosen date range and interval (1h / 4h / 1d).</p>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <h4 class="step-title">Simulate LP Position</h4>
+          <p class="step-desc">Model Uniswap v3 concentrated liquidity math — token balances, fees earned, and in/out-of-range status per candle.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <h4 class="step-title">Apply Hedge Logic</h4>
+          <p class="step-desc">Open SHORT perp when price falls below lower tick. Apply funding rate costs and PnL on each candle while out-of-range.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">04</div>
+          <h4 class="step-title">Report &amp; Compare</h4>
+          <p class="step-desc">Calculate Sharpe, Sortino, Max Drawdown, Profit Factor and plot equity curves side-by-side across all three strategies.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+
+  <!-- ============================================================
+       METRICS
+  ============================================================ -->
+  <section id="metrics">
+    <div class="container">
+      <div class="section-label">Performance Analytics</div>
+      <h2 class="section-title text-gradient">Full Metrics Suite</h2>
+      <p class="section-desc text-muted">
+        Every strategy run produces a complete risk-adjusted performance breakdown.
+      </p>
+
+      <div class="metrics-grid">
+
+        <div class="metric-card">
+          <div class="metric-icon">&#128200;</div>
+          <div class="metric-name">Total Return</div>
+          <div class="metric-value text-neon">%</div>
+          <div class="metric-desc">Net portfolio gain relative to initial capital over the full backtest window.</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">&#128336;</div>
+          <div class="metric-name">Annualized Return</div>
+          <div class="metric-value text-neon">% p.a.</div>
+          <div class="metric-desc">Normalized to 365 days. Compare strategies regardless of backtest duration.</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">&#128201;</div>
+          <div class="metric-name">Sharpe Ratio</div>
+          <div class="metric-value text-neon">&#x221E;</div>
+          <div class="metric-desc">Annualized risk-adjusted return using hourly periods. &gt;1.0 = good, &gt;2.0 = excellent.</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">&#128202;</div>
+          <div class="metric-name">Sortino Ratio</div>
+          <div class="metric-value text-neon">&#x221E;</div>
+          <div class="metric-desc">Like Sharpe but only penalises downside deviation — better for asymmetric strategies.</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">&#128203;</div>
+          <div class="metric-name">Max Drawdown</div>
+          <div class="metric-value text-neon">%</div>
+          <div class="metric-desc">Largest peak-to-trough equity drop. Key measure of capital risk at the worst moment.</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">&#128204;</div>
+          <div class="metric-name">Profit Factor</div>
+          <div class="metric-value text-neon">ratio</div>
+          <div class="metric-desc">Total gains divided by total losses per candle. Values &gt;1.5 indicate a strong edge.</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+
+  <!-- ============================================================
+       DATA SOURCES & INTEGRATIONS
+  ============================================================ -->
+  <section id="integrations">
+    <div class="container">
+      <div class="section-label">Data &amp; Protocols</div>
+      <h2 class="section-title text-gradient">Built On Proven Infrastructure</h2>
+      <p class="section-desc text-muted">
+        The backtester models the same mechanics you encounter in production DeFi.
+      </p>
+
+      <div class="source-grid">
+
+        <div class="source-card">
+          <div class="source-icon">&#128279;</div>
+          <div class="source-name">Binance OHLCV</div>
+          <div class="source-desc">Historical BTC/USDT klines via public REST API. 1h, 4h, 1d intervals.</div>
+        </div>
+
+        <div class="source-card">
+          <div class="source-icon">&#128260;</div>
+          <div class="source-name">Uniswap v3 Math</div>
+          <div class="source-desc">Full concentrated liquidity model with tick-based position tracking and fee simulation.</div>
+        </div>
+
+        <div class="source-card">
+          <div class="source-icon">&#128176;</div>
+          <div class="source-name">Perps Funding</div>
+          <div class="source-desc">Configurable funding rate model. Supports fixed APY or per-8h rate assumptions.</div>
+        </div>
+
+        <div class="source-card">
+          <div class="source-icon">&#128196;</div>
+          <div class="source-name">Cost Model</div>
+          <div class="source-desc">Slippage, protocol fees, and gas costs factored in at every entry and exit event.</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+
+  <!-- ============================================================
+       CTA BANNER
+  ============================================================ -->
+  <section style="padding: 60px 0;">
+    <div class="container" style="text-align: center;">
+      <div style="
+        background: linear-gradient(135deg, #071428 0%, #091c38 100%);
+        border: 1px solid rgba(26, 143, 255, 0.35);
+        border-radius: 16px;
+        padding: 60px 40px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 0 60px rgba(26, 143, 255, 0.1);
+      ">
+        <!-- glow blob -->
+        <div style="
+          position: absolute;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: 400px; height: 200px;
+          background: radial-gradient(ellipse, rgba(0,212,255,0.08) 0%, transparent 70%);
+          pointer-events: none;
+        "></div>
+
+        <div class="section-label" style="justify-content: center; margin-bottom: 16px;">Ready to Run</div>
+        <h2 class="section-title text-gradient" style="margin-bottom: 12px;">Start Your Backtest</h2>
+        <p style="color: var(--color-text-secondary); max-width: 480px; margin: 0 auto 32px; font-size: 0.95rem;">
+          Configure your date range, LP range width, fee tier and hedge ratio in
+          <code style="color: var(--color-neon-cyan); background: rgba(0,212,255,0.08); padding: 2px 8px; border-radius: 4px;">config.json</code>
+          then run a single command.
+        </p>
+
+        <div style="
+          background: #040d1a;
+          border: 1px solid var(--color-border);
+          border-radius: 8px;
+          padding: 20px 28px;
+          display: inline-block;
+          text-align: left;
+          font-family: 'Courier New', monospace;
+          font-size: 0.9rem;
+          color: var(--color-neon-green);
+          box-shadow: 0 0 20px rgba(0,255,179,0.08);
+        ">
+          <span style="color: var(--color-text-muted)">$ </span>python run_backtest.py<br/>
+          <span style="color: var(--color-text-muted)">$ </span>python run_backtest.py --config custom_config.json
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       FOOTER
+  ============================================================ -->
+  <hr class="divider" />
+  <footer>
+    <div class="footer">
+      <img src="assets/Gemini_Generated_Image_i12tnji12tnji12t.png"
+           alt="VIZNAGO FURY"
+           class="footer-logo" />
+      <span class="footer-text">LP + Perps Hedge Backtester &mdash; VIZNAGO FURY &copy; 2026</span>
+      <div class="footer-links">
+        <a href="#strategies" class="footer-link">Strategies</a>
+        <a href="#metrics"    class="footer-link">Metrics</a>
+        <a href="#how-it-works" class="footer-link">Docs</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
