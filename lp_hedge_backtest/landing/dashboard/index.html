@@ -93,6 +93,12 @@
             <div class="ws-chain" id="ws-chain"></div>
           </div>
           <div class="wallet-summary-right">
+            <!-- Network selector pills -->
+            <div class="chain-switcher">
+              <button class="chain-pill" id="pill-42161" onclick="switchToChain('0xa4b1')" title="Arbitrum One">Arbitrum</button>
+              <button class="chain-pill" id="pill-1"     onclick="switchToChain('0x1')"    title="Ethereum">Ethereum</button>
+              <button class="chain-pill" id="pill-8453"  onclick="switchToChain('0x2105')" title="Base">Base</button>
+            </div>
             <div class="ws-count" id="ws-count">— positions</div>
             <button class="btn btn-outline btn-sm" onclick="refreshAll()">
               &#8635;&nbsp; Refresh
@@ -102,6 +108,9 @@
             </button>
           </div>
         </div>
+
+        <!-- Error banner -->
+        <div id="error-banner" class="alert alert-error hidden"></div>
 
         <!-- Wrong network warning -->
         <div id="wrong-network-warning" class="alert alert-warning hidden">

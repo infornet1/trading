@@ -169,13 +169,19 @@ window.refreshAll = async function () {
   if (btn) btn.classList.remove('spinning');
 };
 
+function registerWalletListeners() {
+  // Remove before re-adding to prevent listener stacking on reconnect
+  window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+  window.ethereum.removeListener('chainChanged',    handleChainChanged);
+  window.ethereum.on('accountsChanged', handleAccountsChanged);
+  window.ethereum.on('chainChanged',    handleChainChanged);
+}
+
 function onWalletConnected() {
   setWalletBtnLoading(false);
   renderWalletConnected();
 
-  // Listen for account / chain changes
-  window.ethereum.on('accountsChanged', handleAccountsChanged);
-  window.ethereum.on('chainChanged',    handleChainChanged);
+  registerWalletListeners();
 
   // Initial data load
   fetchLivePrices();
@@ -201,11 +207,36 @@ function handleAccountsChanged(accounts) {
 
 function handleChainChanged(chainIdHex) {
   state.chainId = parseInt(chainIdHex, 16);
-  // Reset provider so it picks up the new chain
-  state.provider = new ethers.BrowserProvider(window.ethereum);
-  updateWalletBar();
-  fetchPositions();
+  // Brief delay — some wallets (Rabby, MetaMask) are still finalising the
+  // chain switch when this event fires; recreating the provider immediately
+  // can result in calls going to the old chain.
+  setTimeout(() => {
+    state.provider = new ethers.BrowserProvider(window.ethereum);
+    updateWalletBar();
+    updateChainPills();
+    fetchPositions();
+  }, 150);
 }
+
+// ── Network Switcher ──────────────────────────────────────────────────────
+
+window.switchToChain = async function (chainIdHex) {
+  if (!window.ethereum) return;
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: chainIdHex }],
+    });
+    // chainChanged event will fire and trigger handleChainChanged automatically
+  } catch (err) {
+    if (err.code === 4902) {
+      showError('This chain is not added to your wallet yet. Add it in Rabby first.');
+    } else if (err.code !== 4001) {
+      // 4001 = user rejected — silently ignore
+      showError('Failed to switch network: ' + (err.message || err));
+    }
+  }
+};
 
 // ── On-Chain Position Fetching ────────────────────────────────────────────
 
@@ -425,6 +456,18 @@ function updateWalletBar() {
     badge.textContent = 'Wrong Network';
     badge.classList.add('chain-wrong');
   }
+
+  updateChainPills();
+}
+
+function updateChainPills() {
+  // Highlight the active chain pill; grey-out the others
+  const pillMap = { 42161: 'pill-42161', 1: 'pill-1', 8453: 'pill-8453' };
+  Object.entries(pillMap).forEach(([id, elId]) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.classList.toggle('chain-pill--active', Number(id) === state.chainId);
+  });
 }
 
 function updatePositionCount(n) {
@@ -603,8 +646,13 @@ function setWalletBtnLoading(loading) {
 }
 
 function showError(msg) {
-  // Simple inline error — append below wallet summary if dashboard is visible
   console.error(msg);
+  const el = document.getElementById('error-banner');
+  if (!el) return;
+  el.textContent = '⚠ ' + msg;
+  el.classList.remove('hidden');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.add('hidden'), 8000);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
