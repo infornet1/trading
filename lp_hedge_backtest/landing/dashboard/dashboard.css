@@ -45,6 +45,8 @@
   position: sticky;
   top: 70px;
   z-index: 90;
+  /* Push ticker below the fixed navbar (70px) so it isn't hidden behind it */
+  margin-top: 70px;
   background: rgba(7, 20, 40, 0.95);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--color-border);

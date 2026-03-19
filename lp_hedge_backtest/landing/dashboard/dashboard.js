@@ -228,14 +228,10 @@ async function fetchPositions() {
   updateWrongNetworkBanner(false);
 
   try {
-    // Use a read-only provider from the public RPC for on-chain queries
-    // (falls back to the injected wallet provider if RPC fails)
-    let readProvider;
-    try {
-      readProvider = new ethers.JsonRpcProvider(chainCfg.rpc);
-    } catch (_) {
-      readProvider = state.provider;
-    }
+    // Use the wallet's own provider — it is already connected to the correct chain
+    // (JsonRpcProvider constructor is lazy and never throws, so the old try/catch
+    //  fallback never triggered; wallet provider avoids that race entirely)
+    const readProvider = state.provider;
 
     const nfpm = new ethers.Contract(chainCfg.nfpmAddr, NFPM_ABI, readProvider);
 
