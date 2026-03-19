@@ -283,8 +283,21 @@ async function fetchPositions() {
     }
     const tokenIds = await Promise.all(tokenIdPromises);
 
-    // Fetch position data for each tokenId in parallel
-    const posDataPromises = tokenIds.map(id => nfpm.positions(id).then(p => ({ tokenId: id, ...p })));
+    // Fetch position data for each tokenId in parallel.
+    // NOTE: ethers v6 returns a Result (Proxy) object — named properties are
+    // NOT enumerable so { ...p } only copies numeric indices, not token0/token1.
+    // Must extract fields explicitly.
+    const posDataPromises = tokenIds.map(id => nfpm.positions(id).then(p => ({
+      tokenId:     id,
+      token0:      p.token0,
+      token1:      p.token1,
+      fee:         p.fee,
+      tickLower:   p.tickLower,
+      tickUpper:   p.tickUpper,
+      liquidity:   p.liquidity,
+      tokensOwed0: p.tokensOwed0,
+      tokensOwed1: p.tokensOwed1,
+    })));
     const rawPositions = await Promise.all(posDataPromises);
 
     // Filter out closed (zero-liquidity) positions — keep but tag them
