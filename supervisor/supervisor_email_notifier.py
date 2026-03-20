@@ -51,6 +51,11 @@ class SupervisorEmailNotifier:
                 'recipient_email': os.getenv('EMAIL_RECIPIENT', 'perdomo.gustavo@gmail.com')
             }
 
+        # Normalise recipient_email to always be a list
+        _r = self.config.get('recipient_email', [])
+        self.config['recipient_emails'] = _r if isinstance(_r, list) else [_r]
+        self.config['recipient_email']  = ', '.join(self.config['recipient_emails'])
+
     def send_email(self, subject: str, body_html: str, body_text: str = None) -> bool:
         """Send an email notification"""
 
@@ -63,7 +68,7 @@ class SupervisorEmailNotifier:
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
             msg['From'] = self.config['sender_email']
-            msg['To'] = self.config['recipient_email']
+            msg['To'] = self.config['recipient_email']  # comma-separated string
 
             # Add text and HTML parts
             if body_text:
@@ -77,7 +82,11 @@ class SupervisorEmailNotifier:
             with smtplib.SMTP(self.config['smtp_server'], self.config['smtp_port']) as server:
                 server.starttls()
                 server.login(self.config['sender_email'], self.config['sender_password'])
-                server.send_message(msg)
+                server.sendmail(
+                    self.config['sender_email'],
+                    self.config['recipient_emails'],
+                    msg.as_string(),
+                )
 
             print(f"✅ Email sent: {subject}")
             return True

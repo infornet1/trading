@@ -52,7 +52,9 @@ class BTCEmailNotifier:
         self.smtp_username = config.get('smtp_username')
         self.smtp_password = config.get('smtp_password')
         self.sender_email = config.get('sender_email')
-        self.recipient_email = config.get('recipient_email')
+        _r = config.get('recipient_email', [])
+        self.recipient_emails = _r if isinstance(_r, list) else [_r]
+        self.recipient_email  = ', '.join(self.recipient_emails)  # display / To header
 
         # Alert preferences
         self.alert_preferences = {
@@ -289,7 +291,7 @@ Price: ${current_price:,.2f}
                 server.login(self.smtp_username, self.smtp_password)
 
             # Send email
-            server.sendmail(self.sender_email, self.recipient_email, msg.as_string())
+            server.sendmail(self.sender_email, self.recipient_emails, msg.as_string())
             server.quit()
 
             logger.info(f"Email sent successfully to {self.recipient_email}")
