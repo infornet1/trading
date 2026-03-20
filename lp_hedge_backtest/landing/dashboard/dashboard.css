@@ -754,6 +754,57 @@
   margin-top: 4px;
 }
 
+/* ── Live Log Terminal ───────────────────────────────────────── */
+.bot-log-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  margin-bottom: 6px;
+}
+.bot-log-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.2em;
+  color: var(--color-neon-green);
+  text-transform: uppercase;
+}
+.bot-log-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-neon-green);
+  box-shadow: 0 0 6px var(--color-neon-green);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--color-neon-green); }
+  50%       { opacity: 0.4; box-shadow: none; }
+}
+.bot-log-terminal {
+  background: #050e1a;
+  border: 1px solid rgba(0,255,179,0.15);
+  border-radius: 8px;
+  padding: 12px 14px;
+  height: 180px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: #7fffcb;
+  scroll-behavior: smooth;
+}
+.bot-log-terminal::-webkit-scrollbar { width: 4px; }
+.bot-log-terminal::-webkit-scrollbar-track { background: transparent; }
+.bot-log-terminal::-webkit-scrollbar-thumb {
+  background: rgba(0,255,179,0.2);
+  border-radius: 2px;
+}
+.bot-log-line { white-space: pre-wrap; word-break: break-all; }
+.log-warn  { color: #fbbf24; font-weight: 700; }
+.log-ok    { color: #00ffb3; font-weight: 700; }
+.log-alert { color: #f87171; font-weight: 700; }
+
 /* ── Protection Drawer ───────────────────────────────────────── */
 .pc-protection {
   border-top: 1px solid var(--color-border);

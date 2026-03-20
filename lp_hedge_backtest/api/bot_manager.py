@@ -125,6 +125,13 @@ class BotManager:
                         await self._handle_event(config_id, record)
                     except Exception as e:
                         print(f"[BotManager] Event parse error: {e}", flush=True)
+                else:
+                    # Forward raw stdout lines as live log messages
+                    await self._broadcast(config_id, {
+                        "type": "log",
+                        "msg":  line,
+                        "ts":   datetime.now(timezone.utc).isoformat(),
+                    })
         except Exception as e:
             print(f"[BotManager] Tail error for config {config_id}: {e}", flush=True)
         finally:

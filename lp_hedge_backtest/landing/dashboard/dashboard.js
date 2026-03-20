@@ -126,7 +126,9 @@ const saas = {
   bots:     {},    // nft_token_id (string) → BotConfigOut
   sockets:  {},    // config_id (number) → WebSocket
   statuses: {},    // config_id → last event payload
+  logs:     {},    // config_id → array of log line strings (max 50)
 };
+const LOG_MAX = 50;
 
 // Track which protection drawers are open (survive re-render)
 const _drawerOpen = new Set();
@@ -1067,10 +1069,49 @@ function renderLiveBots() {
           <span class="hedge-rule-icon">&#9888;</span>
           <span data-i18n-html="dash.hedge.rule">${t('dash.hedge.rule')}</span>
         </div>
+        ${buildLogTerminal(bot.id)}
       </div>`;
   }).join('');
 
   section.innerHTML = cards;
+}
+
+// ── Log terminal ──────────────────────────────────────────────────────────
+
+function appendLogLine(configId, msg) {
+  const el = document.getElementById(`bot-log-${configId}`);
+  if (!el) return;
+  const line = document.createElement('div');
+  line.className = 'bot-log-line';
+  // Colour-code key words
+  const escaped = msg
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  line.innerHTML = escaped
+    .replace(/(TRIGGERED|HEDGE|SHORT|LONG|TP|SL|ERROR)/g, '<span class="log-warn">$1</span>')
+    .replace(/(IN RANGE|✅|🟢)/g, '<span class="log-ok">$1</span>')
+    .replace(/(OUT|⚠|🔴|❌)/g,   '<span class="log-alert">$1</span>');
+  el.appendChild(line);
+  // Keep only last LOG_MAX lines in DOM
+  while (el.children.length > LOG_MAX) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+
+function buildLogTerminal(configId) {
+  const lines = (saas.logs[configId] || []).map(msg => {
+    const escaped = msg
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<div class="bot-log-line">${escaped
+      .replace(/(TRIGGERED|HEDGE|SHORT|LONG|TP|SL|ERROR)/g, '<span class="log-warn">$1</span>')
+      .replace(/(IN RANGE|✅|🟢)/g, '<span class="log-ok">$1</span>')
+      .replace(/(OUT|⚠|🔴|❌)/g,   '<span class="log-alert">$1</span>')
+    }</div>`;
+  }).join('');
+  return `
+    <div class="bot-log-header">
+      <span class="bot-log-title">&#9654; LIVE LOG</span>
+      <span class="bot-log-dot"></span>
+    </div>
+    <div class="bot-log-terminal" id="bot-log-${configId}">${lines}</div>`;
 }
 
 // ── WebSocket per bot ─────────────────────────────────────────────────────
@@ -1086,8 +1127,18 @@ function connectBotWS(configId) {
     try {
       const data = JSON.parse(e.data);
       if (data.event === 'ping') return;
-      saas.statuses[configId] = data;
-      updateBotStatusDisplay(configId, data);
+
+      if (data.type === 'log') {
+        // Raw stdout line — append to log buffer and update terminal
+        if (!saas.logs[configId]) saas.logs[configId] = [];
+        saas.logs[configId].push(data.msg);
+        if (saas.logs[configId].length > LOG_MAX) saas.logs[configId].shift();
+        appendLogLine(configId, data.msg);
+      } else {
+        // Structured event
+        saas.statuses[configId] = data;
+        updateBotStatusDisplay(configId, data);
+      }
     } catch (_) {}
   };
 
