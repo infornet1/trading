@@ -79,6 +79,27 @@
         <p class="connect-hint" data-i18n="dash.connect.hint">
           Compatible con: Rabby Wallet · MetaMask · cualquier billetera EIP-1193
         </p>
+
+        <!-- ── Watch Address (read-only) ──────────────────── -->
+        <div class="watch-divider">
+          <span data-i18n="dash.watch.or">o ver una dirección</span>
+        </div>
+        <div class="watch-form">
+          <input type="text" id="watch-addr-input" class="watch-input"
+                 data-i18n-placeholder="dash.watch.placeholder"
+                 placeholder="0x... dirección de billetera"
+                 autocomplete="off" spellcheck="false" />
+          <select id="watch-chain-select" class="watch-chain-select">
+            <option value="42161">Arbitrum</option>
+            <option value="1">Ethereum</option>
+            <option value="8453">Base</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="startWatchMode()">
+            &#128065;&nbsp;<span data-i18n="dash.watch.btn">Ver</span>
+          </button>
+        </div>
+        <p class="watch-hint" data-i18n="dash.watch.hint">Solo lectura — sin conexión de billetera</p>
+
         <div class="connect-no-wallet" id="no-wallet-msg" style="display:none;">
           <span data-i18n="dash.connect.nowallet">No se detectó billetera.</span>
           <a href="https://rabby.io" target="_blank" rel="noopener" class="text-neon">
@@ -96,6 +117,7 @@
           <div class="wallet-summary-left">
             <div class="ws-address" id="ws-address"></div>
             <div class="ws-chain" id="ws-chain"></div>
+            <span id="watch-badge" class="watch-mode-badge hidden" data-i18n="dash.watch.badge">👁 VIENDO</span>
           </div>
           <div class="wallet-summary-right">
             <!-- Network selector pills -->
@@ -108,8 +130,8 @@
             <button class="btn btn-outline btn-sm" onclick="refreshAll()">
               &#8635;&nbsp; <span data-i18n="dash.ws.refresh">Actualizar</span>
             </button>
-            <button class="btn btn-outline btn-sm" onclick="disconnectWallet()">
-              <span data-i18n="dash.ws.disconnect">Desconectar</span>
+            <button class="btn btn-outline btn-sm" id="disconnect-btn" onclick="disconnectWallet()">
+              <span id="disconnect-label" data-i18n="dash.ws.disconnect">Desconectar</span>
             </button>
           </div>
         </div>

@@ -174,6 +174,17 @@ const TRANSLATIONS = {
     'dash.btn.connect':        '🟢 Conectar Billetera',
     'dash.btn.connecting':     '⏳ Conectando…',
     'dash.rabby.detected':     'Rabby Wallet detectado ✓',
+
+    // ── Dashboard: watch address mode ─────────────────────────
+    'dash.watch.or':           'o ver una dirección',
+    'dash.watch.placeholder':  '0x... dirección de billetera',
+    'dash.watch.btn':          'Ver',
+    'dash.watch.hint':         'Solo lectura — sin conexión de billetera',
+    'dash.watch.badge':        '👁 VIENDO',
+    'dash.watch.stop':         'Dejar de Ver',
+    'dash.watch.invalid':      'Dirección inválida. Debe empezar con 0x y tener 42 caracteres.',
+    'dash.watch.network':      'Red:',
+
     'dash.footer.text':        'Panel de Control LP — VIZNAGO FURY © 2026',
     'dash.footer.backtest':    'Backtester',
   },
@@ -339,6 +350,17 @@ const TRANSLATIONS = {
     'dash.btn.connect':        '🟢 Connect Wallet',
     'dash.btn.connecting':     '⏳ Connecting…',
     'dash.rabby.detected':     'Rabby Wallet detected ✓',
+
+    // ── Dashboard: watch address mode ─────────────────────────
+    'dash.watch.or':           'or watch an address',
+    'dash.watch.placeholder':  '0x... wallet address',
+    'dash.watch.btn':          'Watch',
+    'dash.watch.hint':         'Read-only — no wallet connection required',
+    'dash.watch.badge':        '👁 WATCHING',
+    'dash.watch.stop':         'Stop Watching',
+    'dash.watch.invalid':      'Invalid address. Must start with 0x and be 42 characters.',
+    'dash.watch.network':      'Network:',
+
     'dash.footer.text':        'LP Pool Dashboard — VIZNAGO FURY © 2026',
     'dash.footer.backtest':    'Backtester',
   },
@@ -368,6 +390,12 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const val = window.t(el.dataset.i18n);
     if (val) el.textContent = val;
+  });
+
+  // Placeholder attributes (inputs)
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const val = window.t(el.dataset.i18nPlaceholder);
+    if (val) el.placeholder = val;
   });
 
   // HTML content (strings that contain tags like <strong>)

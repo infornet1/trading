@@ -69,13 +69,14 @@ const FACTORY_ABI = [
 
 // ── App State ─────────────────────────────────────────────────────────────
 const state = {
-  provider:  null,   // ethers.BrowserProvider (wallet)
+  provider:  null,   // ethers.BrowserProvider (wallet) or JsonRpcProvider (watch)
   address:   null,   // connected wallet address
   chainId:   null,   // numeric chain id
   positions: [],     // fetched position objects
   prices:    { eth: null, btc: null },
   loading:   false,
   refreshTimer: null,
+  watchMode: false,  // true = read-only address watch, no wallet connected
 };
 
 // ── Price Math ────────────────────────────────────────────────────────────
@@ -159,7 +160,45 @@ window.disconnectWallet = function () {
   state.chainId   = null;
   state.provider  = null;
   state.positions = [];
+  state.watchMode = false;
   renderConnectPrompt();
+};
+
+// ── Watch Address (read-only) ─────────────────────────────────────────────
+
+window.startWatchMode = async function () {
+  const input   = document.getElementById('watch-addr-input');
+  const rawAddr = (input?.value || '').trim();
+  if (!rawAddr) return;
+
+  if (!ethers.isAddress(rawAddr)) {
+    showError(window.t ? window.t('dash.watch.invalid') : 'Invalid address');
+    return;
+  }
+
+  const addr    = ethers.getAddress(rawAddr); // normalise to checksum form
+  const chainId = parseInt(document.getElementById('watch-chain-select').value, 10);
+  const chainCfg = CHAINS[chainId];
+  if (!chainCfg) return;
+
+  state.watchMode = true;
+  state.address   = addr;
+  state.chainId   = chainId;
+  state.provider  = new ethers.JsonRpcProvider(chainCfg.rpc);
+
+  hide('connect-prompt');
+  show('dashboard-content');
+  updateWalletBar();
+  updateChainPills();
+
+  fetchLivePrices();
+  fetchPositions();
+
+  clearInterval(state.refreshTimer);
+  state.refreshTimer = setInterval(() => {
+    fetchLivePrices();
+    fetchPositions();
+  }, 30_000);
 };
 
 window.refreshAll = async function () {
@@ -221,6 +260,20 @@ function handleChainChanged(chainIdHex) {
 // ── Network Switcher ──────────────────────────────────────────────────────
 
 window.switchToChain = async function (chainIdHex) {
+  const chainId  = parseInt(chainIdHex, 16);
+  const chainCfg = CHAINS[chainId];
+
+  // Watch mode: switch public RPC directly — no wallet involved
+  if (state.watchMode) {
+    if (!chainCfg) return;
+    state.chainId  = chainId;
+    state.provider = new ethers.JsonRpcProvider(chainCfg.rpc);
+    updateWalletBar();
+    updateChainPills();
+    fetchPositions();
+    return;
+  }
+
   if (!window.ethereum) return;
   try {
     await window.ethereum.request({
@@ -449,15 +502,31 @@ function renderWalletConnected() {
 }
 
 function updateWalletBar() {
+  const t = window.t || (k => k);
   document.getElementById('ws-address').textContent = truncateAddr(state.address);
   const chainCfg = CHAINS[state.chainId];
   document.getElementById('ws-chain').textContent = chainCfg
     ? chainCfg.name
     : `Chain ID ${state.chainId} (unsupported)`;
 
-  // Navbar wallet button → now shows address
+  // Watch mode badge in summary bar
+  const watchBadge = document.getElementById('watch-badge');
+  if (watchBadge) {
+    watchBadge.classList.toggle('hidden', !state.watchMode);
+    if (state.watchMode) watchBadge.textContent = t('dash.watch.badge');
+  }
+
+  // Disconnect button label
+  const disconnectLabel = document.getElementById('disconnect-label');
+  if (disconnectLabel) {
+    disconnectLabel.textContent = state.watchMode
+      ? t('dash.watch.stop')
+      : t('dash.ws.disconnect');
+  }
+
+  // Navbar wallet button → shows address (eye prefix in watch mode)
   const btn = document.getElementById('wallet-btn');
-  btn.textContent = '● ' + truncateAddr(state.address);
+  btn.textContent = (state.watchMode ? '👁 ' : '● ') + truncateAddr(state.address);
   btn.onclick = disconnectWallet;
 
   // Chain badge in navbar
@@ -685,6 +754,14 @@ function init() {
     // Rabby detected — tweak copy
     const hint = document.querySelector('.connect-hint');
     if (hint) hint.textContent = window.t ? window.t('dash.rabby.detected') : 'Rabby Wallet detected ✓';
+  }
+
+  // Enter key on watch address input
+  const watchInput = document.getElementById('watch-addr-input');
+  if (watchInput) {
+    watchInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') startWatchMode();
+    });
   }
 
   // Start price ticker even before wallet connects
