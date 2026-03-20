@@ -989,10 +989,15 @@ async function saasLoadBots() {
     for (const bot of bots) {
       saas.bots[bot.nft_token_id] = bot;
     }
-    // Open WebSocket for every active bot not already connected
+    // Pre-populate last event status from API, then open WebSocket
     for (const bot of bots) {
-      if (bot.active && !saas.sockets[bot.id]) {
-        connectBotWS(bot.id);
+      if (bot.active) {
+        // Fetch last known event so panel shows real data immediately after refresh
+        apiCall('GET', `/bots/${bot.id}/status`).then(s => {
+          if (s?.last_event) saas.statuses[bot.id] = s.last_event;
+          renderLiveBots();
+        }).catch(() => {});
+        if (!saas.sockets[bot.id]) connectBotWS(bot.id);
       }
     }
     // Re-render positions and live bots panel
