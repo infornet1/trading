@@ -1,5 +1,5 @@
 # VIZNAGO FURY — SaaS Option B: Hosted LP Hedge Bot Service
-> Architecture & Implementation Plan — v1.2 (2026-03-20)
+> Architecture & Implementation Plan — v1.3 (2026-03-20)
 > Status: **Steps 0–7 Complete · Step 8 (Subscriptions) Pending**
 
 ---
@@ -98,7 +98,7 @@ Users prove wallet ownership by signing a challenge. No email/password required.
         → server stores nonce, returns: { nonce: "abc123" }
 
 2. Rabby signs message:
-        "Sign in to VIZNAGO FURY\nNonce: abc123\nChain: 42161"
+        "Sign in to VIZNAGO FURY\nNonce: abc123"
 
 3. POST /auth/verify { address, signature }
         → server recovers signer address via eth_account
@@ -322,17 +322,36 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 
 **Implemented in `landing/dashboard/dashboard.js` + `dashboard.css` + `i18n.js`:**
 
-- **Auth flow**: wallet sign-in button in drawer → `GET /auth/nonce` → `signMessage` → `POST /auth/verify` → JWT stored in `localStorage['vf_jwt']`
+- **Auth flow**: wallet sign-in button in drawer → `GET /auth/nonce` → `signMessage("Sign in to VIZNAGO FURY\nNonce: {nonce}")` → `POST /auth/verify` → JWT stored in `localStorage['vf_jwt']`
 - **Collapsible drawer** on every active position card; open/closed state persists across re-renders
 - **Mode toggle**: Defensor Bajista / Avaro radio buttons (Avaro disabled for BTC pairs — golden rule enforced in UI and API)
-- **Config form**: trigger %, hedge size %, HL API Key (password field), HL wallet address
+- **Config form**: trigger %, hedge size %, HL API Key (64-hex private key, password field, red label), HL wallet address (yellow label)
+- **Key validation**: 64-hex length check client-side before submit (prevents "20 bytes" bot crash)
 - **Create or update**: `POST /bots` (new) or `PUT /bots/{id}` (existing inactive bot) → `POST /bots/{id}/start`
 - **Active state**: replaces form with live status row + stop button; last event shown inline
+- **Stop button**: styled red for clear destructive intent
+- **Amber highlight**: unprotected positions show amber toggle to draw user attention
 - **WebSocket**: `wss://{host}/trading/lp-hedge/api/ws/{config_id}?token={jwt}` auto-connects on activate, auto-reconnects after 10 s on drop, updates status row in real time
+- **Live log terminal**: real-time stdout lines from bot subprocess shown in monospace terminal per bot
+- **Live bots panel**: dynamic `#live-bots-section` replaces hardcoded static hedge panel; shows all active bots with range, trigger, last event, log terminal
+- **Pre-fetch on load**: `GET /bots/{id}/status` called on page load for active bots to avoid "Verificando…" after refresh
 - **Sign-in gate**: if no JWT, drawer shows "Sign In with Wallet" button
 - **Watch mode**: drawer shows disabled message (no protection without wallet)
 - **Bilingual**: all new strings added to `i18n.js` (ES + EN, ~30 keys each)
 - **Nginx proxy**: already configured at `/trading/lp-hedge/api/` → port 8001 with WebSocket upgrade headers
+
+### ✅ Phase 5: Admin & UX Hardening (complete — 2026-03-20)
+
+- **Nuclear Stop button** (`☢ Stop All`): pulsing red button in navbar, visible only to admin wallets
+  - `ADMIN_WALLETS` env var (comma-separated) → `is_admin: true` claim injected into JWT at sign-in
+  - `POST /admin/stop-all`: server re-validates `is_admin` claim; terminates all bot subprocesses and marks all `active=False` (no auto-restart)
+  - Confirmation modal with bot count before firing
+  - Client decodes JWT (base64) for UI gating; server enforces independently (two-layer security)
+- **Bot persistence across API restarts**: `_shutting_down` flag prevents `active=False` on graceful shutdown; `_auto_restart_bots()` in lifespan re-launches all `active=True` configs on startup
+- **Auto-refresh off by default**: saves droplet resources; user-selectable intervals (Off / 1m / 3m / 5m / 10m) in navbar pill control; preference persisted in `localStorage['vf_refresh_interval']`
+- **Unicorn favicon** 🦄: SVG emoji favicon (`data:image/svg+xml`) — Uniswap symbol, no image file needed
+- **Waitlist CTA**: landing page "Inicia Tu Backtest" section replaced with email waitlist form; submissions stored in `localStorage` (Step 8 will wire to backend)
+- **Standalone bot retired**: `live_hedge_bot.py` no longer runs as a standalone systemd service; all bot lifecycle now managed exclusively by BotManager via the SaaS API
 
 ---
 
@@ -346,7 +365,7 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 | BTC short violation | Hard-coded block in bot code, not just UI |
 | Runaway bot process | Watchdog: if process exits unexpectedly → mark inactive + email user |
 | Shared DB with FreeScount | Separate DB user `viznago` with no access to FreeScount tables |
-| Root process risk | FastAPI service runs as dedicated `viznago` system user, not root |
+| Root process risk | FastAPI service currently runs as root — creating dedicated `viznago` system user is an open item (Step 10 pre-req) |
 
 ---
 
@@ -361,12 +380,13 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 | **4** | Bot config CRUD endpoints + DB models | ✅ Complete |
 | **5** | Bot Manager (spawn/stop/tail subprocesses) | ✅ Complete |
 | **6** | WebSocket live event stream | ✅ Complete |
-| **7** | Dashboard Phase 4 (config drawer + WS client) | ✅ Complete |
+| **7** | Dashboard Phase 4 (protection drawer + WS client + live bots panel) | ✅ Complete |
+| **7.5** | Admin hardening: nuclear stop, bot persistence, auto-refresh control, waitlist CTA | ✅ Complete |
 | **8** | Subscription + USDC on-chain payment verification | 🔲 Pending |
 | **9** | Email alerts per user (reuse existing email setup) | 🔲 Pending |
 | **10** | Alpha test with 3–5 real users | 🔲 Pending |
 
-**Estimated remaining to MVP: 2–3 weeks** from Step 1 start.
+**Estimated remaining to MVP: 1–2 weeks.**
 
 ---
 
