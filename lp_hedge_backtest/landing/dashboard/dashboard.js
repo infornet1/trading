@@ -12,23 +12,61 @@
 const CHAINS = {
   42161: {
     name:        'Arbitrum One',
-    rpc:         'https://arbitrum.llamarpc.com',
+    rpcs: [
+      'https://arb1.arbitrum.io/rpc',            // official — most reliable
+      'https://rpc.ankr.com/arbitrum',            // Ankr — CORS-friendly
+      'https://arbitrum.llamarpc.com',            // llamarpc fallback
+      'https://arbitrum-one.public.blastapi.io',  // BlastAPI fallback
+    ],
     nfpmAddr:    '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
     factoryAddr: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
   },
   1: {
     name:        'Ethereum',
-    rpc:         'https://eth.llamarpc.com',
+    rpcs: [
+      'https://cloudflare-eth.com',               // Cloudflare — very stable
+      'https://rpc.ankr.com/eth',                 // Ankr
+      'https://eth.llamarpc.com',                 // llamarpc fallback
+    ],
     nfpmAddr:    '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
     factoryAddr: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
   },
   8453: {
     name:        'Base',
-    rpc:         'https://base.llamarpc.com',
+    rpcs: [
+      'https://mainnet.base.org',                 // official Base RPC
+      'https://rpc.ankr.com/base',                // Ankr
+      'https://base.llamarpc.com',                // llamarpc fallback
+    ],
     nfpmAddr:    '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f4',
     factoryAddr: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
   },
 };
+
+// ── Watch RPC Selector ────────────────────────────────────────────────────
+// Tries each RPC in order, returns the first one that responds within 5 s.
+async function makeWatchProvider(chainId) {
+  const chainCfg = CHAINS[chainId];
+  if (!chainCfg) throw new Error('Unsupported chain ' + chainId);
+
+  let lastErr;
+  for (const rpc of chainCfg.rpcs) {
+    try {
+      const provider = new ethers.JsonRpcProvider(rpc);
+      // Race a real call against a 5 s hard timeout to confirm the endpoint works
+      await Promise.race([
+        provider.getBlockNumber(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
+      ]);
+      console.log('[RPC] Using', rpc);
+      return provider;
+    } catch (e) {
+      console.warn('[RPC] Failed:', rpc, '—', e.message, '— trying next…');
+      lastErr = e;
+    }
+  }
+  throw new Error('All RPCs for ' + chainCfg.name + ' are unreachable. Check your connection.');
+}
 
 // ── Known Token Registry (all addresses lowercase) ────────────────────────
 const KNOWN_TOKENS = {
@@ -178,13 +216,32 @@ window.startWatchMode = async function () {
 
   const addr    = ethers.getAddress(rawAddr); // normalise to checksum form
   const chainId = parseInt(document.getElementById('watch-chain-select').value, 10);
-  const chainCfg = CHAINS[chainId];
-  if (!chainCfg) return;
+  if (!CHAINS[chainId]) return;
+
+  // Disable Watch button while probing RPCs
+  const watchBtn  = document.querySelector('.watch-card .btn');
+  const watchSpan = watchBtn?.querySelector('span');
+  if (watchBtn)  { watchBtn.disabled = true; watchBtn.style.opacity = '0.6'; }
+  if (watchSpan) { watchSpan.textContent = '…'; }
+
+  let provider;
+  try {
+    provider = await makeWatchProvider(chainId);
+  } catch (e) {
+    showError(e.message);
+    if (watchBtn)  { watchBtn.disabled = false; watchBtn.style.opacity = ''; }
+    if (watchSpan) { watchSpan.textContent = window.t ? window.t('dash.watch.btn') : 'Watch'; }
+    return;
+  }
+
+  // Restore button before navigating away from connect prompt
+  if (watchBtn)  { watchBtn.disabled = false; watchBtn.style.opacity = ''; }
+  if (watchSpan) { watchSpan.textContent = window.t ? window.t('dash.watch.btn') : 'Watch'; }
 
   state.watchMode = true;
   state.address   = addr;
   state.chainId   = chainId;
-  state.provider  = new ethers.JsonRpcProvider(chainCfg.rpc);
+  state.provider  = provider;
 
   hide('connect-prompt');
   show('dashboard-content');
@@ -263,11 +320,17 @@ window.switchToChain = async function (chainIdHex) {
   const chainId  = parseInt(chainIdHex, 16);
   const chainCfg = CHAINS[chainId];
 
-  // Watch mode: switch public RPC directly — no wallet involved
+  // Watch mode: probe fallback RPCs and switch directly — no wallet involved
   if (state.watchMode) {
     if (!chainCfg) return;
-    state.chainId  = chainId;
-    state.provider = new ethers.JsonRpcProvider(chainCfg.rpc);
+    try {
+      const provider   = await makeWatchProvider(chainId);
+      state.chainId    = chainId;
+      state.provider   = provider;
+    } catch (e) {
+      showError(e.message);
+      return;
+    }
     updateWalletBar();
     updateChainPills();
     fetchPositions();
