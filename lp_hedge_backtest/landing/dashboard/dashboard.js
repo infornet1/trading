@@ -1248,6 +1248,16 @@ window.activateProtection = async function (tokenId) {
       return;
     }
 
+    // Validate key length — must be 32 bytes (64 hex chars + optional 0x)
+    if (apiKey) {
+      const hexPart = apiKey.startsWith('0x') ? apiKey.slice(2) : apiKey;
+      if (hexPart.length !== 64) {
+        showError(`HL API Key must be 64 hex characters (32 bytes). You entered ${hexPart.length} chars. This is the PRIVATE KEY of the API Wallet, not the wallet address.`);
+        if (btn) { btn.disabled = false; btn.innerHTML = `🛡&nbsp; ${t('prot.btn.activate')}`; }
+        return;
+      }
+    }
+
     const pos = state.positions.find(p => p.tokenId === tokenId);
     if (!pos) throw new Error('Position not found in current state');
 
