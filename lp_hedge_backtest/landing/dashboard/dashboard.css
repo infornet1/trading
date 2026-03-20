@@ -897,6 +897,8 @@
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
+.prot-label--danger  { color: #f87171; }
+.prot-label--warning { color: #fbbf24; }
 
 /* Mode toggle */
 .prot-mode-toggle { display: flex; gap: 6px; }
