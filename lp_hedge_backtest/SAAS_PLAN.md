@@ -8,7 +8,7 @@
 
 Allow any user to connect their wallet to the VIZNAGO FURY dashboard, select a
 Uniswap v3 LP position, configure hedge parameters, and activate a managed Bot
-Aragan/Avaro instance — without running anything locally.
+Defensor Bajista/Avaro instance — without running anything locally.
 
 Revenue model: monthly subscription paid in USDC on Arbitrum (crypto-first),
 Stripe as secondary option once validated.
@@ -269,7 +269,7 @@ These rules from Bootcamp Cripto 2026 are enforced server-side regardless
 of user config — not just UI hints:
 
 - **BTC: NEVER short** — bot refuses to open SHORT on BTC pairs
-- **ETH:** long + short OK (Bot Aragan + Avaro modes)
+- **ETH:** long + short OK (Defensor Bajista + Avaro modes)
 - **Hedge wallet:** 10–20% of pool value maximum
 - **API key only:** Hyperliquid API key stored, never private key
 - **Min deposit:** $10 hedge balance enforced before bot starts
@@ -325,7 +325,7 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 ────────────────────────────────────────────
 [ ▼ Enable Bot Protection ]
 
-  Mode:         ● Aragan (hedge only)  ○ Avaro (+long)
+  Mode:         ● Defensor Bajista (hedge only)  ○ Avaro (+long)
   Trigger:      [ -0.5 ]% below lower bound
   Hedge size:   [ 50 ]% of volatile capital
   Exchange:     [ Hyperliquid ▼ ]

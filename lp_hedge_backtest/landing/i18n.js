@@ -156,7 +156,7 @@ const TRANSLATIONS = {
     'dash.hedge.trig.label':   'Disparador de Cobertura',
     'dash.hedge.trig.sub':     '−0.5% bajo el piso → SHORT 10× en HL',
     'dash.hedge.mode.label':   'Modo',
-    'dash.hedge.mode.val':     'Aragan (Solo Cobertura)',
+    'dash.hedge.mode.val':     'Defensor Bajista (Solo Cobertura)',
     'dash.hedge.mode.sub':     'SL +0.5% · TP en piso del rango',
     'dash.hedge.rule':         '<strong>Regla de Oro:</strong>\u00A0 BTC → NUNCA short. ETH → long+short OK. Billetera de cobertura: 10–20% del valor del pool.',
 
@@ -338,7 +338,7 @@ const TRANSLATIONS = {
     'dash.hedge.trig.label':   'Hedge Trigger',
     'dash.hedge.trig.sub':     '−0.5% below floor → 10× SHORT on HL',
     'dash.hedge.mode.label':   'Mode',
-    'dash.hedge.mode.val':     'Aragan (Hedge Only)',
+    'dash.hedge.mode.val':     'Defensor Bajista (Hedge Only)',
     'dash.hedge.mode.sub':     'SL +0.5% · TP at range floor',
     'dash.hedge.rule':         '<strong>Golden Rule:</strong>\u00A0 BTC → NEVER short. ETH → long+short OK. Hedge wallet: 10–20% of pool value.',
 
