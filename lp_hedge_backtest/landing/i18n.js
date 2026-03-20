@@ -177,7 +177,7 @@ const TRANSLATIONS = {
 
     // ── Dashboard: watch address mode ─────────────────────────
     'dash.watch.or':           'o ver una dirección',
-    'dash.watch.placeholder':  '0x... dirección de billetera',
+    'dash.watch.placeholder':  '… dirección de billetera',
     'dash.watch.btn':          'Ver',
     'dash.watch.hint':         'Solo lectura — sin conexión de billetera',
     'dash.watch.badge':        '👁 VIENDO',
@@ -353,7 +353,7 @@ const TRANSLATIONS = {
 
     // ── Dashboard: watch address mode ─────────────────────────
     'dash.watch.or':           'or watch an address',
-    'dash.watch.placeholder':  '0x... wallet address',
+    'dash.watch.placeholder':  '… wallet address',
     'dash.watch.btn':          'Watch',
     'dash.watch.hint':         'Read-only — no wallet connection required',
     'dash.watch.badge':        '👁 WATCHING',

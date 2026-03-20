@@ -84,21 +84,27 @@
         <div class="watch-divider">
           <span data-i18n="dash.watch.or">o ver una dirección</span>
         </div>
-        <div class="watch-form">
-          <input type="text" id="watch-addr-input" class="watch-input"
-                 data-i18n-placeholder="dash.watch.placeholder"
-                 placeholder="0x... dirección de billetera"
-                 autocomplete="off" spellcheck="false" />
-          <select id="watch-chain-select" class="watch-chain-select">
-            <option value="42161">Arbitrum</option>
-            <option value="1">Ethereum</option>
-            <option value="8453">Base</option>
-          </select>
-          <button class="btn btn-outline btn-sm" onclick="startWatchMode()">
-            &#128065;&nbsp;<span data-i18n="dash.watch.btn">Ver</span>
-          </button>
+
+        <div class="watch-card">
+          <div class="watch-form">
+            <div class="watch-input-wrapper">
+              <span class="watch-input-prefix">0x</span>
+              <input type="text" id="watch-addr-input" class="watch-input"
+                     data-i18n-placeholder="dash.watch.placeholder"
+                     placeholder="… dirección de billetera"
+                     autocomplete="off" spellcheck="false" />
+            </div>
+            <select id="watch-chain-select" class="watch-chain-select">
+              <option value="42161">Arbitrum</option>
+              <option value="1">Ethereum</option>
+              <option value="8453">Base</option>
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="startWatchMode()">
+              &#128065;&nbsp;<span data-i18n="dash.watch.btn">Ver</span>
+            </button>
+          </div>
+          <p class="watch-hint" data-i18n="dash.watch.hint">Solo lectura — sin conexión de billetera</p>
         </div>
-        <p class="watch-hint" data-i18n="dash.watch.hint">Solo lectura — sin conexión de billetera</p>
 
         <div class="connect-no-wallet" id="no-wallet-msg" style="display:none;">
           <span data-i18n="dash.connect.nowallet">No se detectó billetera.</span>
