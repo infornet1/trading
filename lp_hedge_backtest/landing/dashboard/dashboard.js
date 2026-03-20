@@ -1258,12 +1258,14 @@ function buildProtectionDrawer(pos) {
       </div>`;
   }
 
+  const isActive = bot?.active;
   return `
     <div class="pc-protection">
-      <button class="pc-prot-toggle" onclick="toggleProtectionDrawer('${tokenId}')">
+      <button class="pc-prot-toggle ${isActive ? 'pc-prot-toggle--active' : ''}"
+              onclick="toggleProtectionDrawer('${tokenId}')">
         <span class="prot-chevron ${isOpen ? 'prot-chevron--open' : ''}"
               id="prot-chevron-${tokenId}">▶</span>
-        <span class="prot-toggle-label">${t('prot.drawer.title')}</span>
+        <span class="prot-toggle-label">${isActive ? '' : '⚠ '}${t('prot.drawer.title')}</span>
         ${badge}
       </button>
       <div class="pc-prot-body ${isOpen ? '' : 'hidden'}" id="prot-body-${tokenId}">

@@ -764,18 +764,30 @@
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  background: transparent;
+  background: rgba(251,191,36,0.06);
   border: none;
   cursor: pointer;
   text-align: left;
-  color: var(--color-text-muted);
+  color: #fbbf24;
   font-family: 'Orbitron', sans-serif;
   font-size: 0.58rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   transition: background 0.2s, color 0.2s;
 }
-.pc-prot-toggle:hover { background: rgba(0,212,255,0.04); color: var(--color-neon-cyan); }
+.pc-prot-toggle:hover {
+  background: rgba(251,191,36,0.12);
+  color: #fde68a;
+}
+/* When bot is active — switch to green */
+.pc-prot-toggle--active {
+  background: rgba(0,255,179,0.05);
+  color: var(--color-neon-green);
+}
+.pc-prot-toggle--active:hover {
+  background: rgba(0,255,179,0.1);
+  color: var(--color-neon-green);
+}
 .prot-chevron {
   font-size: 0.5rem;
   transition: transform 0.2s;
