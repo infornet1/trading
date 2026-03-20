@@ -191,45 +191,8 @@
         <!-- Positions grid -->
         <div id="positions-grid" class="positions-grid"></div>
 
-        <!-- ── Hedge Status Panel ──────────────────────────── -->
-        <div class="hedge-panel" id="hedge-panel">
-          <div class="hedge-panel-header">
-            <div class="section-label" data-i18n="dash.hedge.label">Bot en Vivo</div>
-            <h3 class="hedge-panel-title">
-              Defensor Bajista v1.2
-              <span class="status-dot dot-green" title="Live"></span>
-              <span class="status-live-tag">LIVE</span>
-            </h3>
-          </div>
-
-          <div class="hedge-info-grid">
-            <div class="hedge-info-card">
-              <div class="hi-label" data-i18n="dash.hedge.nft.label">Monitoreando NFT</div>
-              <div class="hi-value text-neon">#5364087</div>
-              <div class="hi-sub">ETH/USDC · 0.05% · Arbitrum</div>
-            </div>
-            <div class="hedge-info-card">
-              <div class="hi-label" data-i18n="dash.hedge.range.label">Rango LP</div>
-              <div class="hi-value">$1,800.87 — $2,250.75</div>
-              <div class="hi-sub" data-i18n="dash.hedge.range.sub">~25.0% de ancho</div>
-            </div>
-            <div class="hedge-info-card">
-              <div class="hi-label" data-i18n="dash.hedge.trig.label">Disparador de Cobertura</div>
-              <div class="hi-value text-neon">$1,791.87</div>
-              <div class="hi-sub" data-i18n="dash.hedge.trig.sub">−0.5% bajo el piso → SHORT 10× en HL</div>
-            </div>
-            <div class="hedge-info-card">
-              <div class="hi-label" data-i18n="dash.hedge.mode.label">Modo</div>
-              <div class="hi-value" data-i18n="dash.hedge.mode.val">Defensor Bajista (Solo Cobertura)</div>
-              <div class="hi-sub" data-i18n="dash.hedge.mode.sub">SL +0.5% · TP en piso del rango</div>
-            </div>
-          </div>
-
-          <div class="hedge-rule">
-            <span class="hedge-rule-icon">&#9888;</span>
-            <span data-i18n-html="dash.hedge.rule"><strong>Regla de Oro:</strong>&nbsp; BTC → NUNCA short. ETH → long+short OK. Billetera de cobertura: 10–20% del valor del pool.</span>
-          </div>
-        </div>
+        <!-- ── Live Bots Section (dynamic) ───────────────────── -->
+        <div id="live-bots-section"></div>
 
       </div>
       <!-- /dashboard-content -->

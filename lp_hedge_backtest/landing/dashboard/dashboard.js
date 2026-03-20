@@ -993,12 +993,84 @@ async function saasLoadBots() {
         connectBotWS(bot.id);
       }
     }
-    // Re-render positions if already loaded so drawers reflect bot state
+    // Re-render positions and live bots panel
     if (state.positions.length > 0) renderPositions();
+    renderLiveBots();
   } catch (err) {
     // Silently ignore — JWT may be expired (apiCall handles 401)
     console.warn('[SaaS] loadBots:', err.message);
   }
+}
+
+// ── Live Bots Panel ───────────────────────────────────────────────────────
+
+function renderLiveBots() {
+  const section = document.getElementById('live-bots-section');
+  if (!section) return;
+  const t = window.t || (k => k);
+
+  const activeBots = Object.values(saas.bots).filter(b => b.active);
+
+  if (!activeBots.length) {
+    section.innerHTML = '';
+    return;
+  }
+
+  const cards = activeBots.map(bot => {
+    const modeName  = bot.mode === 'aragan'
+      ? t('dash.hedge.mode.val')
+      : 'Avaro (Cobertura + Long)';
+    const triggerPx = (bot.lower_bound * (1 + bot.trigger_pct / 100)).toFixed(2);
+    const rangePct  = (((bot.upper_bound - bot.lower_bound) / bot.lower_bound) * 100).toFixed(1);
+    const chainName = { 42161: 'Arbitrum', 1: 'Ethereum', 8453: 'Base' }[bot.chain_id] || `Chain ${bot.chain_id}`;
+    const lastEvt   = saas.statuses[bot.id];
+    const lastEvtHtml = lastEvt
+      ? `<div class="hi-label" style="margin-top:10px">${t('prot.lastevent')}</div>
+         <div class="hi-value" style="font-size:0.7rem" id="live-bot-evt-${bot.id}">
+           ${(lastEvt.event||'').replace(/_/g,' ')} · ${lastEvt.price ? formatPrice(lastEvt.price) : '—'}
+         </div>`
+      : `<div class="hi-value" style="font-size:0.7rem" id="live-bot-evt-${bot.id}">${t('prot.status.checking')}</div>`;
+
+    return `
+      <div class="hedge-panel" style="margin-top:16px">
+        <div class="hedge-panel-header">
+          <div class="section-label">${t('dash.hedge.label')}</div>
+          <h3 class="hedge-panel-title">
+            ${bot.mode === 'aragan' ? 'Defensor Bajista' : 'Avaro'} v1.3
+            <span class="status-dot dot-green"></span>
+            <span class="status-live-tag">LIVE</span>
+          </h3>
+        </div>
+        <div class="hedge-info-grid">
+          <div class="hedge-info-card">
+            <div class="hi-label">${t('dash.hedge.nft.label')}</div>
+            <div class="hi-value text-neon">#${bot.nft_token_id}</div>
+            <div class="hi-sub">${bot.pair} · ${chainName}</div>
+          </div>
+          <div class="hedge-info-card">
+            <div class="hi-label">${t('dash.hedge.range.label')}</div>
+            <div class="hi-value">$${Number(bot.lower_bound).toLocaleString('en-US',{maximumFractionDigits:2})} — $${Number(bot.upper_bound).toLocaleString('en-US',{maximumFractionDigits:2})}</div>
+            <div class="hi-sub">~${rangePct}% ${t('dash.hedge.range.width')}</div>
+          </div>
+          <div class="hedge-info-card">
+            <div class="hi-label">${t('dash.hedge.trig.label')}</div>
+            <div class="hi-value text-neon">$${Number(triggerPx).toLocaleString('en-US',{maximumFractionDigits:2})}</div>
+            <div class="hi-sub">${bot.trigger_pct}% ${t('dash.hedge.trig.below')}</div>
+          </div>
+          <div class="hedge-info-card">
+            <div class="hi-label">${t('dash.hedge.mode.label')}</div>
+            <div class="hi-value" style="font-size:0.75rem">${modeName}</div>
+            ${lastEvtHtml}
+          </div>
+        </div>
+        <div class="hedge-rule">
+          <span class="hedge-rule-icon">&#9888;</span>
+          <span data-i18n-html="dash.hedge.rule">${t('dash.hedge.rule')}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  section.innerHTML = cards;
 }
 
 // ── WebSocket per bot ─────────────────────────────────────────────────────
@@ -1032,17 +1104,22 @@ function connectBotWS(configId) {
 }
 
 function updateBotStatusDisplay(configId, data) {
-  const el = document.getElementById(`prot-status-${configId}`);
-  if (!el) return;
-  const t        = window.t || (k => k);
-  const evtType  = data.event || data.event_type || '';
-  const price    = data.price ? formatPrice(data.price) : '—';
-  const pnl      = data.pnl != null
-    ? (data.pnl >= 0 ? '+' : '') + '$' + Number(data.pnl).toFixed(2)
-    : '—';
-  el.innerHTML = `<span class="prot-evt-type">${evtType.replace(/_/g,' ')}</span>`
+  const t       = window.t || (k => k);
+  const evtType = (data.event || data.event_type || '').replace(/_/g, ' ');
+  const price   = data.price ? formatPrice(data.price) : '—';
+  const pnl     = data.pnl != null
+    ? (data.pnl >= 0 ? '+' : '') + '$' + Number(data.pnl).toFixed(2) : '—';
+  const html = `<span class="prot-evt-type">${evtType}</span>`
     + ` &middot; ${t('prot.price')}: ${price}`
     + ` &middot; P&L: ${pnl}`;
+
+  // Update protection drawer status row
+  const drawerEl = document.getElementById(`prot-status-${configId}`);
+  if (drawerEl) drawerEl.innerHTML = html;
+
+  // Update live bots panel
+  const panelEl = document.getElementById(`live-bot-evt-${configId}`);
+  if (panelEl) panelEl.innerHTML = `${evtType} · ${price}`;
 }
 
 // ── Protection Drawer HTML builder ────────────────────────────────────────
