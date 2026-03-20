@@ -288,7 +288,7 @@ window.startWatchMode = async function () {
   state.refreshTimer = setInterval(() => {
     fetchLivePrices();
     fetchPositions();
-  }, 30_000);
+  }, 180_000);
 };
 
 window.refreshAll = async function () {
@@ -319,12 +319,12 @@ function onWalletConnected() {
   fetchLivePrices();
   fetchPositions();
 
-  // Auto-refresh every 30 s
+  // Auto-refresh every 3 min
   clearInterval(state.refreshTimer);
   state.refreshTimer = setInterval(() => {
     fetchLivePrices();
     fetchPositions();
-  }, 30_000);
+  }, 180_000);
 }
 
 function handleAccountsChanged(accounts) {
