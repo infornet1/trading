@@ -223,7 +223,10 @@ window.disconnectWallet = function () {
   saas.sockets  = {};
   saas.bots     = {};
   saas.statuses = {};
+  saas.jwt      = null;
+  localStorage.removeItem('vf_jwt');
   _drawerOpen.clear();
+  updateNuclearBtn();
   renderConnectPrompt();
 };
 
@@ -315,6 +318,7 @@ function onWalletConnected() {
   registerWalletListeners();
 
   // Load SaaS bots if JWT exists (silently, no prompt)
+  updateNuclearBtn();
   saasLoadBots();
 
   // Initial data load
@@ -969,12 +973,63 @@ window.saasSignIn = async function () {
 
     saas.jwt = access_token;
     localStorage.setItem('vf_jwt', access_token);
+    updateNuclearBtn();
 
     await saasLoadBots();
     renderPositions(); // re-render so drawers show forms
   } catch (err) {
     if (err.code === 4001) return; // user rejected wallet popup
     showError('Sign-in failed: ' + (err.message || err));
+  }
+};
+
+// ── Admin helpers ─────────────────────────────────────────────────────────
+
+function jwtIsAdmin(token) {
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.is_admin === true;
+  } catch { return false; }
+}
+
+function updateNuclearBtn() {
+  const btn = document.getElementById('nuclear-stop-btn');
+  if (!btn) return;
+  if (jwtIsAdmin(saas.jwt)) {
+    btn.classList.remove('hidden');
+  } else {
+    btn.classList.add('hidden');
+  }
+}
+
+window.nuclearStop = function () {
+  document.getElementById('nuclear-result').textContent = '';
+  document.getElementById('nuclear-modal').classList.remove('hidden');
+};
+
+window.closeNuclearModal = function (e) {
+  if (e && e.target !== document.getElementById('nuclear-modal')) return;
+  document.getElementById('nuclear-modal').classList.add('hidden');
+};
+
+window.confirmNuclearStop = async function () {
+  const confirmBtn = document.querySelector('.btn-nuclear-confirm');
+  const result     = document.getElementById('nuclear-result');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = '⏳ Deteniendo…';
+  try {
+    const data = await apiCall('POST', '/admin/stop-all');
+    result.style.color = '#00ffb3';
+    result.textContent = `✓ ${data.stopped_count} bot(s) detenidos.`;
+    confirmBtn.textContent = '✓ Hecho';
+    await saasLoadBots();
+    renderPositions();
+  } catch (err) {
+    result.style.color = '#f87171';
+    result.textContent = `Error: ${err.message}`;
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = '☢ Confirmar Parada Total';
   }
 };
 

@@ -29,6 +29,10 @@
     </div>
 
     <div class="navbar-wallet-area">
+      <!-- Nuclear stop button — only rendered for admin wallets -->
+      <button id="nuclear-stop-btn" class="btn-nuclear hidden" onclick="nuclearStop()">
+        &#9762; <span data-i18n="dash.admin.stop">Stop All</span>
+      </button>
       <!-- Chain badge (hidden until connected) -->
       <span id="chain-badge" class="navbar-chain-badge hidden"></span>
       <!-- Connect / address button -->
@@ -37,6 +41,20 @@
       </button>
     </div>
   </nav>
+
+  <!-- Nuclear Stop Confirmation Modal -->
+  <div id="nuclear-modal" class="nuclear-modal-overlay hidden" onclick="closeNuclearModal(event)">
+    <div class="nuclear-modal">
+      <div class="nuclear-modal-icon">&#9762;</div>
+      <h3 data-i18n="dash.admin.modal.title">Parada de Emergencia</h3>
+      <p data-i18n="dash.admin.modal.desc">Esto detendrá TODOS los bots activos para TODOS los usuarios y los marcará inactivos. Esta acción no puede deshacerse automáticamente.</p>
+      <div class="nuclear-modal-actions">
+        <button class="btn-nuclear-confirm" onclick="confirmNuclearStop()" data-i18n="dash.admin.modal.confirm">☢ Confirmar Parada Total</button>
+        <button class="btn btn-sm" style="border-color:rgba(255,255,255,0.2)" onclick="closeNuclearModal()" data-i18n="dash.admin.modal.cancel">Cancelar</button>
+      </div>
+      <p id="nuclear-result" style="margin-top:12px;font-size:0.85rem;min-height:18px;"></p>
+    </div>
+  </div>
 
 
   <!-- ============================================================
