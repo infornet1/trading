@@ -1,6 +1,6 @@
 # VIZNAGO FURY — SaaS Option B: Hosted LP Hedge Bot Service
-> Architecture & Implementation Plan — v1.0 Draft (2026-03-19)
-> Status: **Pending Final Review**
+> Architecture & Implementation Plan — v1.2 (2026-03-20)
+> Status: **Dashboard Phase 1–3 Complete · Phase 4 (Bot Protection) Pending**
 
 ---
 
@@ -276,7 +276,47 @@ of user config — not just UI hints:
 
 ---
 
-## 10. Dashboard Changes Required (Phase 4)
+## 10. Dashboard — Build Status
+
+### ✅ Phase 1: Wallet Connect (complete — 2026-03-19)
+- Rabby / MetaMask / EIP-1193 wallet connection
+- Chain detection (Arbitrum, Ethereum, Base) with pill switcher
+- Auto-reconnect on page reload, listener deduplication
+- Navbar: address badge, chain badge, disconnect
+
+### ✅ Phase 2: On-Chain Position Fetching (complete — 2026-03-19)
+- NonfungiblePositionManager `balanceOf` + `tokenOfOwnerByIndex` + `positions()`
+- Pool `slot0()` for current tick; tick-to-price math (accounts for stable/volatile ordering)
+- In-range / out-low / out-high / closed status per NFT
+- Range bar visual, % through range, fees owed (tokensOwed0/1)
+- Price ticker: ETH/USDC + BTC/USDT via CoinGecko (30 s refresh)
+
+### ✅ Phase 3: Dashboard UX Enhancements (complete — 2026-03-20)
+
+**Bilingual (ES/EN):**
+- `landing/i18n.js` — full TRANSLATIONS object (~170 keys each language)
+- `window.t(key)`, `window.setLanguage()`, `applyTranslations()`
+- `data-i18n` / `data-i18n-html` / `data-i18n-placeholder` attributes throughout
+- ES/EN toggle in both navbars; preference persisted in `localStorage (vf_lang)`
+
+**Watch Address (read-only mode):**
+- Enter any `0x…` address + pick chain → loads positions without wallet connection
+- Public RPC with multi-endpoint fallback per chain (4-second probe + timeout):
+  - Arbitrum: `arb1.arbitrum.io` → Ankr → llamarpc → BlastAPI
+  - Ethereum: `cloudflare-eth` → Ankr → llamarpc
+  - Base: `mainnet.base.org` → Ankr → llamarpc
+- `0x` prefix cell + chain select + Watch button (shows `…` while probing)
+- `👁 WATCHING` badge in wallet summary; chain pills switch RPC directly
+- Styled as a card with neon cyan top-accent bar, matching brand system
+
+**Active / History Tabs:**
+- Tab bar below wallet summary with per-tab count badges
+- **Active** — positions with liquidity (`in-range`, `out-low`, `out-high`)
+- **History** — zero-liquidity / removed positions
+- Instant filtering (no re-fetch); separate empty states per tab
+- `ws-count` reflects currently visible tab
+
+### 🔲 Phase 4: Bot Protection Drawer (pending — requires SaaS backend)
 
 Each position card gains a collapsible **"Enable Protection"** drawer:
 
@@ -302,6 +342,7 @@ Last event: Hedge opened @ $1,791.20 · P&L: +$42.10
 - Config form sends `POST /bots` → `POST /bots/{id}/start`
 - WebSocket `/ws/{bot_id}` updates status + last event in real time
 - Subscription gate: Free users see the form but "Activate" prompts upgrade
+- **Prerequisite:** SaaS backend Steps 1–6 must be complete first
 
 ---
 
@@ -321,20 +362,21 @@ Last event: Hedge opened @ $1,791.20 · P&L: +$42.10
 
 ## 12. Implementation Phases
 
-| Step | Scope | Effort |
+| Step | Scope | Status |
 |---|---|---|
-| **1** | MariaDB: create databases + user + schema | 1–2 hrs |
-| **2** | `live_hedge_bot.py` refactor: all config from env vars | 1 day |
-| **3** | FastAPI skeleton + auth (nonce + JWT + `/auth/*`) | 1 day |
-| **4** | Bot config CRUD endpoints + DB models | 1 day |
-| **5** | Bot Manager (spawn/stop/tail subprocesses) | 2 days |
-| **6** | WebSocket live event stream | 1 day |
-| **7** | Dashboard Phase 4 (config drawer + WS client) | 2–3 days |
-| **8** | Subscription + USDC on-chain payment verification | 1–2 days |
-| **9** | Email alerts per user (reuse existing email setup) | 1 day |
-| **10** | Alpha test with 3–5 real users | ongoing |
+| **0** | Dashboard Phase 1–3: wallet connect, positions, i18n, watch mode, tabs | ✅ Complete |
+| **1** | MariaDB: create databases + user + schema | 🔲 Pending |
+| **2** | `live_hedge_bot.py` refactor: all config from env vars | 🔲 Pending |
+| **3** | FastAPI skeleton + auth (nonce + JWT + `/auth/*`) | 🔲 Pending |
+| **4** | Bot config CRUD endpoints + DB models | 🔲 Pending |
+| **5** | Bot Manager (spawn/stop/tail subprocesses) | 🔲 Pending |
+| **6** | WebSocket live event stream | 🔲 Pending |
+| **7** | Dashboard Phase 4 (config drawer + WS client) | 🔲 Pending |
+| **8** | Subscription + USDC on-chain payment verification | 🔲 Pending |
+| **9** | Email alerts per user (reuse existing email setup) | 🔲 Pending |
+| **10** | Alpha test with 3–5 real users | 🔲 Pending |
 
-**Estimated MVP: 2–3 weeks** from Step 1 start.
+**Estimated remaining to MVP: 2–3 weeks** from Step 1 start.
 
 ---
 
