@@ -953,7 +953,7 @@ window.saasSignIn = async function () {
 
     // 2. Sign with wallet
     const signer  = await state.provider.getSigner();
-    const message = `Sign in to VIZNAGO FURY\nNonce: ${nonce}\nChain: ${state.chainId}`;
+    const message = `Sign in to VIZNAGO FURY\nNonce: ${nonce}`;
     const signature = await signer.signMessage(message);
 
     // 3. Verify and get JWT
