@@ -533,6 +533,34 @@ section { padding: 80px 0; }
 }
 .footer-link:hover { color: var(--color-neon-cyan); }
 
+/* ---------- Language Toggle ---------- */
+.lang-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lang-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.lang-btn:hover {
+  border-color: var(--color-neon-cyan);
+  color: var(--color-neon-cyan);
+}
+.lang-btn--active {
+  border-color: var(--color-neon-blue);
+  color: var(--color-neon-blue);
+  background: rgba(26, 143, 255, 0.1);
+}
+
 /* ---------- Divider ---------- */
 .divider {
   border: none;

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VIZNAGO FURY — LP Pool Dashboard</title>
+  <title>VIZNAGO FURY — Panel de Control LP</title>
   <meta name="description" content="Monitor your Uniswap v3 LP positions live. Connect Rabby Wallet to track range status, fees earned, and impermanent loss." />
   <link rel="stylesheet" href="../global.css" />
   <link rel="stylesheet" href="dashboard.css" />
@@ -20,14 +20,19 @@
     <img src="../assets/Gemini_Generated_Image_i12tnji12tnji12t.png"
          alt="VIZNAGO FURY"
          class="navbar-logo" />
-    <div class="navbar-title">LP Pool Dashboard</div>
+    <div class="navbar-title" data-i18n="dash.nav.title">Panel de Control LP</div>
+
+    <div class="lang-toggle">
+      <button class="lang-btn" data-lang-btn="es" onclick="window.setLanguage('es')">ES</button>
+      <button class="lang-btn" data-lang-btn="en" onclick="window.setLanguage('en')">EN</button>
+    </div>
 
     <div class="navbar-wallet-area">
       <!-- Chain badge (hidden until connected) -->
       <span id="chain-badge" class="navbar-chain-badge hidden"></span>
       <!-- Connect / address button -->
       <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()">
-        &#128994;&nbsp; Connect Wallet
+        &#128994;&nbsp; <span data-i18n="dash.btn.connect">Conectar Billetera</span>
       </button>
     </div>
   </nav>
@@ -38,17 +43,17 @@
   ============================================================ -->
   <div class="price-ticker" id="price-ticker">
     <div class="ticker-item">
-      <span class="ticker-label">ETH/USDC</span>
+      <span class="ticker-label" data-i18n="dash.ticker.eth">ETH/USDC</span>
       <span class="ticker-value" id="price-eth">—</span>
     </div>
     <div class="ticker-divider"></div>
     <div class="ticker-item">
-      <span class="ticker-label">BTC/USDT</span>
+      <span class="ticker-label" data-i18n="dash.ticker.btc">BTC/USDT</span>
       <span class="ticker-value" id="price-btc">—</span>
     </div>
     <div class="ticker-divider"></div>
     <div class="ticker-item ticker-meta">
-      <span id="ticker-updated">Fetching prices…</span>
+      <span id="ticker-updated" data-i18n="dash.ticker.fetching">Obteniendo precios…</span>
       <button class="ticker-refresh-btn" onclick="refreshAll()" title="Refresh">&#8635;</button>
     </div>
   </div>
@@ -63,21 +68,21 @@
       <!-- ── Connect Prompt (no wallet) ─────────────────────── -->
       <div id="connect-prompt" class="connect-prompt">
         <div class="connect-prompt-icon">&#128081;</div>
-        <h2 class="connect-prompt-title text-gradient">Connect Your Wallet</h2>
-        <p class="connect-prompt-desc text-muted">
-          Connect Rabby or any EIP-1193 wallet to view your live<br/>
-          Uniswap&nbsp;v3 LP positions on Arbitrum, Base, or Ethereum.
+        <h2 class="connect-prompt-title text-gradient" data-i18n="dash.connect.title">Conectar tu Billetera</h2>
+        <p class="connect-prompt-desc text-muted" data-i18n="dash.connect.desc">
+          Conecta Rabby o cualquier billetera EIP-1193 para ver tus posiciones LP de Uniswap&nbsp;v3
+          en vivo en Arbitrum, Base o Ethereum.
         </p>
         <button class="btn btn-primary" onclick="connectWallet()">
-          &#128994;&nbsp; Connect Wallet
+          &#128994;&nbsp; <span data-i18n="dash.connect.btn">Conectar Billetera</span>
         </button>
-        <p class="connect-hint">
-          Supports: Rabby Wallet · MetaMask · any EIP-1193 wallet
+        <p class="connect-hint" data-i18n="dash.connect.hint">
+          Compatible con: Rabby Wallet · MetaMask · cualquier billetera EIP-1193
         </p>
         <div class="connect-no-wallet" id="no-wallet-msg" style="display:none;">
-          <span>No wallet detected. </span>
+          <span data-i18n="dash.connect.nowallet">No se detectó billetera.</span>
           <a href="https://rabby.io" target="_blank" rel="noopener" class="text-neon">
-            Download Rabby &#8599;
+            <span data-i18n="dash.connect.download">Descargar Rabby ↗</span>
           </a>
         </div>
       </div>
@@ -99,12 +104,12 @@
               <button class="chain-pill" id="pill-1"     onclick="switchToChain('0x1')"    title="Ethereum">Ethereum</button>
               <button class="chain-pill" id="pill-8453"  onclick="switchToChain('0x2105')" title="Base">Base</button>
             </div>
-            <div class="ws-count" id="ws-count">— positions</div>
+            <div class="ws-count" id="ws-count">—</div>
             <button class="btn btn-outline btn-sm" onclick="refreshAll()">
-              &#8635;&nbsp; Refresh
+              &#8635;&nbsp; <span data-i18n="dash.ws.refresh">Actualizar</span>
             </button>
             <button class="btn btn-outline btn-sm" onclick="disconnectWallet()">
-              Disconnect
+              <span data-i18n="dash.ws.disconnect">Desconectar</span>
             </button>
           </div>
         </div>
@@ -114,23 +119,23 @@
 
         <!-- Wrong network warning -->
         <div id="wrong-network-warning" class="alert alert-warning hidden">
-          &#9888;&nbsp; Switch to <strong>Arbitrum One</strong>, Ethereum, or Base to see
-          Uniswap&nbsp;v3 positions. Current chain: <span id="wrong-chain-name"></span>
+          <span data-i18n-html="dash.wrongnet">&#9888;&nbsp; Cambia a <strong>Arbitrum One</strong>, Ethereum o Base para ver posiciones Uniswap&nbsp;v3. Red actual:</span>
+          <span id="wrong-chain-name"></span>
         </div>
 
         <!-- Loading state -->
         <div id="positions-loading" class="loading-state hidden">
           <div class="spinner"></div>
-          <p>Fetching on-chain positions…</p>
+          <p data-i18n="dash.loading.text">Obteniendo posiciones on-chain…</p>
         </div>
 
         <!-- No positions -->
         <div id="no-positions" class="empty-state hidden">
           <div class="empty-icon">&#128200;</div>
-          <h3>No Uniswap v3 Positions Found</h3>
-          <p class="text-muted">
-            No active LP NFTs found for this wallet on the current network.<br/>
-            Create a position on Uniswap v3 to start monitoring.
+          <h3 data-i18n="dash.nopos.title">No se Encontraron Posiciones Uniswap v3</h3>
+          <p class="text-muted" data-i18n="dash.nopos.desc">
+            No se encontraron NFTs LP activos para esta billetera en la red actual.
+            Crea una posición en Uniswap v3 para comenzar a monitorear.
           </p>
         </div>
 
@@ -140,7 +145,7 @@
         <!-- ── Hedge Status Panel ──────────────────────────── -->
         <div class="hedge-panel" id="hedge-panel">
           <div class="hedge-panel-header">
-            <div class="section-label">Live Bot</div>
+            <div class="section-label" data-i18n="dash.hedge.label">Bot en Vivo</div>
             <h3 class="hedge-panel-title">
               Bot Aragan v1.2
               <span class="status-dot dot-green" title="Live"></span>
@@ -150,31 +155,30 @@
 
           <div class="hedge-info-grid">
             <div class="hedge-info-card">
-              <div class="hi-label">Monitoring NFT</div>
+              <div class="hi-label" data-i18n="dash.hedge.nft.label">Monitoreando NFT</div>
               <div class="hi-value text-neon">#5364087</div>
               <div class="hi-sub">ETH/USDC · 0.05% · Arbitrum</div>
             </div>
             <div class="hedge-info-card">
-              <div class="hi-label">LP Range</div>
+              <div class="hi-label" data-i18n="dash.hedge.range.label">Rango LP</div>
               <div class="hi-value">$1,800.87 — $2,250.75</div>
-              <div class="hi-sub">~25.0% width</div>
+              <div class="hi-sub" data-i18n="dash.hedge.range.sub">~25.0% de ancho</div>
             </div>
             <div class="hedge-info-card">
-              <div class="hi-label">Hedge Trigger</div>
+              <div class="hi-label" data-i18n="dash.hedge.trig.label">Disparador de Cobertura</div>
               <div class="hi-value text-neon">$1,791.87</div>
-              <div class="hi-sub">−0.5% below floor → 10× SHORT on HL</div>
+              <div class="hi-sub" data-i18n="dash.hedge.trig.sub">−0.5% bajo el piso → SHORT 10× en HL</div>
             </div>
             <div class="hedge-info-card">
-              <div class="hi-label">Mode</div>
-              <div class="hi-value">Aragan (Hedge Only)</div>
-              <div class="hi-sub">SL +0.5% · TP at range floor</div>
+              <div class="hi-label" data-i18n="dash.hedge.mode.label">Modo</div>
+              <div class="hi-value" data-i18n="dash.hedge.mode.val">Aragan (Solo Cobertura)</div>
+              <div class="hi-sub" data-i18n="dash.hedge.mode.sub">SL +0.5% · TP en piso del rango</div>
             </div>
           </div>
 
           <div class="hedge-rule">
             <span class="hedge-rule-icon">&#9888;</span>
-            <strong>Golden Rule:</strong>&nbsp; BTC → NEVER short. ETH → long+short OK.
-            Hedge wallet: 10–20% of pool value.
+            <span data-i18n-html="dash.hedge.rule"><strong>Regla de Oro:</strong>&nbsp; BTC → NUNCA short. ETH → long+short OK. Billetera de cobertura: 10–20% del valor del pool.</span>
           </div>
         </div>
 
@@ -194,10 +198,10 @@
       <img src="../assets/Gemini_Generated_Image_i12tnji12tnji12t.png"
            alt="VIZNAGO FURY"
            class="footer-logo" />
-      <span class="footer-text">LP Pool Dashboard — VIZNAGO FURY &copy; 2026</span>
+      <span class="footer-text" data-i18n="dash.footer.text">Panel de Control LP — VIZNAGO FURY © 2026</span>
       <div class="footer-links">
-        <a href="../index.html" class="footer-link">Backtester</a>
-        <a href="#" class="footer-link">Dashboard</a>
+        <a href="../index.html" class="footer-link" data-i18n="dash.footer.backtest">Backtester</a>
+        <a href="#" class="footer-link" data-i18n="dash.nav.title">Dashboard</a>
       </div>
     </div>
   </footer>
@@ -206,6 +210,7 @@
   <!-- ============================================================
        SCRIPTS
   ============================================================ -->
+  <script src="../i18n.js"></script>
   <!-- ethers.js v6 (UMD build — exposes window.ethers) -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
   <script src="dashboard.js"></script>

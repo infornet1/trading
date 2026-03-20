@@ -435,7 +435,7 @@ function renderConnectPrompt() {
   show('connect-prompt');
 
   const btn = document.getElementById('wallet-btn');
-  btn.textContent = '🟢 Connect Wallet';
+  btn.textContent = window.t ? window.t('dash.btn.connect') : '🟢 Connect Wallet';
   btn.onclick = connectWallet;
 
   const chainBadge = document.getElementById('chain-badge');
@@ -484,7 +484,8 @@ function updateChainPills() {
 }
 
 function updatePositionCount(n) {
-  document.getElementById('ws-count').textContent = n + (n === 1 ? ' position' : ' positions');
+  const countWord = window.t ? window.t(n === 1 ? 'dash.count.one' : 'dash.count.many') : (n === 1 ? 'position' : 'positions');
+  document.getElementById('ws-count').textContent = n + ' ' + countWord;
 }
 
 function updateWrongNetworkBanner(show_) {
@@ -546,10 +547,11 @@ function buildPositionCard(pos) {
                     : rangeStatus === 'out-low'   ? 'out-low'
                     : rangeStatus === 'out-high'  ? 'out-high'
                     : 'zero-liq';
-  const statusLabel = rangeStatus === 'in-range' ? 'IN RANGE'
-                    : rangeStatus === 'out-low'   ? 'OUT ↓ BELOW'
-                    : rangeStatus === 'out-high'  ? 'OUT ↑ ABOVE'
-                    : rangeStatus === 'closed'    ? 'CLOSED'
+  const t = window.t || (k => k);
+  const statusLabel = rangeStatus === 'in-range' ? t('pos.status.inrange')
+                    : rangeStatus === 'out-low'   ? t('pos.status.outlow')
+                    : rangeStatus === 'out-high'  ? t('pos.status.outhigh')
+                    : rangeStatus === 'closed'    ? t('pos.status.closed')
                     : '–';
   const dotClass = rangeStatus === 'in-range' ? 'dot-green'
                  : rangeStatus === 'out-low'   ? 'dot-red'
@@ -570,13 +572,13 @@ function buildPositionCard(pos) {
   // Range % text
   let rangePctText = '';
   if (rangePercent !== null && rangeStatus === 'in-range') {
-    rangePctText = `<strong>${rangePercent.toFixed(1)}%</strong> through range`;
+    rangePctText = `<strong>${rangePercent.toFixed(1)}%</strong> ${t('pos.range.through')}`;
   } else if (rangeStatus === 'out-low') {
-    rangePctText = 'Price is <strong>below</strong> lower bound — hedge active zone';
+    rangePctText = t('pos.range.outlow');
   } else if (rangeStatus === 'out-high') {
-    rangePctText = 'Price is <strong>above</strong> upper bound — all in stablecoin';
+    rangePctText = t('pos.range.outhigh');
   } else if (rangeStatus === 'closed') {
-    rangePctText = 'Position closed (zero liquidity)';
+    rangePctText = t('pos.range.closed');
   }
 
   // Fees owed display
@@ -589,7 +591,7 @@ function buildPositionCard(pos) {
       <div>
         <div class="pc-id">NFT #${tokenId}</div>
         <div class="pc-pair">${pairLabel}</div>
-        <div class="pc-fee">Fee tier: ${feeDisplay}</div>
+        <div class="pc-fee">${t('pos.fee.tier')} ${feeDisplay}</div>
       </div>
       <div class="pc-status ${statusClass}">
         <span class="status-dot ${dotClass}"></span>
@@ -600,7 +602,7 @@ function buildPositionCard(pos) {
     <div class="pc-divider"></div>
 
     <div class="pc-range-section">
-      <div class="pc-range-label">Price Range (${priceBase})</div>
+      <div class="pc-range-label">${t('pos.range.label')} (${priceBase})</div>
       <div class="range-bar-wrap">
         <div class="range-bar-track">
           <div class="range-bar-fill"></div>
@@ -617,15 +619,15 @@ function buildPositionCard(pos) {
 
     <div class="pc-prices">
       <div class="pc-price-item">
-        <div class="pc-price-label">Lower Bound</div>
+        <div class="pc-price-label">${t('pos.price.lower')}</div>
         <div class="pc-price-value lower">${formatPrice(priceLower)}</div>
       </div>
       <div class="pc-price-item">
-        <div class="pc-price-label">Current Price</div>
+        <div class="pc-price-label">${t('pos.price.current')}</div>
         <div class="pc-price-value current">${priceCurrent !== null ? formatPrice(priceCurrent) : '—'}</div>
       </div>
       <div class="pc-price-item">
-        <div class="pc-price-label">Upper Bound</div>
+        <div class="pc-price-label">${t('pos.price.upper')}</div>
         <div class="pc-price-value upper">${formatPrice(priceUpper)}</div>
       </div>
     </div>
@@ -635,7 +637,7 @@ function buildPositionCard(pos) {
       : ''}
 
     <div class="pc-fees">
-      <div class="pc-fees-label">Fees Owed</div>
+      <div class="pc-fees-label">${t('pos.fees.label')}</div>
       <div class="pc-fees-values">
         ${hasFees
           ? `${fee0Display}<span>${token0Info.symbol}</span>&nbsp;+&nbsp;${fee1Display}<span>${token1Info.symbol}</span>`
@@ -655,7 +657,9 @@ function hide(id) { document.getElementById(id)?.classList.add('hidden'); }
 function setWalletBtnLoading(loading) {
   const btn = document.getElementById('wallet-btn');
   btn.disabled  = loading;
-  btn.textContent = loading ? '⏳ Connecting…' : '🟢 Connect Wallet';
+  btn.textContent = loading
+    ? (window.t ? window.t('dash.btn.connecting') : '⏳ Connecting…')
+    : (window.t ? window.t('dash.btn.connect')    : '🟢 Connect Wallet');
 }
 
 function showError(msg) {
@@ -680,7 +684,7 @@ function init() {
   } else if (window.ethereum.isRabby) {
     // Rabby detected — tweak copy
     const hint = document.querySelector('.connect-hint');
-    if (hint) hint.textContent = 'Rabby Wallet detected ✓';
+    if (hint) hint.textContent = window.t ? window.t('dash.rabby.detected') : 'Rabby Wallet detected ✓';
   }
 
   // Start price ticker even before wallet connects
