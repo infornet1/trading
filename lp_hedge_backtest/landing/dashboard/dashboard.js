@@ -1093,6 +1093,19 @@ async function saasLoadBots() {
           if (s?.last_event) saas.statuses[bot.id] = s.last_event;
           renderLiveBots();
         }).catch(() => {});
+        // Seed log terminal with recent DB events so it isn't blank on load
+        apiCall('GET', `/bots/${bot.id}/events?limit=10`).then(events => {
+          if (!Array.isArray(events) || !events.length) return;
+          if (!saas.logs[bot.id]) saas.logs[bot.id] = [];
+          // Events come newest-first — reverse to show oldest at top
+          [...events].reverse().forEach(ev => {
+            const ts  = new Date(ev.ts).toLocaleTimeString();
+            const pnl = ev.pnl != null ? ` | P&L: ${ev.pnl >= 0 ? '+' : ''}$${Number(ev.pnl).toFixed(2)}` : '';
+            const px  = ev.price_at_event ? ` | $${Number(ev.price_at_event).toLocaleString('en-US',{maximumFractionDigits:2})}` : '';
+            saas.logs[bot.id].push(`[${ts}] ${ev.event_type.toUpperCase()}${px}${pnl}`);
+          });
+          renderLiveBots();
+        }).catch(() => {});
         if (!saas.sockets[bot.id]) connectBotWS(bot.id);
       }
     }
