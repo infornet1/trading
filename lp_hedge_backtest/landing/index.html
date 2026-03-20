@@ -325,29 +325,38 @@
           pointer-events: none;
         "></div>
 
-        <div class="section-label" style="justify-content: center; margin-bottom: 16px;" data-i18n="cta.label">Listo para Ejecutar</div>
-        <h2 class="section-title text-gradient" style="margin-bottom: 12px;" data-i18n="cta.title">Inicia Tu Backtest</h2>
-        <p style="color: var(--color-text-secondary); max-width: 480px; margin: 0 auto 32px; font-size: 0.95rem;">
-          <span data-i18n="cta.desc">Configura tu rango de fechas, ancho del rango LP, nivel de comisión y ratio de cobertura en</span>
-          <code style="color: var(--color-neon-cyan); background: rgba(0,212,255,0.08); padding: 2px 8px; border-radius: 4px;">config.json</code>
-          <span data-i18n="cta.desc2">luego ejecuta un solo comando.</span>
+        <div class="section-label" style="justify-content: center; margin-bottom: 16px;" data-i18n="cta.label">Listo para Participar</div>
+        <h2 class="section-title text-gradient" style="margin-bottom: 12px;" data-i18n="cta.title">Únete a la Lista de Espera</h2>
+        <p style="color: var(--color-text-secondary); max-width: 480px; margin: 0 auto 32px; font-size: 0.95rem;" data-i18n="cta.desc">
+          Regálanos tu correo electrónico y te avisaremos en cuanto abran los primeros accesos.
         </p>
 
-        <div style="
-          background: #040d1a;
-          border: 1px solid var(--color-border);
-          border-radius: 8px;
-          padding: 20px 28px;
-          display: inline-block;
-          text-align: left;
-          font-family: 'Courier New', monospace;
-          font-size: 0.9rem;
-          color: var(--color-neon-green);
-          box-shadow: 0 0 20px rgba(0,255,179,0.08);
-        ">
-          <span style="color: var(--color-text-muted)">$ </span>python run_backtest.py<br/>
-          <span style="color: var(--color-text-muted)">$ </span>python run_backtest.py --config custom_config.json
-        </div>
+        <form id="waitlist-form" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; max-width: 480px; margin: 0 auto;" onsubmit="submitWaitlist(event)">
+          <input
+            id="waitlist-email"
+            type="email"
+            required
+            placeholder="tu@correo.com"
+            data-i18n-placeholder="cta.email.placeholder"
+            style="
+              flex: 1 1 260px;
+              background: #040d1a;
+              border: 1px solid var(--color-border);
+              border-radius: 8px;
+              padding: 12px 16px;
+              color: var(--color-text-primary);
+              font-size: 0.95rem;
+              outline: none;
+              transition: border-color 0.2s;
+            "
+            onfocus="this.style.borderColor='var(--color-neon-cyan)'"
+            onblur="this.style.borderColor='var(--color-border)'"
+          />
+          <button type="submit" class="btn btn-primary" style="flex: 0 0 auto; padding: 12px 28px; font-size: 0.95rem;" data-i18n="cta.btn">
+            Notifícame
+          </button>
+        </form>
+        <p id="waitlist-msg" style="margin-top: 16px; font-size: 0.85rem; min-height: 20px;"></p>
       </div>
     </div>
   </section>
@@ -372,6 +381,21 @@
   </footer>
 
   <script src="i18n.js"></script>
+  <script>
+    function submitWaitlist(e) {
+      e.preventDefault();
+      const email = document.getElementById('waitlist-email').value.trim();
+      const msg   = document.getElementById('waitlist-msg');
+      if (!email) return;
+      // Store locally for now (Step 8 will wire to backend)
+      const list = JSON.parse(localStorage.getItem('vf_waitlist') || '[]');
+      if (!list.includes(email)) list.push(email);
+      localStorage.setItem('vf_waitlist', JSON.stringify(list));
+      msg.style.color = 'var(--color-neon-green)';
+      msg.textContent = '✓ ¡Listo! Te avisaremos en cuanto abramos acceso.';
+      document.getElementById('waitlist-email').value = '';
+    }
+  </script>
 
 </body>
 </html>

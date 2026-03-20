@@ -103,10 +103,11 @@ const TRANSLATIONS = {
     'int.04.desc':       'Slippage, comisiones de protocolo y costos de gas incluidos en cada evento de entrada y salida.',
 
     // ── Landing: CTA ──────────────────────────────────────────────
-    'cta.label':         'Listo para Ejecutar',
-    'cta.title':         'Inicia Tu Backtest',
-    'cta.desc':          'Configura tu rango de fechas, ancho del rango LP, nivel de comisión y ratio de cobertura en',
-    'cta.desc2':         'luego ejecuta un solo comando.',
+    'cta.label':              'Listo para Participar',
+    'cta.title':              'Únete a la Lista de Espera',
+    'cta.desc':               'Regálanos tu correo electrónico y te avisaremos en cuanto abran los primeros accesos.',
+    'cta.email.placeholder':  'tu@correo.com',
+    'cta.btn':                'Notifícame',
 
     // ── Landing: footer ───────────────────────────────────────────
     'footer.text':       'LP + Perps Hedge Backtester — VIZNAGO FURY © 2026',
@@ -316,10 +317,11 @@ const TRANSLATIONS = {
     'int.04.desc':       'Slippage, protocol fees, and gas costs factored in at every entry and exit event.',
 
     // ── Landing: CTA ──────────────────────────────────────────────
-    'cta.label':         'Ready to Run',
-    'cta.title':         'Start Your Backtest',
-    'cta.desc':          'Configure your date range, LP range width, fee tier and hedge ratio in',
-    'cta.desc2':         'then run a single command.',
+    'cta.label':              'Ready to Join',
+    'cta.title':              'Join the Waiting List',
+    'cta.desc':               'Drop us your email and we\'ll notify you as soon as early access opens.',
+    'cta.email.placeholder':  'your@email.com',
+    'cta.btn':                'Notify Me',
 
     // ── Landing: footer ───────────────────────────────────────────
     'footer.text':       'LP + Perps Hedge Backtester — VIZNAGO FURY © 2026',
