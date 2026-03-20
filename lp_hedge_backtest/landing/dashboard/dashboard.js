@@ -993,6 +993,8 @@ async function saasLoadBots() {
         connectBotWS(bot.id);
       }
     }
+    // Re-render positions if already loaded so drawers reflect bot state
+    if (state.positions.length > 0) renderPositions();
   } catch (err) {
     // Silently ignore — JWT may be expired (apiCall handles 401)
     console.warn('[SaaS] loadBots:', err.message);
