@@ -40,6 +40,7 @@ class BotManager:
         self._procs:  dict[int, subprocess.Popen]         = {}   # config_id → process
         self._tasks:  dict[int, asyncio.Task]              = {}   # config_id → tail task
         self._subscribers: dict[int, list[asyncio.Queue]] = {}   # config_id → WS queues
+        self._shutting_down: bool = False
 
     # ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -71,6 +72,20 @@ class BotManager:
         task = asyncio.create_task(self._tail(config_id, proc))
         self._tasks[config_id] = task
         print(f"[BotManager] Started bot for config {config_id}, PID {proc.pid}", flush=True)
+
+    async def shutdown(self):
+        """Graceful API shutdown — terminate all bots without marking them inactive in DB."""
+        self._shutting_down = True
+        for config_id, proc in list(self._procs.items()):
+            try:
+                proc.terminate()
+                proc.wait(timeout=3)
+            except Exception:
+                try: proc.kill()
+                except Exception: pass
+        self._procs.clear()
+        self._tasks.clear()
+        print("[BotManager] Graceful shutdown complete", flush=True)
 
     async def stop(self, config_id: int):
         proc = self._procs.pop(config_id, None)
@@ -135,13 +150,16 @@ class BotManager:
         except Exception as e:
             print(f"[BotManager] Tail error for config {config_id}: {e}", flush=True)
         finally:
-            # Process ended unexpectedly — mark inactive in DB
+            # Process ended — mark inactive only if NOT a graceful API shutdown
             if config_id in self._procs:
                 self._procs.pop(config_id, None)
                 self._tasks.pop(config_id, None)
-                await self._mark_inactive(config_id)
-                await self._broadcast(config_id, {"event": "stopped", "config_id": config_id})
-                print(f"[BotManager] Bot {config_id} exited unexpectedly", flush=True)
+                if not self._shutting_down:
+                    await self._mark_inactive(config_id)
+                    await self._broadcast(config_id, {"event": "stopped", "config_id": config_id})
+                    print(f"[BotManager] Bot {config_id} exited unexpectedly", flush=True)
+                else:
+                    print(f"[BotManager] Bot {config_id} stopped for shutdown (active=True preserved)", flush=True)
 
     async def _handle_event(self, config_id: int, record: dict):
         event_label = record.get("event", "")
