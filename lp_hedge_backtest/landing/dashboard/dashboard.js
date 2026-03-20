@@ -1236,7 +1236,7 @@ function buildProtectionDrawer(pos) {
           <span class="prot-info-value">${bot.hedge_ratio}%</span>
         </div>
       </div>
-      <button class="btn btn-outline btn-sm prot-btn-full" id="prot-stop-btn-${bot.id}"
+      <button class="btn btn-outline btn-sm prot-btn-full prot-btn-stop" id="prot-stop-btn-${bot.id}"
               onclick="stopProtection(${bot.id}, '${tokenId}')">
         ⏹&nbsp; ${t('prot.btn.stop')}
       </button>`;

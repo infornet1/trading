@@ -963,6 +963,15 @@
 
 /* Full-width button */
 .prot-btn-full { width: 100%; justify-content: center; margin-top: 4px; }
+.prot-btn-stop {
+  border-color: #f87171;
+  color: #f87171;
+}
+.prot-btn-stop:hover {
+  background: rgba(248,113,113,0.1);
+  border-color: #f87171;
+  color: #f87171;
+}
 
 /* Active bot status display */
 .prot-status-row {
