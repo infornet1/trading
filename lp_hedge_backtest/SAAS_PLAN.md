@@ -1,6 +1,6 @@
 # VIZNAGO FURY — SaaS Option B: Hosted LP Hedge Bot Service
 > Architecture & Implementation Plan — v1.2 (2026-03-20)
-> Status: **Dashboard Phase 1–3 Complete · Phase 4 (Bot Protection) Pending**
+> Status: **Steps 0–6 Complete · Step 7 (Dashboard Phase 4) Pending**
 
 ---
 
@@ -365,12 +365,12 @@ Last event: Hedge opened @ $1,791.20 · P&L: +$42.10
 | Step | Scope | Status |
 |---|---|---|
 | **0** | Dashboard Phase 1–3: wallet connect, positions, i18n, watch mode, tabs | ✅ Complete |
-| **1** | MariaDB: create databases + user + schema | 🔲 Pending |
-| **2** | `live_hedge_bot.py` refactor: all config from env vars | 🔲 Pending |
-| **3** | FastAPI skeleton + auth (nonce + JWT + `/auth/*`) | 🔲 Pending |
-| **4** | Bot config CRUD endpoints + DB models | 🔲 Pending |
-| **5** | Bot Manager (spawn/stop/tail subprocesses) | 🔲 Pending |
-| **6** | WebSocket live event stream | 🔲 Pending |
+| **1** | MariaDB: create databases + user + schema | ✅ Complete |
+| **2** | `live_hedge_bot.py` refactor: all config from env vars | ✅ Complete |
+| **3** | FastAPI skeleton + auth (nonce + JWT + `/auth/*`) | ✅ Complete |
+| **4** | Bot config CRUD endpoints + DB models | ✅ Complete |
+| **5** | Bot Manager (spawn/stop/tail subprocesses) | ✅ Complete |
+| **6** | WebSocket live event stream | ✅ Complete |
 | **7** | Dashboard Phase 4 (config drawer + WS client) | 🔲 Pending |
 | **8** | Subscription + USDC on-chain payment verification | 🔲 Pending |
 | **9** | Email alerts per user (reuse existing email setup) | 🔲 Pending |
