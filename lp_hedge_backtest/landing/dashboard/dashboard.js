@@ -113,7 +113,8 @@ const state = {
   positions:  [],        // fetched position objects
   prices:     { eth: null, btc: null },
   loading:    false,
-  refreshTimer: null,
+  refreshTimer:    null,
+  refreshInterval: parseInt(localStorage.getItem('vf_refresh_interval') || '0', 10), // ms; 0 = off
   watchMode:  false,     // true = read-only address watch, no wallet connected
   activeTab:  'active',  // 'active' | 'history'
 };
@@ -227,6 +228,7 @@ window.disconnectWallet = function () {
   localStorage.removeItem('vf_jwt');
   _drawerOpen.clear();
   updateNuclearBtn();
+  renderRefreshControl();
   renderConnectPrompt();
 };
 
@@ -289,11 +291,8 @@ window.startWatchMode = async function () {
   fetchLivePrices();
   fetchPositions();
 
-  clearInterval(state.refreshTimer);
-  state.refreshTimer = setInterval(() => {
-    fetchLivePrices();
-    fetchPositions();
-  }, 180_000);
+  applyRefreshInterval();
+  renderRefreshControl();
 };
 
 window.refreshAll = async function () {
@@ -325,12 +324,8 @@ function onWalletConnected() {
   fetchLivePrices();
   fetchPositions();
 
-  // Auto-refresh every 3 min
-  clearInterval(state.refreshTimer);
-  state.refreshTimer = setInterval(() => {
-    fetchLivePrices();
-    fetchPositions();
-  }, 180_000);
+  applyRefreshInterval();
+  renderRefreshControl();
 }
 
 function handleAccountsChanged(accounts) {
@@ -655,6 +650,52 @@ function updateChainPills() {
     el.classList.toggle('chain-pill--active', Number(id) === state.chainId);
   });
 }
+
+// ── Auto-refresh control ──────────────────────────────────────────────────
+
+const REFRESH_OPTIONS = [
+  { label: 'Off',  value: 0 },
+  { label: '1m',   value: 60_000 },
+  { label: '3m',   value: 180_000 },
+  { label: '5m',   value: 300_000 },
+  { label: '10m',  value: 600_000 },
+];
+
+function applyRefreshInterval() {
+  clearInterval(state.refreshTimer);
+  state.refreshTimer = null;
+  if (state.refreshInterval > 0) {
+    state.refreshTimer = setInterval(() => {
+      fetchLivePrices();
+      fetchPositions();
+    }, state.refreshInterval);
+  }
+}
+
+function renderRefreshControl() {
+  const el = document.getElementById('refresh-control');
+  if (!el) return;
+  const active = state.address !== null;
+  if (!active) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+
+  const cur = state.refreshInterval;
+  el.innerHTML = `
+    <span class="refresh-label" data-i18n="dash.refresh.label">Auto</span>
+    <div class="refresh-opts">
+      ${REFRESH_OPTIONS.map(o => `
+        <button class="refresh-opt${o.value === cur ? ' refresh-opt--active' : ''}"
+                onclick="setRefreshInterval(${o.value})">${o.label}</button>
+      `).join('')}
+    </div>`;
+}
+
+window.setRefreshInterval = function (ms) {
+  state.refreshInterval = ms;
+  localStorage.setItem('vf_refresh_interval', String(ms));
+  applyRefreshInterval();
+  renderRefreshControl();
+};
 
 function updateTabCounts() {
   const t = window.t || (k => k);

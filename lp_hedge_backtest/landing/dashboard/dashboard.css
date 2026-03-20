@@ -3,6 +3,47 @@
    LP Pool Monitor (extends global.css)
    ============================================================ */
 
+/* ── Auto-refresh control ───────────────────────────────────── */
+.refresh-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.refresh-control.hidden { display: none; }
+
+.refresh-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.refresh-opts {
+  display: flex;
+  gap: 3px;
+}
+
+.refresh-opt {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.refresh-opt:hover {
+  color: var(--color-text-secondary);
+  border-color: rgba(255,255,255,0.25);
+}
+.refresh-opt--active {
+  color: var(--color-neon-cyan);
+  border-color: var(--color-neon-cyan);
+  background: rgba(0,212,255,0.08);
+}
+
 /* ── Nuclear Stop ───────────────────────────────────────────── */
 .btn-nuclear {
   display: inline-flex;

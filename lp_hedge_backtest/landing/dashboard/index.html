@@ -29,6 +29,8 @@
     </div>
 
     <div class="navbar-wallet-area">
+      <!-- Auto-refresh control (hidden until wallet connected) -->
+      <div id="refresh-control" class="refresh-control hidden"></div>
       <!-- Nuclear stop button — only rendered for admin wallets -->
       <button id="nuclear-stop-btn" class="btn-nuclear hidden" onclick="nuclearStop()">
         &#9762; <span data-i18n="dash.admin.stop">Stop All</span>
