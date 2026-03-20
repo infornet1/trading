@@ -151,19 +151,40 @@
           <span id="wrong-chain-name"></span>
         </div>
 
+        <!-- Tab bar -->
+        <div class="tab-bar">
+          <button class="tab-btn tab-btn--active" id="tab-active" onclick="setTab('active')">
+            <span data-i18n="dash.tab.active">Activas</span>
+            <span class="tab-count" id="tab-count-active">0</span>
+          </button>
+          <button class="tab-btn" id="tab-history" onclick="setTab('history')">
+            <span data-i18n="dash.tab.history">Historial</span>
+            <span class="tab-count" id="tab-count-history">0</span>
+          </button>
+        </div>
+
         <!-- Loading state -->
         <div id="positions-loading" class="loading-state hidden">
           <div class="spinner"></div>
           <p data-i18n="dash.loading.text">Obteniendo posiciones on-chain…</p>
         </div>
 
-        <!-- No positions -->
+        <!-- No active positions -->
         <div id="no-positions" class="empty-state hidden">
-          <div class="empty-icon">&#128200;</div>
-          <h3 data-i18n="dash.nopos.title">No se Encontraron Posiciones Uniswap v3</h3>
+          <div class="empty-icon">&#9654;</div>
+          <h3 data-i18n="dash.nopos.title">Sin Posiciones Activas</h3>
           <p class="text-muted" data-i18n="dash.nopos.desc">
             No se encontraron NFTs LP activos para esta billetera en la red actual.
             Crea una posición en Uniswap v3 para comenzar a monitorear.
+          </p>
+        </div>
+
+        <!-- No history -->
+        <div id="no-history" class="empty-state hidden">
+          <div class="empty-icon">&#128337;</div>
+          <h3 data-i18n="dash.nopos.history.title">Sin Historial de Posiciones</h3>
+          <p class="text-muted" data-i18n="dash.nopos.history.desc">
+            Las posiciones cerradas (liquidez cero) aparecerán aquí.
           </p>
         </div>
 

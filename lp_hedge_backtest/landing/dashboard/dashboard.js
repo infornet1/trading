@@ -107,14 +107,15 @@ const FACTORY_ABI = [
 
 // ── App State ─────────────────────────────────────────────────────────────
 const state = {
-  provider:  null,   // ethers.BrowserProvider (wallet) or JsonRpcProvider (watch)
-  address:   null,   // connected wallet address
-  chainId:   null,   // numeric chain id
-  positions: [],     // fetched position objects
-  prices:    { eth: null, btc: null },
-  loading:   false,
+  provider:   null,      // ethers.BrowserProvider (wallet) or JsonRpcProvider (watch)
+  address:    null,      // connected wallet address
+  chainId:    null,      // numeric chain id
+  positions:  [],        // fetched position objects
+  prices:     { eth: null, btc: null },
+  loading:    false,
   refreshTimer: null,
-  watchMode: false,  // true = read-only address watch, no wallet connected
+  watchMode:  false,     // true = read-only address watch, no wallet connected
+  activeTab:  'active',  // 'active' | 'history'
 };
 
 // ── Price Math ────────────────────────────────────────────────────────────
@@ -199,7 +200,18 @@ window.disconnectWallet = function () {
   state.provider  = null;
   state.positions = [];
   state.watchMode = false;
+  state.activeTab = 'active';
   renderConnectPrompt();
+};
+
+// ── Tab Navigation ────────────────────────────────────────────────────────
+
+window.setTab = function (tab) {
+  state.activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('tab-btn--active', btn.id === 'tab-' + tab);
+  });
+  renderPositions();
 };
 
 // ── Watch Address (read-only) ─────────────────────────────────────────────
@@ -386,9 +398,9 @@ async function fetchPositions() {
     const balance = Number(await nfpm.balanceOf(state.address));
 
     if (balance === 0) {
+      state.positions = [];
       hide('positions-loading');
-      show('no-positions');
-      updatePositionCount(0);
+      renderPositions();
       return;
     }
 
@@ -514,7 +526,6 @@ async function fetchPositions() {
     });
 
     hide('positions-loading');
-    updatePositionCount(state.positions.length);
     renderPositions();
 
   } catch (err) {
@@ -615,9 +626,21 @@ function updateChainPills() {
   });
 }
 
-function updatePositionCount(n) {
-  const countWord = window.t ? window.t(n === 1 ? 'dash.count.one' : 'dash.count.many') : (n === 1 ? 'position' : 'positions');
-  document.getElementById('ws-count').textContent = n + ' ' + countWord;
+function updateTabCounts() {
+  const t = window.t || (k => k);
+  const activeN  = state.positions.filter(p => p.rangeStatus !== 'closed').length;
+  const historyN = state.positions.filter(p => p.rangeStatus === 'closed').length;
+
+  const elA = document.getElementById('tab-count-active');
+  const elH = document.getElementById('tab-count-history');
+  if (elA) elA.textContent = activeN;
+  if (elH) elH.textContent = historyN;
+
+  // ws-count reflects the currently visible tab
+  const n = state.activeTab === 'history' ? historyN : activeN;
+  const word = t(n === 1 ? 'dash.count.one' : 'dash.count.many');
+  const wsCount = document.getElementById('ws-count');
+  if (wsCount) wsCount.textContent = n + ' ' + word;
 }
 
 function updateWrongNetworkBanner(show_) {
@@ -647,20 +670,27 @@ function renderPositions() {
   const grid = document.getElementById('positions-grid');
   grid.innerHTML = '';
 
-  if (!state.positions.length) {
-    show('no-positions');
+  // Always update counts first (affects both tabs and ws-count)
+  updateTabCounts();
+
+  hide('no-positions');
+  hide('no-history');
+
+  const isHistory = state.activeTab === 'history';
+  const filtered  = state.positions.filter(p =>
+    isHistory ? p.rangeStatus === 'closed' : p.rangeStatus !== 'closed'
+  );
+
+  if (!filtered.length) {
+    show(isHistory ? 'no-history' : 'no-positions');
     return;
   }
-  hide('no-positions');
 
-  // Sort: in-range first, then out-low, out-high, closed
+  // Sort: in-range → out-low → out-high → closed → unknown
   const order = { 'in-range': 0, 'out-low': 1, 'out-high': 2, 'closed': 3, 'unknown': 4 };
-  const sorted = [...state.positions].sort((a, b) => (order[a.rangeStatus] ?? 4) - (order[b.rangeStatus] ?? 4));
+  const sorted = [...filtered].sort((a, b) => (order[a.rangeStatus] ?? 4) - (order[b.rangeStatus] ?? 4));
 
-  sorted.forEach(pos => {
-    const card = buildPositionCard(pos);
-    grid.appendChild(card);
-  });
+  sorted.forEach(pos => grid.appendChild(buildPositionCard(pos)));
 }
 
 function buildPositionCard(pos) {

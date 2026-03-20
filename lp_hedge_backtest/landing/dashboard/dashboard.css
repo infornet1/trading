@@ -543,6 +543,54 @@
 }
 .hedge-rule-icon { margin-right: 6px; }
 
+/* ── Tab Bar ─────────────────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 28px;
+}
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--color-text-muted);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.2s, border-bottom-color 0.2s;
+}
+.tab-btn:hover { color: var(--color-text-secondary); }
+.tab-btn--active {
+  color: var(--color-neon-cyan);
+  border-bottom-color: var(--color-neon-cyan);
+}
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.55rem;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.tab-btn--active .tab-count {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.4);
+  color: var(--color-neon-cyan);
+}
+
 /* ── Watch Address Mode ──────────────────────────────────────── */
 .watch-divider {
   display: flex;

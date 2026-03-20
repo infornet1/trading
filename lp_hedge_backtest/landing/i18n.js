@@ -137,10 +137,16 @@ const TRANSLATIONS = {
     // ── Dashboard: network warning ────────────────────────────────
     'dash.wrongnet':           '⚠\u00A0 Cambia a <strong>Arbitrum One</strong>, Ethereum o Base para ver posiciones Uniswap\u00A0v3. Red actual:',
 
+    // ── Dashboard: tabs ───────────────────────────────────────────
+    'dash.tab.active':              'Activas',
+    'dash.tab.history':             'Historial',
+
     // ── Dashboard: states ─────────────────────────────────────────
-    'dash.loading.text':       'Obteniendo posiciones on-chain…',
-    'dash.nopos.title':        'No se Encontraron Posiciones Uniswap v3',
-    'dash.nopos.desc':         'No se encontraron NFTs LP activos para esta billetera en la red actual. Crea una posición en Uniswap v3 para comenzar a monitorear.',
+    'dash.loading.text':            'Obteniendo posiciones on-chain…',
+    'dash.nopos.title':             'Sin Posiciones Activas',
+    'dash.nopos.desc':              'No se encontraron NFTs LP activos para esta billetera en la red actual. Crea una posición en Uniswap v3 para comenzar a monitorear.',
+    'dash.nopos.history.title':     'Sin Historial de Posiciones',
+    'dash.nopos.history.desc':      'Las posiciones cerradas (liquidez cero) aparecerán aquí.',
 
     // ── Dashboard: hedge panel ────────────────────────────────────
     'dash.hedge.label':        'Bot en Vivo',
@@ -313,10 +319,16 @@ const TRANSLATIONS = {
     // ── Dashboard: network warning ────────────────────────────────
     'dash.wrongnet':           '⚠\u00A0 Switch to <strong>Arbitrum One</strong>, Ethereum, or Base to see Uniswap\u00A0v3 positions. Current chain:',
 
+    // ── Dashboard: tabs ───────────────────────────────────────────
+    'dash.tab.active':              'Active',
+    'dash.tab.history':             'History',
+
     // ── Dashboard: states ─────────────────────────────────────────
-    'dash.loading.text':       'Fetching on-chain positions…',
-    'dash.nopos.title':        'No Uniswap v3 Positions Found',
-    'dash.nopos.desc':         'No active LP NFTs found for this wallet on the current network. Create a position on Uniswap v3 to start monitoring.',
+    'dash.loading.text':            'Fetching on-chain positions…',
+    'dash.nopos.title':             'No Active Positions',
+    'dash.nopos.desc':              'No active LP NFTs found for this wallet on the current network. Create a position on Uniswap v3 to start monitoring.',
+    'dash.nopos.history.title':     'No Position History',
+    'dash.nopos.history.desc':      'Closed positions (zero liquidity) will appear here.',
 
     // ── Dashboard: hedge panel ────────────────────────────────────
     'dash.hedge.label':        'Live Bot',
