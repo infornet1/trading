@@ -1,6 +1,6 @@
 # VIZNAGO FURY — SaaS Option B: Hosted LP Hedge Bot Service
 > Architecture & Implementation Plan — v1.2 (2026-03-20)
-> Status: **Steps 0–6 Complete · Step 7 (Dashboard Phase 4) Pending**
+> Status: **Steps 0–7 Complete · Step 8 (Subscriptions) Pending**
 
 ---
 
@@ -316,33 +316,23 @@ of user config — not just UI hints:
 - Instant filtering (no re-fetch); separate empty states per tab
 - `ws-count` reflects currently visible tab
 
-### 🔲 Phase 4: Bot Protection Drawer (pending — requires SaaS backend)
+### ✅ Phase 4: Bot Protection Drawer (complete — 2026-03-20)
 
 Each position card gains a collapsible **"Enable Protection"** drawer:
 
-```
-[Position Card — WETH/USDC · IN RANGE]
-────────────────────────────────────────────
-[ ▼ Enable Bot Protection ]
+**Implemented in `landing/dashboard/dashboard.js` + `dashboard.css` + `i18n.js`:**
 
-  Mode:         ● Defensor Bajista (hedge only)  ○ Avaro (+long)
-  Trigger:      [ -0.5 ]% below lower bound
-  Hedge size:   [ 50 ]% of volatile capital
-  Exchange:     [ Hyperliquid ▼ ]
-  HL API Key:   [ •••••••••••••••• ]
-  HL Wallet:    [ 0xABC... ]
-
-  [ Activate Protection ]
-────────────────────────────────────────────
-Status:     🟢 ACTIVE — Last check: 12s ago
-Last event: Hedge opened @ $1,791.20 · P&L: +$42.10
-[ Event history ▼ ]
-```
-
-- Config form sends `POST /bots` → `POST /bots/{id}/start`
-- WebSocket `/ws/{bot_id}` updates status + last event in real time
-- Subscription gate: Free users see the form but "Activate" prompts upgrade
-- **Prerequisite:** SaaS backend Steps 1–6 must be complete first
+- **Auth flow**: wallet sign-in button in drawer → `GET /auth/nonce` → `signMessage` → `POST /auth/verify` → JWT stored in `localStorage['vf_jwt']`
+- **Collapsible drawer** on every active position card; open/closed state persists across re-renders
+- **Mode toggle**: Defensor Bajista / Avaro radio buttons (Avaro disabled for BTC pairs — golden rule enforced in UI and API)
+- **Config form**: trigger %, hedge size %, HL API Key (password field), HL wallet address
+- **Create or update**: `POST /bots` (new) or `PUT /bots/{id}` (existing inactive bot) → `POST /bots/{id}/start`
+- **Active state**: replaces form with live status row + stop button; last event shown inline
+- **WebSocket**: `wss://{host}/trading/lp-hedge/api/ws/{config_id}?token={jwt}` auto-connects on activate, auto-reconnects after 10 s on drop, updates status row in real time
+- **Sign-in gate**: if no JWT, drawer shows "Sign In with Wallet" button
+- **Watch mode**: drawer shows disabled message (no protection without wallet)
+- **Bilingual**: all new strings added to `i18n.js` (ES + EN, ~30 keys each)
+- **Nginx proxy**: already configured at `/trading/lp-hedge/api/` → port 8001 with WebSocket upgrade headers
 
 ---
 
@@ -371,7 +361,7 @@ Last event: Hedge opened @ $1,791.20 · P&L: +$42.10
 | **4** | Bot config CRUD endpoints + DB models | ✅ Complete |
 | **5** | Bot Manager (spawn/stop/tail subprocesses) | ✅ Complete |
 | **6** | WebSocket live event stream | ✅ Complete |
-| **7** | Dashboard Phase 4 (config drawer + WS client) | 🔲 Pending |
+| **7** | Dashboard Phase 4 (config drawer + WS client) | ✅ Complete |
 | **8** | Subscription + USDC on-chain payment verification | 🔲 Pending |
 | **9** | Email alerts per user (reuse existing email setup) | 🔲 Pending |
 | **10** | Alpha test with 3–5 real users | 🔲 Pending |

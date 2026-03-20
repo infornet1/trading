@@ -118,6 +118,19 @@ const state = {
   activeTab:  'active',  // 'active' | 'history'
 };
 
+// ── SaaS State ────────────────────────────────────────────────────────────
+const API_BASE = '/trading/lp-hedge/api';
+
+const saas = {
+  jwt:      localStorage.getItem('vf_jwt') || null,
+  bots:     {},    // nft_token_id (string) → BotConfigOut
+  sockets:  {},    // config_id (number) → WebSocket
+  statuses: {},    // config_id → last event payload
+};
+
+// Track which protection drawers are open (survive re-render)
+const _drawerOpen = new Set();
+
 // ── Price Math ────────────────────────────────────────────────────────────
 
 /**
@@ -201,6 +214,14 @@ window.disconnectWallet = function () {
   state.positions = [];
   state.watchMode = false;
   state.activeTab = 'active';
+  // Close bot WebSockets on disconnect
+  for (const ws of Object.values(saas.sockets)) {
+    try { ws.close(); } catch (_) {}
+  }
+  saas.sockets  = {};
+  saas.bots     = {};
+  saas.statuses = {};
+  _drawerOpen.clear();
   renderConnectPrompt();
 };
 
@@ -290,6 +311,9 @@ function onWalletConnected() {
   renderWalletConnected();
 
   registerWalletListeners();
+
+  // Load SaaS bots if JWT exists (silently, no prompt)
+  saasLoadBots();
 
   // Initial data load
   fetchLivePrices();
@@ -806,6 +830,8 @@ function buildPositionCard(pos) {
           : '<span style="color:var(--color-text-muted)">—</span>'}
       </div>
     </div>
+
+    ${buildProtectionDrawer(pos)}
   `;
 
   return card;
@@ -881,3 +907,414 @@ if (typeof ethers !== 'undefined') {
 } else {
   window.addEventListener('load', init);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SaaS — Auth, Bot Management, Protection Drawer (Phase 4)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── API helper ────────────────────────────────────────────────────────────
+
+async function apiCall(method, path, body) {
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(saas.jwt ? { Authorization: `Bearer ${saas.jwt}` } : {}),
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API_BASE + path, opts);
+  if (res.status === 401) {
+    saas.jwt = null;
+    localStorage.removeItem('vf_jwt');
+    renderPositions();
+    throw new Error('Session expired — please sign in again.');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || res.statusText);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+
+window.saasSignIn = async function () {
+  if (!state.provider || !state.address || state.watchMode) return;
+  try {
+    const signerBtn = document.getElementById('prot-signin-spinner');
+    if (signerBtn) signerBtn.textContent = '⏳';
+
+    // 1. Get nonce from API
+    const nonceRes = await fetch(`${API_BASE}/auth/nonce?address=${state.address}`);
+    if (!nonceRes.ok) throw new Error('Could not get nonce from server');
+    const { nonce } = await nonceRes.json();
+
+    // 2. Sign with wallet
+    const signer  = await state.provider.getSigner();
+    const message = `Sign in to VIZNAGO FURY\nNonce: ${nonce}\nChain: ${state.chainId}`;
+    const signature = await signer.signMessage(message);
+
+    // 3. Verify and get JWT
+    const verRes = await fetch(`${API_BASE}/auth/verify`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ address: state.address, signature }),
+    });
+    if (!verRes.ok) throw new Error('Signature verification failed');
+    const { access_token } = await verRes.json();
+
+    saas.jwt = access_token;
+    localStorage.setItem('vf_jwt', access_token);
+
+    await saasLoadBots();
+    renderPositions(); // re-render so drawers show forms
+  } catch (err) {
+    if (err.code === 4001) return; // user rejected wallet popup
+    showError('Sign-in failed: ' + (err.message || err));
+  }
+};
+
+// ── Bot loading ───────────────────────────────────────────────────────────
+
+async function saasLoadBots() {
+  if (!saas.jwt) return;
+  try {
+    const bots = await apiCall('GET', '/bots');
+    if (!Array.isArray(bots)) return;
+    saas.bots = {};
+    for (const bot of bots) {
+      saas.bots[bot.nft_token_id] = bot;
+    }
+    // Open WebSocket for every active bot not already connected
+    for (const bot of bots) {
+      if (bot.active && !saas.sockets[bot.id]) {
+        connectBotWS(bot.id);
+      }
+    }
+  } catch (err) {
+    // Silently ignore — JWT may be expired (apiCall handles 401)
+    console.warn('[SaaS] loadBots:', err.message);
+  }
+}
+
+// ── WebSocket per bot ─────────────────────────────────────────────────────
+
+function connectBotWS(configId) {
+  if (saas.sockets[configId]) return; // already connected
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url   = `${proto}://${location.host}/trading/lp-hedge/api/ws/${configId}?token=${saas.jwt}`;
+  const ws    = new WebSocket(url);
+  saas.sockets[configId] = ws;
+
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.event === 'ping') return;
+      saas.statuses[configId] = data;
+      updateBotStatusDisplay(configId, data);
+    } catch (_) {}
+  };
+
+  ws.onclose = () => {
+    delete saas.sockets[configId];
+    // Reconnect after 10 s if the bot is still marked active
+    setTimeout(() => {
+      const bot = Object.values(saas.bots).find(b => b.id === configId);
+      if (bot?.active && saas.jwt) connectBotWS(configId);
+    }, 10_000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+function updateBotStatusDisplay(configId, data) {
+  const el = document.getElementById(`prot-status-${configId}`);
+  if (!el) return;
+  const t        = window.t || (k => k);
+  const evtType  = data.event || data.event_type || '';
+  const price    = data.price ? formatPrice(data.price) : '—';
+  const pnl      = data.pnl != null
+    ? (data.pnl >= 0 ? '+' : '') + '$' + Number(data.pnl).toFixed(2)
+    : '—';
+  el.innerHTML = `<span class="prot-evt-type">${evtType.replace(/_/g,' ')}</span>`
+    + ` &middot; ${t('prot.price')}: ${price}`
+    + ` &middot; P&L: ${pnl}`;
+}
+
+// ── Protection Drawer HTML builder ────────────────────────────────────────
+
+function buildProtectionDrawer(pos) {
+  const t       = window.t || (k => k);
+  const tokenId = pos.tokenId;
+  const bot     = saas.bots[tokenId];
+  const isOpen  = _drawerOpen.has(tokenId);
+
+  // Badge shown on toggle row
+  const badge = bot
+    ? `<span class="prot-badge ${bot.active ? 'prot-badge--active' : 'prot-badge--inactive'}">`
+        + (bot.active ? t('prot.status.active') : t('prot.status.inactive'))
+        + `</span>`
+    : '';
+
+  const isBTC = ['BTC', 'WBTC'].some(s =>
+    pos.token0Info.symbol.includes(s) || pos.token1Info.symbol.includes(s)
+  );
+
+  let bodyHtml;
+
+  if (state.watchMode) {
+    // Watch mode — no protection available
+    bodyHtml = `<p class="prot-info-msg">${t('prot.watch.disabled')}</p>`;
+
+  } else if (!saas.jwt) {
+    // Not signed in
+    bodyHtml = `
+      <p class="prot-info-msg">${t('prot.drawer.signin.hint')}</p>
+      <button class="btn btn-primary btn-sm prot-btn-full" onclick="saasSignIn()">
+        🔐&nbsp; ${t('prot.btn.signin')}
+      </button>`;
+
+  } else if (bot && bot.active) {
+    // Bot is active — show live status + stop button
+    const lastEvt = saas.statuses[bot.id];
+    const statusInner = lastEvt
+      ? (() => {
+          const evtType = lastEvt.event || lastEvt.event_type || '';
+          const price   = lastEvt.price ? formatPrice(lastEvt.price) : '—';
+          const pnl     = lastEvt.pnl != null
+            ? (lastEvt.pnl >= 0 ? '+' : '') + '$' + Number(lastEvt.pnl).toFixed(2) : '—';
+          return `<span class="prot-evt-type">${evtType.replace(/_/g,' ')}</span>`
+            + ` &middot; ${t('prot.price')}: ${price} &middot; P&L: ${pnl}`;
+        })()
+      : t('prot.status.checking');
+
+    bodyHtml = `
+      <div class="prot-status-row" id="prot-status-${bot.id}">${statusInner}</div>
+      <div class="prot-active-info">
+        <div class="prot-info-item">
+          <span class="prot-info-label">${t('prot.mode.label')}</span>
+          <span class="prot-info-value">${bot.mode === 'aragan' ? 'Defensor Bajista' : 'Avaro'}</span>
+        </div>
+        <div class="prot-info-item">
+          <span class="prot-info-label">${t('prot.trigger.label')}</span>
+          <span class="prot-info-value">${bot.trigger_pct}%</span>
+        </div>
+        <div class="prot-info-item">
+          <span class="prot-info-label">${t('prot.hedgesize.label')}</span>
+          <span class="prot-info-value">${bot.hedge_ratio}%</span>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm prot-btn-full" id="prot-stop-btn-${bot.id}"
+              onclick="stopProtection(${bot.id}, '${tokenId}')">
+        ⏹&nbsp; ${t('prot.btn.stop')}
+      </button>`;
+
+  } else {
+    // No active bot (or inactive) — show config form
+    const modeVal   = bot?.mode        || 'aragan';
+    const trigVal   = bot?.trigger_pct ?? -0.50;
+    const hedgeVal  = bot?.hedge_ratio ?? 50;
+    const hlWallet  = bot?.hl_wallet_addr || '';
+    const apiKeyPH  = bot
+      ? t('prot.apikey.keepcurrent')
+      : t('prot.apikey.placeholder');
+
+    bodyHtml = `
+      ${isBTC ? `<p class="prot-btc-warning">⚠&nbsp; ${t('prot.btc.warning')}</p>` : ''}
+      <div class="prot-form" id="prot-form-${tokenId}">
+        <div class="prot-field">
+          <label class="prot-label">${t('prot.mode.label')}</label>
+          <div class="prot-mode-toggle">
+            <label class="prot-mode-opt ${modeVal === 'aragan' ? 'prot-mode-opt--active' : ''}">
+              <input type="radio" name="prot-mode-${tokenId}" value="aragan"
+                     ${modeVal === 'aragan' ? 'checked' : ''}
+                     onchange="onModeChange('${tokenId}', this)" />
+              ${t('prot.mode.aragan')}
+            </label>
+            <label class="prot-mode-opt ${!isBTC && modeVal === 'avaro' ? 'prot-mode-opt--active' : ''} ${isBTC ? 'prot-mode-opt--disabled' : ''}">
+              <input type="radio" name="prot-mode-${tokenId}" value="avaro"
+                     ${!isBTC && modeVal === 'avaro' ? 'checked' : ''}
+                     ${isBTC ? 'disabled' : ''}
+                     onchange="onModeChange('${tokenId}', this)" />
+              ${t('prot.mode.avaro')}
+            </label>
+          </div>
+        </div>
+        <div class="prot-field-row">
+          <div class="prot-field">
+            <label class="prot-label">${t('prot.trigger.label')}</label>
+            <div class="prot-input-group">
+              <input type="number" class="prot-input" id="prot-trigger-${tokenId}"
+                     value="${trigVal}" step="0.1" max="-0.1" min="-5" />
+              <span class="prot-input-suffix">%</span>
+            </div>
+          </div>
+          <div class="prot-field">
+            <label class="prot-label">${t('prot.hedgesize.label')}</label>
+            <div class="prot-input-group">
+              <input type="number" class="prot-input" id="prot-hedge-${tokenId}"
+                     value="${hedgeVal}" step="5" min="10" max="100" />
+              <span class="prot-input-suffix">%</span>
+            </div>
+          </div>
+        </div>
+        <div class="prot-field">
+          <label class="prot-label">${t('prot.apikey.label')}</label>
+          <input type="password" class="prot-input prot-input-full"
+                 id="prot-apikey-${tokenId}" placeholder="${apiKeyPH}" autocomplete="off" />
+        </div>
+        <div class="prot-field">
+          <label class="prot-label">${t('prot.wallet.label')}</label>
+          <input type="text" class="prot-input prot-input-full"
+                 id="prot-wallet-${tokenId}" value="${hlWallet}"
+                 placeholder="${t('prot.wallet.placeholder')}" />
+        </div>
+        <button class="btn btn-primary btn-sm prot-btn-full"
+                id="prot-activate-btn-${tokenId}"
+                onclick="activateProtection('${tokenId}')">
+          🛡&nbsp; ${t('prot.btn.activate')}
+        </button>
+      </div>`;
+  }
+
+  return `
+    <div class="pc-protection">
+      <button class="pc-prot-toggle" onclick="toggleProtectionDrawer('${tokenId}')">
+        <span class="prot-chevron ${isOpen ? 'prot-chevron--open' : ''}"
+              id="prot-chevron-${tokenId}">▶</span>
+        <span class="prot-toggle-label">${t('prot.drawer.title')}</span>
+        ${badge}
+      </button>
+      <div class="pc-prot-body ${isOpen ? '' : 'hidden'}" id="prot-body-${tokenId}">
+        ${bodyHtml}
+      </div>
+    </div>`;
+}
+
+// ── Drawer toggle ─────────────────────────────────────────────────────────
+
+window.toggleProtectionDrawer = function (tokenId) {
+  const body    = document.getElementById('prot-body-' + tokenId);
+  const chevron = document.getElementById('prot-chevron-' + tokenId);
+  if (!body) return;
+  const opening = body.classList.contains('hidden');
+  if (opening) {
+    _drawerOpen.add(tokenId);
+    body.classList.remove('hidden');
+    chevron?.classList.add('prot-chevron--open');
+  } else {
+    _drawerOpen.delete(tokenId);
+    body.classList.add('hidden');
+    chevron?.classList.remove('prot-chevron--open');
+  }
+};
+
+// ── Mode radio styling ────────────────────────────────────────────────────
+
+window.onModeChange = function (tokenId, radio) {
+  const form = document.getElementById('prot-form-' + tokenId);
+  if (!form) return;
+  form.querySelectorAll('.prot-mode-opt').forEach(label => {
+    const input = label.querySelector('input[type="radio"]');
+    label.classList.toggle('prot-mode-opt--active', !!input?.checked);
+  });
+};
+
+// ── Activate bot ──────────────────────────────────────────────────────────
+
+window.activateProtection = async function (tokenId) {
+  const t   = window.t || (k => k);
+  const btn = document.getElementById(`prot-activate-btn-${tokenId}`);
+  if (btn) { btn.disabled = true; btn.textContent = t('prot.btn.activating'); }
+
+  try {
+    const mode     = document.querySelector(`input[name="prot-mode-${tokenId}"]:checked`)?.value || 'aragan';
+    const trigger  = parseFloat(document.getElementById(`prot-trigger-${tokenId}`)?.value || '-0.5');
+    const hedge    = parseFloat(document.getElementById(`prot-hedge-${tokenId}`)?.value  || '50');
+    const apiKey   = document.getElementById(`prot-apikey-${tokenId}`)?.value.trim();
+    const hlWallet = document.getElementById(`prot-wallet-${tokenId}`)?.value.trim();
+
+    const existingBot = saas.bots[tokenId];
+
+    // Validate: need API key on first create, optional on update
+    if (!existingBot && !apiKey) {
+      showError(t('prot.no.hlkey'));
+      return;
+    }
+    if (!hlWallet) {
+      showError(t('prot.no.hlkey'));
+      return;
+    }
+
+    const pos = state.positions.find(p => p.tokenId === tokenId);
+    if (!pos) throw new Error('Position not found in current state');
+
+    let configId;
+
+    if (existingBot) {
+      // Update existing config
+      const payload = { trigger_pct: trigger, hedge_ratio: hedge, hl_wallet_addr: hlWallet, mode };
+      if (apiKey) payload.hl_api_key = apiKey;
+      await apiCall('PUT', `/bots/${existingBot.id}`, payload);
+      configId = existingBot.id;
+    } else {
+      // Create new bot config
+      const pair = `${pos.token0Info.symbol}/${pos.token1Info.symbol}`;
+      const res  = await apiCall('POST', '/bots', {
+        chain_id:       state.chainId,
+        nft_token_id:   tokenId,
+        pair,
+        lower_bound:    pos.priceLower,
+        upper_bound:    pos.priceUpper,
+        trigger_pct:    trigger,
+        hedge_ratio:    hedge,
+        hl_api_key:     apiKey,
+        hl_wallet_addr: hlWallet,
+        mode,
+      });
+      configId = res.id;
+    }
+
+    // Start the bot
+    await apiCall('POST', `/bots/${configId}/start`);
+
+    // Refresh bot list and re-render
+    await saasLoadBots();
+    renderPositions();
+
+    // Connect WebSocket for live updates
+    connectBotWS(configId);
+
+  } catch (err) {
+    showError('Activation failed: ' + (err.message || err));
+    if (btn) {
+      btn.disabled  = false;
+      btn.innerHTML = `🛡&nbsp; ${(window.t || (k=>k))('prot.btn.activate')}`;
+    }
+  }
+};
+
+// ── Stop bot ──────────────────────────────────────────────────────────────
+
+window.stopProtection = async function (configId, tokenId) {
+  const t   = window.t || (k => k);
+  const btn = document.getElementById(`prot-stop-btn-${configId}`);
+  if (btn) { btn.disabled = true; btn.textContent = t('prot.btn.stopping'); }
+
+  try {
+    await apiCall('POST', `/bots/${configId}/stop`);
+
+    // Close WebSocket
+    const ws = saas.sockets[configId];
+    if (ws) { try { ws.close(); } catch (_) {} delete saas.sockets[configId]; }
+
+    await saasLoadBots();
+    renderPositions();
+
+  } catch (err) {
+    showError('Stop failed: ' + (err.message || err));
+    if (btn) { btn.disabled = false; btn.textContent = t('prot.btn.stop'); }
+  }
+};
