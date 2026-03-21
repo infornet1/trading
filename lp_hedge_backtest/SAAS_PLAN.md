@@ -1,6 +1,6 @@
 # VIZNAGO FURY — SaaS Option B: Hosted LP Hedge Bot Service
-> Architecture & Implementation Plan — v1.3 (2026-03-20)
-> Status: **Steps 0–7 Complete · Step 8 (Subscriptions) Pending**
+> Architecture & Implementation Plan — v1.4 (2026-03-21)
+> Status: **Steps 0–8.5 Complete · Step 8 (Unlock Protocol) + Step 9 (Telegram) Pending**
 
 ---
 
@@ -247,23 +247,260 @@ from environment variables (currently hardcoded). This is Step 2 of the build.
 
 ## 8. Subscription Plans
 
+### 8.1 Plan Tiers
+
 | Plan | Price | Active Bots | Check Interval | Alerts |
 |---|---|---|---|---|
 | Free | $0 | 0 (monitor only) | — | — |
-| Starter | $29 USDC/mo | 1 | 30s | Email |
-| Pro | $79 USDC/mo | 5 | 10s | Email + Telegram |
+| Starter | $29 USDC/mo | 1 | 30s | Telegram (high-priority) |
+| Pro | $79 USDC/mo | 5 | 10s | Telegram (all events + commands) |
 
-**Payment flow (crypto-first):**
-1. User sends USDC to treasury wallet on Arbitrum
-2. Posts `tx_hash` to `POST /subscription/verify`
-3. API reads tx on-chain (via public RPC), confirms amount + recipient
-4. Activates plan until `now + 30 days`
-
-Stripe added as secondary option post-alpha.
+**No email required at any tier. Wallet + NFT Key = full identity.**
 
 ---
 
-## 9. Golden Rules (Enforced in Bot Code)
+### 8.2 Payment — Unlock Protocol NFT Key (crypto-native, no KYC)
+
+Instead of a database subscription row, the user's plan is an **NFT sitting in their wallet**.
+Access is gated by on-chain NFT ownership — no payment database, no trust-the-server.
+
+**How it works:**
+
+```
+1. You deploy a "Lock" smart contract on Arbitrum (one-time, via Unlock dashboard)
+   → Starter Lock: 29 USDC / 30 days
+   → Pro Lock:     79 USDC / 30 days
+
+2. User clicks "Subscribe" in dashboard
+   → Wallet prompts: approve 29 USDC → confirm
+   → One transaction → NFT "Key" lands in their wallet
+   → NFT shows: "VIZNAGO FURY — Starter — expires April 21 2026"
+   → NFT has a Key ID (e.g. Key #42) — this IS their subscription identity
+
+3. API checks access (replaces tx_hash verification):
+   lock.getHasValidKey(walletAddress) → true | false
+   → true  → issue JWT with plan: starter
+   → false → issue JWT with plan: free
+
+4. Auto-renewal (optional):
+   → User pre-approves contract to pull 29 USDC on expiry
+   → Renews silently — no clicks, no support tickets
+   → Cancel = revoke the approval
+```
+
+**What Unlock Protocol handles vs what you build:**
+
+| Task | Owner |
+|---|---|
+| Collecting USDC | Unlock smart contract |
+| Minting NFT Key to user | Unlock smart contract |
+| Expiry logic | Unlock smart contract |
+| Auto-renewal pulls | Unlock smart contract |
+| Withdrawing revenue to treasury | You (on-demand via Unlock UI) |
+| Checking if user has valid key | Your API (one `getHasValidKey()` call) |
+
+**Cost:** ~$2–5 ETH gas to deploy Locks (one-time). Unlock Protocol takes 1% of subscription revenue (~$0.29 per Starter payment).
+
+**Privacy:** No email, no KYC, no name. Wallet address + NFT Key ID = full identity.
+
+---
+
+### 8.3 Subscription Expiry with Open HL Position — Grace Period
+
+**Critical edge case:** bot has an active short in profit when the Key NFT expires.
+Killing the bot immediately could force-close a winning trade. This must never happen.
+
+**Rule: never force-close an open position on expiry.**
+
+```
+Key expires
+    ↓
+Is there an active SHORT open?
+    ├── NO  → stop bot immediately (clean)
+    └── YES → enter GRACE PERIOD
+                  │
+                  ├── Position closes naturally via trailing SL
+                  │       └──→ bot stops · user notified
+                  │
+                  ├── User renews within 72h
+                  │       └──→ back to ACTIVE seamlessly
+                  │
+                  └── 72h pass, position still open
+                          → urgent Telegram alert to user
+                          └── 48h more, no renewal
+                                  → close at market → bot stops
+```
+
+**Grace period rules:**
+- Bot runs in `grace_period` mode: manages existing position only, opens NO new shorts
+- Hard cap: 72h grace + 48h urgent warning = 120h maximum before force-close
+- Renewal during grace → seamless return to normal, no restart needed
+- All state transitions logged to `bot_events` table
+
+**Bot mode env var injected by BotManager:**
+```
+BOT_MODE=active        → normal operation
+BOT_MODE=grace_period  → manage existing position only, no new entries
+BOT_MODE=closing       → close position at market immediately, then exit
+```
+
+**Subscription watchdog:** background task in API checks every hour for expired keys
+with open positions and transitions bot mode accordingly.
+
+---
+
+### 8.4 Backend pieces to build
+
+- `GET /subscription` — current plan, Key NFT token ID, expiry date, days remaining
+- `GET /admin/overview` — already includes plan per pool (complete ✅)
+- On-chain Key check in `api/auth.py`: `getHasValidKey()` called on JWT issuance
+- Subscription watchdog async task (expiry + grace period state machine)
+- Plan enforcement in BotManager: check plan tier before `start()`, enforce bot count limits
+- Deploy Starter + Pro Lock contracts on Arbitrum via `app.unlock-protocol.com`
+
+**Open decisions before building:**
+- [ ] Confirm Starter price: $29 USDC/mo
+- [ ] Confirm Pro price: $79 USDC/mo
+- [ ] Confirm Free plan: monitor-only OR 7-day trial with 1 active bot?
+- [ ] Deploy Lock contracts → get contract addresses for `.env`
+
+---
+
+## 9. Alerts — Telegram Bot (Anonymous, Real-Time)
+
+### 9.1 Why Telegram + NFT Key is the right alert channel
+
+DeFi users are pseudonymous by default. Requiring an email address to receive alerts
+creates a wallet → real-world identity linkage that breaks user trust and may deter
+serious LP holders. Telegram + NFT Key solves this cleanly:
+
+```
+Unlock Protocol NFT Key  →  subscription identity (on-chain)
+Telegram Bot             →  alert delivery (off-chain, pseudonymous)
+
+Neither requires a name, email address, or any real-world identity.
+The NFT Key ID IS the identity bridge.
+```
+
+| Property | Email | Telegram + NFT Key |
+|---|---|---|
+| Identity revealed | Yes — email = real person | No — just a number |
+| Delivery speed | Minutes (spam filters) | Instant push |
+| DeFi users already use it | Maybe | Almost universally |
+| Two-way commands | No | Yes |
+| Infrastructure cost | SMTP + domain setup | One bot token (free) |
+| Personal data stored | Email address | Nothing identifiable |
+
+**Email remains optional** — available for users who explicitly opt in (e.g. subscription
+receipts, grace period warnings). Never mandatory.
+
+---
+
+### 9.2 Setup flow (one-time per user)
+
+```
+1. User mints NFT Key #42 → Starter plan activated
+2. Dashboard shows: "Enable Telegram Alerts"
+   → "Message @ViznagoFuryBot and send: /start 42"
+3. User opens Telegram → sends /start 42
+4. Bot verifies Key #42 owner matches their connected wallet (on-chain)
+5. Stores: { nft_key_id: 42, telegram_chat_id: 7291834 }
+6. Replies: "✅ Alertas activadas para Key #42"
+
+No email. No name. Nothing identifiable stored on Viznago's side.
+```
+
+---
+
+### 9.3 Alert events per plan
+
+| Event | Starter | Pro |
+|---|---|---|
+| `hedge_opened` — short opened | ✅ | ✅ |
+| `sl_hit` — stop loss fired | ✅ | ✅ |
+| `tp_hit` — take profit hit | ✅ | ✅ |
+| `error` — bot crashed | ✅ | ✅ |
+| `breakeven` — SL moved to entry | ❌ | ✅ |
+| `started` — bot confirmed running | ❌ | ✅ |
+| `stopped` — bot stopped | ❌ | ✅ |
+| Subscription expiry warning | ✅ | ✅ |
+| Grace period alert (open position) | ✅ | ✅ |
+
+---
+
+### 9.4 Alert message format
+
+```
+🚨 SHORT ABIERTO — ETH/USDC NFT #5364575
+Par: ETH-PERP · Trigger: entrada desde arriba
+Precio: $2,180.00 · Tamaño: 0.045 ETH
+Leverage: 5x · SL inicial: $2,191.00
+
+🛡️ BREAKEVEN ACTIVADO
+SL movido a precio de entrada $2,180 · PnL actual: +1.0%
+
+🛑 TRAILING STOP ACTIVADO
+Precio cierre: $2,095 · PnL: +2.3% · Duración: 4h 23min
+
+❌ BOT CAÍDO — acción requerida
+NFT #5364575 · Error: HL API timeout
+Ingresa al dashboard para reiniciarlo.
+
+⚠️ SUSCRIPCIÓN EXPIRADA — short activo en curso
+Grace period activo. 72h para renovar tu Key NFT.
+Posición actual: PnL +1.8% · SL trailing activo
+```
+
+---
+
+### 9.5 Two-way commands (Pro plan)
+
+```
+/status   → current bot state, PnL, SL price, time running
+/stop     → request bot stop (asks /confirm before acting)
+/confirm  → confirms a pending /stop command
+/help     → list available commands
+```
+
+This lets Pro users manage their bot from Telegram without opening the dashboard —
+critical for traders on the move.
+
+---
+
+### 9.6 Privacy architecture
+
+```
+What Viznago stores:
+  nft_key_id:        42          ← on-chain number, not a person
+  telegram_chat_id:  7291834     ← Telegram's internal ID number
+
+What Viznago does NOT store:
+  ✗ Name
+  ✗ Email address
+  ✗ Phone number
+  ✗ Telegram username
+  ✗ IP address
+  ✗ Any real-world identity
+```
+
+---
+
+### 9.7 Backend pieces to build
+
+- **Telegram Bot**: create via `@BotFather` → get `TELEGRAM_BOT_TOKEN` → store in `.env`
+- **Webhook endpoint** `POST /telegram/webhook`: parse `/start <key_id>`, verify NFT
+  ownership on-chain, store `{ nft_key_id, telegram_chat_id }` in new `telegram_links` table
+- **Alert dispatcher** `api/telegram_alerts.py`: async `send_alert(config_id, event, details)`
+  — looks up `telegram_chat_id` by config → sends via Bot API
+- **Hook into BotManager** `_handle_event()`: fire `send_alert()` as background task after
+  DB write + WS broadcast (non-blocking)
+- **Command handler**: `/status` queries live bot state + last event; `/stop` triggers
+  `manager.stop(config_id)` after `/confirm`
+- **New DB table**: `telegram_links (nft_key_id, telegram_chat_id, linked_at)`
+
+---
+
+## 10. Golden Rules (Enforced in Bot Code)
 
 These rules from Bootcamp Cripto 2026 are enforced server-side regardless
 of user config — not just UI hints:
@@ -382,8 +619,9 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 | **6** | WebSocket live event stream | ✅ Complete |
 | **7** | Dashboard Phase 4 (protection drawer + WS client + live bots panel) | ✅ Complete |
 | **7.5** | Admin hardening: nuclear stop, bot persistence, auto-refresh control, waitlist CTA | ✅ Complete |
-| **8** | Subscription + USDC on-chain payment verification | 🔲 Pending |
-| **9** | Email alerts per user (reuse existing email setup) | 🔲 Pending |
+| **8.5** | Admin monitoring dashboard: pool health, HL live positions, event history, fills, wallet acquisition funnel | ✅ Complete |
+| **8** | Subscriptions via Unlock Protocol NFT Keys + grace period state machine | 🔲 Pending |
+| **9** | Telegram Bot alerts (anonymous, NFT Key linked, two-way commands) | 🔲 Pending |
 | **10** | Alpha test with 3–5 real users | 🔲 Pending |
 
 **Estimated remaining to MVP: 1–2 weeks.**
@@ -413,11 +651,20 @@ Migration is low-friction:
 
 ## 14. Open Decisions (For Review)
 
-- [ ] Confirm treasury wallet address for USDC subscription payments
-- [ ] Confirm Telegram bot token for Pro plan alerts (or defer to post-alpha)
-- [ ] Confirm `viznago` Linux system user creation (replaces current `root` bot)
-- [ ] Free plan: monitor-only dashboard OR 7-day free trial with 1 active bot?
-- [ ] Starter plan price point: $29/mo — confirm or adjust
+**Blocking Step 8 (Subscriptions):**
+- [ ] Deploy Starter Lock contract on Arbitrum → get contract address
+- [ ] Deploy Pro Lock contract on Arbitrum → get contract address
+- [ ] Confirm Starter plan price: $29 USDC/mo
+- [ ] Confirm Pro plan price: $79 USDC/mo
+- [ ] Free plan: monitor-only dashboard OR 7-day trial with 1 active bot?
+
+**Blocking Step 9 (Telegram):**
+- [ ] Create `@ViznagoFuryBot` via Telegram `@BotFather` → store `TELEGRAM_BOT_TOKEN` in `.env`
+- [ ] Confirm two-way commands scope for Pro plan (`/status`, `/stop` — see Section 9.5)
+
+**Infrastructure (pre-alpha):**
+- [ ] Create dedicated `viznago` Linux system user (API currently runs as root — security risk)
+- [ ] Configure Telegram webhook URL in production (`POST /telegram/webhook`)
 
 ---
 
