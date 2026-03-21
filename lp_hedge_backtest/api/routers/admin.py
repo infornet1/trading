@@ -3,9 +3,10 @@ Admin router — emergency controls + monitoring overview. Admin-wallet only.
 """
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import selectinload
 
 from api.auth import get_current_admin
@@ -194,16 +195,36 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                 "volume_usd": round(config_volume, 2),
             })
 
-        unique_wallets = len({p["user_address"] for p in pools})
-        running_count  = sum(1 for p in pools if p["running"])
+        # ── User acquisition stats ──────────────────────────────────────
+        total_registered = (await db.execute(
+            select(func.count()).select_from(User)
+        )).scalar_one()
+
+        cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+        new_24h = (await db.execute(
+            select(func.count()).select_from(User)
+            .where(User.created_at >= cutoff_24h)
+        )).scalar_one()
+
+        # Wallets with at least one pool config
+        wallets_with_pools = len({p["user_address"] for p in pools})
+        # Wallets that signed up but never configured a pool
+        inactive_wallets = total_registered - wallets_with_pools
+
+        running_count = sum(1 for p in pools if p["running"])
 
         return {
             "stats": {
-                "total_wallets":    unique_wallets,
-                "total_pools":      len(pools),
-                "active_bots":      running_count,
-                "active_shorts":    active_shorts,
-                "total_volume_usd": round(total_volume, 2),
+                # Acquisition funnel
+                "total_registered":  total_registered,
+                "wallets_with_pools": wallets_with_pools,
+                "inactive_wallets":  max(inactive_wallets, 0),
+                "new_wallets_24h":   new_24h,
+                # Operations
+                "total_pools":       len(pools),
+                "active_bots":       running_count,
+                "active_shorts":     active_shorts,
+                "total_volume_usd":  round(total_volume, 2),
             },
             "pools": pools,
         }
@@ -287,3 +308,61 @@ async def pool_hl_detail(config_id: int, admin: str = Depends(get_current_admin)
         "hl_error":       hl_error,
         "events":         events_data,
     }
+
+
+# ── User registry ───────────────────────────────────────────────────────────
+
+@router.get("/users")
+async def admin_users(admin: str = Depends(get_current_admin)):
+    """
+    Full registered-wallet registry — every wallet that has ever signed in,
+    regardless of whether they have active pools or bots.
+    Returns each user with their plan, join date, last activity, pool count,
+    and bot status — the full acquisition funnel in one call.
+    """
+    async with AsyncSessionLocal() as db:
+        # All users ordered by join date desc
+        users_result = await db.execute(
+            select(User)
+            .options(selectinload(User.bot_configs))
+            .order_by(User.created_at.desc())
+        )
+        users = users_result.scalars().all()
+
+        now = datetime.now(timezone.utc)
+        rows = []
+        for u in users:
+            configs = u.bot_configs or []
+            pool_count   = len(configs)
+            active_pools = sum(1 for c in configs if c.active)
+            running_bots = sum(1 for c in configs if c.id in manager._procs)
+
+            # Last seen: normalize tz for comparison
+            last_seen = u.last_seen
+            if last_seen and last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            days_since = (now - last_seen).days if last_seen else None
+
+            # Funnel stage
+            if running_bots > 0:
+                funnel = "bot_running"
+            elif active_pools > 0:
+                funnel = "bot_configured"
+            elif pool_count > 0:
+                funnel = "pool_added"
+            else:
+                funnel = "signed_up"
+
+            rows.append({
+                "address":      u.address,
+                "plan":         u.plan,
+                "created_at":   u.created_at.isoformat() if u.created_at else None,
+                "last_seen":    last_seen.isoformat() if last_seen else None,
+                "days_inactive": days_since,
+                "pool_count":   pool_count,
+                "active_pools": active_pools,
+                "running_bots": running_bots,
+                "funnel":       funnel,
+            })
+
+    return {"users": rows, "total": len(rows)}

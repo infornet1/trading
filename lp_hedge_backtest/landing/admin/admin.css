@@ -235,6 +235,28 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
 .mini-evt--red    { border-left: 2px solid var(--red); }
 .mini-evt--muted  { border-left: 2px solid var(--border); }
 
+/* ── Users registry section ─────────────────────────────────────────── */
+.users-section {
+  margin: 0 1.5rem 1.5rem;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.users-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .75rem 1.25rem; background: #111; border-bottom: 1px solid var(--border);
+}
+.users-title {
+  font-size: .8rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--gold);
+}
+#users-table-wrap { padding: .75rem 1rem 1rem; }
+
+.users-table { width: 100%; }
+.users-table th { white-space: nowrap; }
+.users-table td { white-space: nowrap; }
+.users-addr { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.users-row--cold td { opacity: .65; }
+.center { text-align: center; }
+
 /* Utilities */
 .hidden  { display: none !important; }
 .mono    { font-family: monospace; }

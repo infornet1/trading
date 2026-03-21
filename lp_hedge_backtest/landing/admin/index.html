@@ -39,9 +39,21 @@
 
   <!-- Stats bar -->
   <section class="stats-bar">
+    <div class="stat-card stat-card--gold">
+      <div class="stat-value" id="stat-registered">—</div>
+      <div class="stat-label">Wallets Registradas</div>
+    </div>
     <div class="stat-card">
       <div class="stat-value" id="stat-wallets">—</div>
-      <div class="stat-label">Wallets</div>
+      <div class="stat-label">Con Pools</div>
+    </div>
+    <div class="stat-card stat-card--warn">
+      <div class="stat-value" id="stat-inactive">—</div>
+      <div class="stat-label">Sin Pools</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-new24h">—</div>
+      <div class="stat-label">Nuevas 24h</div>
     </div>
     <div class="stat-card">
       <div class="stat-value" id="stat-pools">—</div>
@@ -71,6 +83,20 @@
   <!-- Pool health grid -->
   <section class="pools-grid" id="pools-grid">
     <div class="loading-msg">Cargando pools...</div>
+  </section>
+
+  <!-- Users registry section -->
+  <section class="users-section" id="users-section">
+    <div class="users-header">
+      <span class="users-title">Wallets Registradas</span>
+      <button class="btn-outline-sm" onclick="toggleUsersTable()">
+        <span id="users-toggle-label">▼ Ver todas</span>
+      </button>
+    </div>
+    <div id="users-table-wrap" class="hidden">
+      <div class="loading-msg" id="users-loading">Cargando...</div>
+      <div id="users-table-content"></div>
+    </div>
   </section>
 
 </div>

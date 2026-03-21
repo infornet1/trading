@@ -196,12 +196,15 @@ async function renderOverview() {
 }
 
 function renderStats(s) {
-  document.getElementById('stat-wallets').textContent = s.total_wallets;
-  document.getElementById('stat-pools').textContent   = s.total_pools;
-  document.getElementById('stat-bots').textContent    = s.active_bots;
-  document.getElementById('stat-shorts').textContent  = s.active_shorts;
-  document.getElementById('stat-volume').textContent  =
-    '$' + fmtNum(s.total_volume_usd);
+  document.getElementById('stat-registered').textContent = s.total_registered;
+  document.getElementById('stat-wallets').textContent    = s.wallets_with_pools;
+  document.getElementById('stat-inactive').textContent   = s.inactive_wallets;
+  document.getElementById('stat-new24h').textContent     = s.new_wallets_24h > 0
+    ? '+' + s.new_wallets_24h : s.new_wallets_24h;
+  document.getElementById('stat-pools').textContent      = s.total_pools;
+  document.getElementById('stat-bots').textContent       = s.active_bots;
+  document.getElementById('stat-shorts').textContent     = s.active_shorts;
+  document.getElementById('stat-volume').textContent     = '$' + fmtNum(s.total_volume_usd);
 }
 
 function renderPools(pools) {
@@ -539,6 +542,87 @@ function renderHlDetail(d) {
   }
 
   return sections.join('');
+}
+
+// ── Users registry ────────────────────────────────────────────────────────
+let _usersTableOpen = false;
+
+async function toggleUsersTable() {
+  const wrap    = document.getElementById('users-table-wrap');
+  const label   = document.getElementById('users-toggle-label');
+  _usersTableOpen = !_usersTableOpen;
+  if (_usersTableOpen) {
+    wrap.classList.remove('hidden');
+    label.textContent = '▲ Ocultar';
+    await loadUsersTable();
+  } else {
+    wrap.classList.add('hidden');
+    label.textContent = '▼ Ver todas';
+  }
+}
+
+async function loadUsersTable() {
+  const loadEl   = document.getElementById('users-loading');
+  const contentEl = document.getElementById('users-table-content');
+  loadEl.classList.remove('hidden');
+  contentEl.innerHTML = '';
+  try {
+    const d = await apiGet('/admin/users');
+    loadEl.classList.add('hidden');
+    contentEl.innerHTML = renderUsersTable(d.users);
+  } catch (e) {
+    loadEl.textContent = `Error: ${e.message}`;
+  }
+}
+
+function renderUsersTable(users) {
+  if (!users.length) return '<div class="loading-msg">Sin usuarios registrados.</div>';
+
+  const funnelLabel = {
+    bot_running:    { text: 'Bot corriendo',   cls: 'green'  },
+    bot_configured: { text: 'Bot configurado', cls: 'yellow' },
+    pool_added:     { text: 'Pool añadido',    cls: 'muted'  },
+    signed_up:      { text: 'Solo registrado', cls: 'muted'  },
+  };
+
+  const rows = users.map(u => {
+    const f = funnelLabel[u.funnel] || { text: u.funnel, cls: 'muted' };
+    const inactiveWarn = u.days_inactive != null && u.days_inactive > 7
+      ? ' users-row--cold' : '';
+    return `<tr class="${inactiveWarn}">
+      <td class="mono users-addr" title="${u.address}">${shortAddr(u.address)}</td>
+      <td><span class="badge badge--${planColor(u.plan)}">${u.plan.toUpperCase()}</span></td>
+      <td><span class="badge badge--${f.cls}">${f.text}</span></td>
+      <td class="mono center">${u.pool_count}</td>
+      <td class="mono center">${u.running_bots > 0
+        ? `<span class="pool-val--green">${u.running_bots}</span>` : '—'}</td>
+      <td class="mono muted">${u.created_at ? relTime(u.created_at) : '—'}</td>
+      <td class="mono ${u.days_inactive != null && u.days_inactive > 7 ? 'pool-val--red' : 'muted'}">${
+        u.last_seen ? relTime(u.last_seen) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+<div class="detail-table-wrap">
+  <table class="detail-table users-table">
+    <thead>
+      <tr>
+        <th>Wallet</th>
+        <th>Plan</th>
+        <th>Funnel</th>
+        <th class="center">Pools</th>
+        <th class="center">Bots</th>
+        <th>Registrado</th>
+        <th>Última actividad</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+</div>`;
+}
+
+function planColor(plan) {
+  return { pro: 'yellow', starter: 'green', free: 'muted' }[plan] || 'muted';
 }
 
 // ── Nuclear stop ───────────────────────────────────────────────────────────
