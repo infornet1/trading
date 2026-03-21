@@ -2,7 +2,9 @@
 Admin router — emergency controls + monitoring overview. Admin-wallet only.
 """
 
-from fastapi import APIRouter, Depends
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
@@ -13,6 +15,65 @@ from api.models import BotConfig, BotEvent, User
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+
+# ── Hyperliquid helper ──────────────────────────────────────────────────────
+
+async def _fetch_hl_data(wallet_addr: str) -> dict:
+    """Query Hyperliquid Info API in a thread (blocking SDK calls)."""
+    def _sync():
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+            info = Info(constants.MAINNET_API_URL, skip_ws=True)
+            state = info.user_state(wallet_addr)
+            fills = info.user_fills(wallet_addr)
+            return {"state": state, "fills": fills[:30], "error": None}
+        except Exception as e:
+            return {"state": None, "fills": [], "error": str(e)}
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _sync)
+
+
+def _parse_hl_position(state: dict, coin: str = "ETH") -> dict | None:
+    """Extract open position for a specific coin from HL user_state response."""
+    if not state:
+        return None
+    for ap in state.get("assetPositions", []):
+        pos = ap.get("position", {})
+        if pos.get("coin", "").upper() == coin.upper():
+            size = float(pos.get("szi", 0))
+            if size == 0:
+                continue
+            lev = pos.get("leverage", {})
+            return {
+                "coin":           pos.get("coin"),
+                "size":           size,
+                "side":           "SHORT" if size < 0 else "LONG",
+                "entry_price":    float(pos.get("entryPx") or 0),
+                "unrealized_pnl": float(pos.get("unrealizedPnl") or 0),
+                "return_on_equity": float(pos.get("returnOnEquity") or 0),
+                "leverage":       lev.get("value") if isinstance(lev, dict) else lev,
+                "leverage_type":  lev.get("type", "cross") if isinstance(lev, dict) else "cross",
+                "liquidation_px": float(pos.get("liquidationPx") or 0) if pos.get("liquidationPx") else None,
+                "margin_used":    float(pos.get("marginUsed") or 0),
+                "position_value": float(pos.get("positionValue") or 0),
+            }
+    return None
+
+
+def _parse_margin_summary(state: dict) -> dict:
+    if not state:
+        return {}
+    ms = state.get("marginSummary", {})
+    return {
+        "account_value":     float(ms.get("accountValue") or 0),
+        "total_margin_used": float(ms.get("totalMarginUsed") or 0),
+        "total_ntl_pos":     float(ms.get("totalNtlPos") or 0),
+    }
+
+
+# ── Stop all ───────────────────────────────────────────────────────────────
 
 @router.post("/stop-all")
 async def nuclear_stop(admin: str = Depends(get_current_admin)):
@@ -25,7 +86,6 @@ async def nuclear_stop(admin: str = Depends(get_current_admin)):
         await manager.stop(config_id)
         stopped.append(config_id)
 
-    # Mark ALL configs inactive in DB (catches any edge cases)
     async with AsyncSessionLocal() as db:
         await db.execute(
             update(BotConfig).where(BotConfig.active == True).values(active=False)
@@ -40,14 +100,15 @@ async def nuclear_stop(admin: str = Depends(get_current_admin)):
     }
 
 
+# ── Overview ───────────────────────────────────────────────────────────────
+
 @router.get("/overview")
 async def admin_overview(admin: str = Depends(get_current_admin)):
     """
     Full platform health snapshot — all wallets, all pools, aggregate stats.
-    Used exclusively by the admin monitoring dashboard.
+    Includes last 5 events per pool and HL wallet address for detail lookups.
     """
     async with AsyncSessionLocal() as db:
-        # All configs + owners
         cfg_result = await db.execute(
             select(BotConfig)
             .options(selectinload(BotConfig.user))
@@ -60,7 +121,7 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
         active_shorts = 0
 
         for cfg in configs:
-            # Last event for this config
+            # Last event
             evt_result = await db.execute(
                 select(BotEvent)
                 .where(BotEvent.config_id == cfg.id)
@@ -69,7 +130,16 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
             )
             last_evt = evt_result.scalar_one_or_none()
 
-            # Total volume: sum notionals from all hedge_opened events
+            # Recent events (last 5 with full details)
+            recent_result = await db.execute(
+                select(BotEvent)
+                .where(BotEvent.config_id == cfg.id)
+                .order_by(BotEvent.id.desc())
+                .limit(5)
+            )
+            recent_evts = recent_result.scalars().all()
+
+            # Volume: sum notionals from hedge_opened events
             vol_result = await db.execute(
                 select(BotEvent)
                 .where(BotEvent.config_id == cfg.id)
@@ -101,6 +171,7 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                 "mode":         cfg.mode,
                 "active":       cfg.active,
                 "running":      running,
+                "hl_wallet_addr": cfg.hl_wallet_addr,
                 "created_at":   cfg.created_at.isoformat() if cfg.created_at else None,
                 "last_event": {
                     "type":    last_evt.event_type,
@@ -109,6 +180,17 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                     "ts":      last_evt.ts.isoformat() if last_evt.ts else None,
                     "details": last_evt.details,
                 } if last_evt else None,
+                "recent_events": [
+                    {
+                        "id":      e.id,
+                        "type":    e.event_type,
+                        "price":   float(e.price_at_event) if e.price_at_event else None,
+                        "pnl":     float(e.pnl) if e.pnl else None,
+                        "ts":      e.ts.isoformat() if e.ts else None,
+                        "details": e.details,
+                    }
+                    for e in recent_evts
+                ],
                 "volume_usd": round(config_volume, 2),
             })
 
@@ -117,11 +199,91 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
 
         return {
             "stats": {
-                "total_wallets":  unique_wallets,
-                "total_pools":    len(pools),
-                "active_bots":    running_count,
-                "active_shorts":  active_shorts,
+                "total_wallets":    unique_wallets,
+                "total_pools":      len(pools),
+                "active_bots":      running_count,
+                "active_shorts":    active_shorts,
                 "total_volume_usd": round(total_volume, 2),
             },
             "pools": pools,
         }
+
+
+# ── Per-pool HL detail ──────────────────────────────────────────────────────
+
+@router.get("/pool/{config_id}/hl")
+async def pool_hl_detail(config_id: int, admin: str = Depends(get_current_admin)):
+    """
+    Live Hyperliquid data for a specific pool:
+      - Open position (size, entry, unrealizedPnL, leverage, liq price, margin)
+      - Margin summary (account value, margin used)
+      - Recent fills (last 30 trades on that wallet)
+      - Full event history from DB (last 20 events)
+    """
+    async with AsyncSessionLocal() as db:
+        cfg_result = await db.execute(
+            select(BotConfig).where(BotConfig.id == config_id)
+        )
+        cfg = cfg_result.scalar_one_or_none()
+        if not cfg:
+            raise HTTPException(status_code=404, detail="Pool config not found")
+
+        # Full event history (last 20)
+        evt_result = await db.execute(
+            select(BotEvent)
+            .where(BotEvent.config_id == config_id)
+            .order_by(BotEvent.id.desc())
+            .limit(20)
+        )
+        events = evt_result.scalars().all()
+
+    events_data = [
+        {
+            "id":      e.id,
+            "type":    e.event_type,
+            "price":   float(e.price_at_event) if e.price_at_event else None,
+            "pnl":     float(e.pnl) if e.pnl else None,
+            "ts":      e.ts.isoformat() if e.ts else None,
+            "details": e.details,
+        }
+        for e in events
+    ]
+
+    # Derive coin from pair (e.g. "ETH/USDC" → "ETH")
+    coin = cfg.pair.split("/")[0] if cfg.pair else "ETH"
+
+    # Query HL if we have a wallet address
+    hl_position = None
+    hl_margin   = {}
+    hl_fills    = []
+    hl_error    = None
+
+    if cfg.hl_wallet_addr:
+        hl_data   = await _fetch_hl_data(cfg.hl_wallet_addr)
+        hl_error  = hl_data.get("error")
+        if not hl_error:
+            hl_position = _parse_hl_position(hl_data["state"], coin)
+            hl_margin   = _parse_margin_summary(hl_data["state"])
+            # Format fills
+            for f in hl_data.get("fills", []):
+                hl_fills.append({
+                    "coin":  f.get("coin"),
+                    "side":  "SELL/SHORT" if f.get("side") == "A" else "BUY/LONG",
+                    "price": float(f.get("px") or 0),
+                    "size":  float(f.get("sz") or 0),
+                    "fee":   float(f.get("fee") or 0),
+                    "ts":    f.get("time"),  # ms epoch
+                    "oid":   f.get("oid"),
+                })
+
+    return {
+        "config_id":      config_id,
+        "pair":           cfg.pair,
+        "nft_token_id":   cfg.nft_token_id,
+        "hl_wallet_addr": cfg.hl_wallet_addr,
+        "hl_position":    hl_position,
+        "hl_margin":      hl_margin,
+        "hl_fills":       hl_fills,
+        "hl_error":       hl_error,
+        "events":         events_data,
+    }

@@ -7,12 +7,14 @@ const NEAR_EDGE_PCT = 0.05;   // 5% from boundary = yellow warning
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
-  jwt:      localStorage.getItem('vf_jwt') || null,
-  provider: null,
-  address:  null,
-  ethPrice: null,
-  timer:    null,
-  countdown: REFRESH_SECS,
+  jwt:        localStorage.getItem('vf_jwt') || null,
+  provider:   null,
+  address:    null,
+  ethPrice:   null,
+  timer:      null,
+  countdown:  REFRESH_SECS,
+  expanded:   new Set(),   // config_ids with open detail drawers
+  hlLoading:  new Set(),   // config_ids currently fetching HL data
 };
 
 // ── Boot ───────────────────────────────────────────────────────────────────
@@ -61,15 +63,12 @@ async function signIn() {
     const signer  = await state.provider.getSigner();
     state.address = (await signer.getAddress()).toLowerCase();
 
-    // Get nonce
     const nonceRes = await fetch(`${API_BASE}/auth/nonce?address=${state.address}`);
     if (!nonceRes.ok) throw new Error('Error al obtener nonce.');
     const { nonce } = await nonceRes.json();
 
-    // Sign
     const sig = await signer.signMessage(`Sign in to VIZNAGO FURY\nNonce: ${nonce}`);
 
-    // Verify
     const verRes = await fetch(`${API_BASE}/auth/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -92,7 +91,7 @@ async function signIn() {
   }
 }
 
-// ── API call ───────────────────────────────────────────────────────────────
+// ── API calls ──────────────────────────────────────────────────────────────
 async function apiGet(path) {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${state.jwt}` },
@@ -144,6 +143,10 @@ async function renderOverview() {
   const data = await apiGet('/admin/overview');
   renderStats(data.stats);
   renderPools(data.pools);
+  // Re-load HL detail for any currently expanded cards
+  for (const configId of state.expanded) {
+    loadHlDetail(configId);
+  }
 }
 
 function renderStats(s) {
@@ -161,7 +164,6 @@ function renderPools(pools) {
     grid.innerHTML = '<div class="loading-msg">No hay pools registrados aún.</div>';
     return;
   }
-
   const price = state.ethPrice;
   grid.innerHTML = pools.map(p => poolCard(p, price)).join('');
 }
@@ -170,15 +172,12 @@ function renderPools(pools) {
 function poolHealth(p, currentPrice) {
   const lastType = p.last_event?.type;
 
-  // Bot crashed: config active but process not running
   if (p.active && !p.running) return { level: 'red', reason: 'Bot caído (proceso detenido)' };
 
-  // Active short open
   if (lastType === 'hedge_opened' && p.running) {
     return { level: 'yellow', reason: 'Short activo — cobertura en curso' };
   }
 
-  // Price out of range (if we have current price for this pair)
   if (currentPrice && p.pair.startsWith('ETH')) {
     const pct_to_lower = (currentPrice - p.lower_bound) / currentPrice;
     const pct_to_upper = (p.upper_bound - currentPrice) / currentPrice;
@@ -199,7 +198,6 @@ function poolHealth(p, currentPrice) {
     }
   }
 
-  // Bot not running and not active — just idle/stopped by user
   if (!p.running && !p.active) {
     return { level: 'yellow', reason: 'Bot detenido manualmente' };
   }
@@ -210,8 +208,8 @@ function poolHealth(p, currentPrice) {
 // ── Pool card HTML ─────────────────────────────────────────────────────────
 function poolCard(p, ethPrice) {
   const h = poolHealth(p, ethPrice);
+  const isExpanded = state.expanded.has(p.config_id);
 
-  // Range bar position (ETH pools only)
   let barPct = 50, cursorPct = 50, priceStr = '—';
   if (ethPrice && p.pair.startsWith('ETH')) {
     const range  = p.upper_bound - p.lower_bound;
@@ -241,8 +239,17 @@ function poolCard(p, ethPrice) {
   const shortBadge = lastEvt?.type === 'hedge_opened' && p.running
     ? `<span class="badge badge--yellow">SHORT ACTIVO</span>` : '';
 
+  // Recent events mini-preview (last 3)
+  const recentEventsHtml = (p.recent_events || []).slice(0, 3).map(e => `
+    <div class="mini-evt mini-evt--${evtColor(e.type)}">
+      <span>${evtLabel(e.type)}</span>
+      ${e.price ? `<span class="mono">$${fmtNum(e.price)}</span>` : ''}
+      ${e.pnl   != null ? `<span class="mono pnl-${e.pnl >= 0 ? 'pos' : 'neg'}">${e.pnl >= 0 ? '+' : ''}${e.pnl.toFixed(2)}%</span>` : ''}
+      <span class="muted">${e.ts ? relTime(e.ts) : ''}</span>
+    </div>`).join('');
+
   return `
-<div class="pool-card pool-card--${h.level}">
+<div class="pool-card pool-card--${h.level}" id="card-${p.config_id}">
   <div class="pool-card-header">
     <div class="health-dot health-dot--${h.level}"></div>
     <span class="pool-pair">${p.pair}</span>
@@ -283,6 +290,8 @@ function poolCard(p, ethPrice) {
     <span class="pool-val pool-val--green">$${fmtNum(p.volume_usd)}</span>
   </div>
 
+  ${recentEventsHtml ? `<div class="mini-events">${recentEventsHtml}</div>` : ''}
+
   <div class="pool-footer">
     <div style="display:flex;gap:.4rem;align-items:center">
       ${botStatus}${shortBadge}
@@ -292,7 +301,198 @@ function poolCard(p, ethPrice) {
     <span style="color:var(--muted);font-size:.7rem">${p.user_plan.toUpperCase()}</span>
   </div>
   <div class="pool-wallet">${p.user_address}</div>
+
+  <button class="detail-toggle" onclick="toggleDetail(${p.config_id})">
+    ${isExpanded ? '▲ Ocultar detalle' : '▼ Ver detalle HL + historial'}
+  </button>
+
+  <div class="detail-drawer ${isExpanded ? '' : 'hidden'}" id="drawer-${p.config_id}">
+    <div class="detail-loading" id="hl-loading-${p.config_id}">Cargando datos HL...</div>
+    <div class="detail-content hidden" id="hl-content-${p.config_id}"></div>
+  </div>
 </div>`;
+}
+
+// ── Detail drawer toggle ───────────────────────────────────────────────────
+function toggleDetail(configId) {
+  const drawer = document.getElementById(`drawer-${configId}`);
+  const btn    = drawer?.previousElementSibling;
+  if (!drawer) return;
+
+  if (state.expanded.has(configId)) {
+    state.expanded.delete(configId);
+    drawer.classList.add('hidden');
+    if (btn) btn.textContent = '▼ Ver detalle HL + historial';
+  } else {
+    state.expanded.add(configId);
+    drawer.classList.remove('hidden');
+    if (btn) btn.textContent = '▲ Ocultar detalle';
+    loadHlDetail(configId);
+  }
+}
+
+async function loadHlDetail(configId) {
+  if (state.hlLoading.has(configId)) return;
+  state.hlLoading.add(configId);
+
+  const loadEl    = document.getElementById(`hl-loading-${configId}`);
+  const contentEl = document.getElementById(`hl-content-${configId}`);
+  if (!loadEl || !contentEl) { state.hlLoading.delete(configId); return; }
+
+  loadEl.classList.remove('hidden');
+  contentEl.classList.add('hidden');
+
+  try {
+    const d = await apiGet(`/admin/pool/${configId}/hl`);
+    contentEl.innerHTML = renderHlDetail(d);
+    loadEl.classList.add('hidden');
+    contentEl.classList.remove('hidden');
+  } catch (e) {
+    loadEl.textContent = `Error: ${e.message}`;
+  } finally {
+    state.hlLoading.delete(configId);
+  }
+}
+
+// ── HL detail content ──────────────────────────────────────────────────────
+function renderHlDetail(d) {
+  const sections = [];
+
+  // ── Active HL Position ──
+  if (d.hl_error) {
+    sections.push(`<div class="detail-section">
+      <div class="detail-section-title">Posición Hyperliquid</div>
+      <div class="detail-error">⚠ ${d.hl_error}</div>
+    </div>`);
+  } else if (d.hl_position) {
+    const pos = d.hl_position;
+    const pnlClass = pos.unrealized_pnl >= 0 ? 'green' : 'red';
+    const roePct   = (pos.return_on_equity * 100).toFixed(2);
+    sections.push(`
+<div class="detail-section">
+  <div class="detail-section-title">Posición Activa — Hyperliquid</div>
+  <div class="hl-pos-grid">
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">Par</span>
+      <span class="hl-pos-val">${pos.coin}-PERP</span>
+    </div>
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">Lado</span>
+      <span class="hl-pos-val hl-pos-val--${pos.side === 'SHORT' ? 'red' : 'green'}">${pos.side}</span>
+    </div>
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">Tamaño</span>
+      <span class="hl-pos-val mono">${Math.abs(pos.size).toFixed(4)} ${pos.coin}</span>
+    </div>
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">Precio entrada</span>
+      <span class="hl-pos-val mono">$${fmtNum(pos.entry_price)}</span>
+    </div>
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">PnL no realizado</span>
+      <span class="hl-pos-val mono pool-val--${pnlClass}">${pos.unrealized_pnl >= 0 ? '+' : ''}$${fmtNum(pos.unrealized_pnl)} (${roePct}%)</span>
+    </div>
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">Apalancamiento</span>
+      <span class="hl-pos-val mono">${pos.leverage}x ${pos.leverage_type}</span>
+    </div>
+    ${pos.liquidation_px ? `
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">Precio liquidación</span>
+      <span class="hl-pos-val mono pool-val--red">$${fmtNum(pos.liquidation_px)}</span>
+    </div>` : ''}
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">Margen usado</span>
+      <span class="hl-pos-val mono">$${fmtNum(pos.margin_used)}</span>
+    </div>
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">Valor posición</span>
+      <span class="hl-pos-val mono">$${fmtNum(pos.position_value)}</span>
+    </div>
+  </div>
+  ${d.hl_margin?.account_value ? `
+  <div class="hl-margin-bar">
+    <span>Cuenta: <b>$${fmtNum(d.hl_margin.account_value)}</b></span>
+    <span>Margen total: <b>$${fmtNum(d.hl_margin.total_margin_used)}</b></span>
+    <span>Exposición: <b>$${fmtNum(d.hl_margin.total_ntl_pos)}</b></span>
+  </div>` : ''}
+</div>`);
+  } else if (!d.hl_error) {
+    sections.push(`<div class="detail-section">
+      <div class="detail-section-title">Posición Hyperliquid</div>
+      <div class="detail-empty">Sin posición activa en HL para ${d.pair?.split('/')[0] || 'ETH'}-PERP</div>
+      ${d.hl_margin?.account_value ? `
+      <div class="hl-margin-bar">
+        <span>Cuenta: <b>$${fmtNum(d.hl_margin.account_value)}</b></span>
+        <span>Margen libre: <b>$${fmtNum(d.hl_margin.account_value - d.hl_margin.total_margin_used)}</b></span>
+      </div>` : ''}
+    </div>`);
+  }
+
+  // ── Event History ──
+  if (d.events?.length) {
+    const rows = d.events.map(e => {
+      const det = e.details || {};
+      const detStr = [
+        det.trigger   ? `trigger: ${det.trigger}` : '',
+        det.size      ? `size: ${det.size} ETH` : '',
+        det.notional  ? `notional: $${fmtNum(det.notional)}` : '',
+        det.leverage  ? `lev: ${det.leverage}x` : '',
+        det.sl_price  ? `SL: $${fmtNum(det.sl_price)}` : '',
+        det.reason    ? `${det.reason}` : '',
+        det.error     ? `err: ${det.error}` : '',
+      ].filter(Boolean).join(' · ');
+
+      return `<tr>
+        <td class="mono muted">${e.ts ? relTime(e.ts) : '—'}</td>
+        <td><span class="badge badge--${evtColor(e.type)}">${evtLabel(e.type)}</span></td>
+        <td class="mono">${e.price ? '$'+fmtNum(e.price) : '—'}</td>
+        <td class="mono ${e.pnl != null ? (e.pnl >= 0 ? 'pnl-pos' : 'pnl-neg') : ''}">${e.pnl != null ? (e.pnl >= 0 ? '+' : '')+e.pnl.toFixed(2)+'%' : '—'}</td>
+        <td class="muted detail-notes">${detStr}</td>
+      </tr>`;
+    }).join('');
+
+    sections.push(`
+<div class="detail-section">
+  <div class="detail-section-title">Historial de Eventos (últimos ${d.events.length})</div>
+  <div class="detail-table-wrap">
+    <table class="detail-table">
+      <thead><tr><th>Tiempo</th><th>Evento</th><th>Precio</th><th>PnL</th><th>Detalles</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+</div>`);
+  }
+
+  // ── HL Fills ──
+  if (d.hl_fills?.length) {
+    const fillRows = d.hl_fills.map(f => `<tr>
+      <td class="mono muted">${f.ts ? relTime(new Date(f.ts).toISOString()) : '—'}</td>
+      <td>${f.coin}-PERP</td>
+      <td><span class="badge badge--${f.side.startsWith('SELL') ? 'red' : 'green'}">${f.side}</span></td>
+      <td class="mono">$${fmtNum(f.price)}</td>
+      <td class="mono">${Math.abs(f.size).toFixed(4)}</td>
+      <td class="mono muted">$${fmtNum(f.fee)}</td>
+    </tr>`).join('');
+
+    sections.push(`
+<div class="detail-section">
+  <div class="detail-section-title">Fills Recientes — Hyperliquid (últimos ${d.hl_fills.length})</div>
+  <div class="detail-table-wrap">
+    <table class="detail-table">
+      <thead><tr><th>Tiempo</th><th>Par</th><th>Lado</th><th>Precio</th><th>Tamaño</th><th>Fee</th></tr></thead>
+      <tbody>${fillRows}</tbody>
+    </table>
+  </div>
+</div>`);
+  } else if (!d.hl_error) {
+    sections.push(`<div class="detail-section">
+      <div class="detail-section-title">Fills Recientes — Hyperliquid</div>
+      <div class="detail-empty">Sin fills recientes en esta wallet.</div>
+    </div>`);
+  }
+
+  return sections.join('');
 }
 
 // ── Nuclear stop ───────────────────────────────────────────────────────────
@@ -339,10 +539,23 @@ function evtLabel(type) {
   }[type] || type;
 }
 
+function evtColor(type) {
+  return {
+    started:       'muted',
+    hedge_opened:  'yellow',
+    breakeven:     'green',
+    tp_hit:        'green',
+    sl_hit:        'red',
+    trailing_stop: 'red',
+    stopped:       'muted',
+    error:         'red',
+  }[type] || 'muted';
+}
+
 function relTime(isoStr) {
   const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
-  if (diff < 60)   return `hace ${diff}s`;
-  if (diff < 3600) return `hace ${Math.floor(diff/60)}min`;
+  if (diff < 60)    return `hace ${diff}s`;
+  if (diff < 3600)  return `hace ${Math.floor(diff/60)}min`;
   if (diff < 86400) return `hace ${Math.floor(diff/3600)}h`;
   return `hace ${Math.floor(diff/86400)}d`;
 }
