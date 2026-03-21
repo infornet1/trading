@@ -2,19 +2,26 @@
 
 // ── Config ─────────────────────────────────────────────────────────────────
 const API_BASE      = '/trading/lp-hedge/api';
-const REFRESH_SECS  = 30;
 const NEAR_EDGE_PCT = 0.05;   // 5% from boundary = yellow warning
+
+const REFRESH_OPTIONS = [
+  { label: 'Off', value: 0        },
+  { label: '30s', value: 30_000   },
+  { label: '1m',  value: 60_000   },
+  { label: '3m',  value: 180_000  },
+  { label: '5m',  value: 300_000  },
+];
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
-  jwt:        localStorage.getItem('vf_jwt') || null,
-  provider:   null,
-  address:    null,
-  ethPrice:   null,
-  timer:      null,
-  countdown:  REFRESH_SECS,
-  expanded:   new Set(),   // config_ids with open detail drawers
-  hlLoading:  new Set(),   // config_ids currently fetching HL data
+  jwt:             localStorage.getItem('vf_jwt') || null,
+  provider:        null,
+  address:         null,
+  ethPrice:        null,
+  refreshTimer:    null,
+  refreshInterval: parseInt(localStorage.getItem('vf_admin_refresh') || '30000', 10),
+  expanded:        new Set(),   // config_ids with open detail drawers
+  hlLoading:       new Set(),   // config_ids currently fetching HL data
 };
 
 // ── Boot ───────────────────────────────────────────────────────────────────
@@ -22,6 +29,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (state.jwt && jwtIsAdmin(state.jwt) && !jwtExpired(state.jwt)) {
     showContent();
     doRefresh();
+    applyRefreshInterval();
   } else {
     state.jwt = null;
     localStorage.removeItem('vf_jwt');
@@ -50,6 +58,7 @@ function showContent() {
   if (jwtIsAdmin(state.jwt)) {
     document.getElementById('btn-nuclear').classList.remove('hidden');
   }
+  renderRefreshControl();
 }
 
 // ── Sign in ────────────────────────────────────────────────────────────────
@@ -85,6 +94,7 @@ async function signIn() {
     localStorage.setItem('vf_jwt', access_token);
     showContent();
     doRefresh();
+    applyRefreshInterval();
   } catch (e) {
     errEl.textContent = e.message || 'Error desconocido.';
     errEl.classList.remove('hidden');
@@ -119,16 +129,13 @@ async function fetchEthPrice() {
 
 // ── Refresh cycle ──────────────────────────────────────────────────────────
 async function doRefresh() {
-  clearInterval(state.timer);
   setStatus('Actualizando...');
   try {
     await Promise.all([fetchEthPrice(), renderOverview()]);
-    state.countdown = REFRESH_SECS;
-    state.timer = setInterval(() => {
-      state.countdown--;
-      setStatus(`Actualizado · próximo en ${state.countdown}s`);
-      if (state.countdown <= 0) doRefresh();
-    }, 1000);
+    const now = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setStatus(state.refreshInterval > 0
+      ? `Actualizado ${now} · Auto ${msToLabel(state.refreshInterval)}`
+      : `Actualizado ${now}`);
   } catch (e) {
     setStatus(`Error: ${e.message}`);
   }
@@ -136,6 +143,45 @@ async function doRefresh() {
 
 function setStatus(msg) {
   document.getElementById('refresh-status').textContent = msg;
+}
+
+// ── Auto-refresh control ───────────────────────────────────────────────────
+function applyRefreshInterval() {
+  clearInterval(state.refreshTimer);
+  state.refreshTimer = null;
+  if (state.refreshInterval > 0) {
+    state.refreshTimer = setInterval(doRefresh, state.refreshInterval);
+  }
+}
+
+function renderRefreshControl() {
+  const el = document.getElementById('refresh-control');
+  if (!el) return;
+  el.classList.remove('hidden');
+  const cur = state.refreshInterval;
+  el.innerHTML = `
+    <span class="refresh-label">Auto</span>
+    <div class="refresh-opts">
+      ${REFRESH_OPTIONS.map(o => `
+        <button class="refresh-opt${o.value === cur ? ' refresh-opt--active' : ''}"
+                onclick="setRefreshInterval(${o.value})">${o.label}</button>
+      `).join('')}
+    </div>`;
+}
+
+function setRefreshInterval(ms) {
+  state.refreshInterval = ms;
+  localStorage.setItem('vf_admin_refresh', String(ms));
+  applyRefreshInterval();
+  renderRefreshControl();
+  if (ms === 0) {
+    const now = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setStatus(`Actualizado ${now} · Auto-refresh desactivado`);
+  }
+}
+
+function msToLabel(ms) {
+  return REFRESH_OPTIONS.find(o => o.value === ms)?.label || `${ms/1000}s`;
 }
 
 // ── Overview render ────────────────────────────────────────────────────────

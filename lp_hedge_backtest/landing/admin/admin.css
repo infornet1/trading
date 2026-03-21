@@ -37,6 +37,28 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
 }
 .btn-outline-sm:hover { border-color: var(--gold); color: var(--gold); }
 
+/* ── Auto-refresh control (navbar) ──────────────────────────────────── */
+.refresh-control {
+  display: flex; align-items: center; gap: 6px;
+}
+.refresh-control.hidden { display: none; }
+.refresh-label {
+  font-size: .7rem; color: var(--muted);
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.refresh-opts { display: flex; gap: 3px; }
+.refresh-opt {
+  padding: 3px 8px; font-size: .7rem; font-weight: 600;
+  color: var(--muted); background: transparent;
+  border: 1px solid rgba(255,255,255,.1); border-radius: 4px;
+  cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+}
+.refresh-opt:hover { color: var(--text); border-color: rgba(255,255,255,.25); }
+.refresh-opt--active {
+  color: var(--gold); border-color: var(--gold);
+  background: rgba(201,168,76,.1);
+}
+
 /* ── Sign-in gate ───────────────────────────────────────────────────── */
 .gate-wrap {
   display: flex; align-items: center; justify-content: center;
