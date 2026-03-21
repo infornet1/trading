@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIZNAGO FURY — Admin</title>
+  <link rel="stylesheet" href="../global.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+
+<!-- ── Navbar ─────────────────────────────────────────────────────────── -->
+<nav class="dash-nav">
+  <div class="dash-nav-left">
+    <img src="../assets/viznago-logo.png" alt="Viznago" class="dash-logo" />
+    <span class="dash-nav-title">Admin Panel</span>
+    <span class="admin-badge">ADMIN ONLY</span>
+  </div>
+  <div class="dash-nav-right">
+    <span id="admin-wallet" class="wallet-chip"></span>
+    <a href="../dashboard/" class="btn-outline-sm">← Dashboard</a>
+  </div>
+</nav>
+
+<!-- ── Sign-in gate ───────────────────────────────────────────────────── -->
+<div id="signin-gate" class="gate-wrap hidden">
+  <div class="gate-card">
+    <div class="gate-icon">🔐</div>
+    <h2 class="gate-title">Acceso Restringido</h2>
+    <p class="gate-sub">Solo wallets administradoras pueden acceder a este panel.</p>
+    <button id="btn-signin" class="btn-primary-lg">Conectar Wallet Admin</button>
+    <p id="signin-error" class="gate-error hidden"></p>
+  </div>
+</div>
+
+<!-- ── Main content ───────────────────────────────────────────────────── -->
+<div id="admin-content" class="hidden">
+
+  <!-- Stats bar -->
+  <section class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-wallets">—</div>
+      <div class="stat-label">Wallets</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-pools">—</div>
+      <div class="stat-label">Pools Totales</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-bots">—</div>
+      <div class="stat-label">Bots Activos</div>
+    </div>
+    <div class="stat-card stat-card--warn">
+      <div class="stat-value" id="stat-shorts">—</div>
+      <div class="stat-label">Shorts Abiertos</div>
+    </div>
+    <div class="stat-card stat-card--gold">
+      <div class="stat-value" id="stat-volume">—</div>
+      <div class="stat-label">Volumen Total (USD)</div>
+    </div>
+  </section>
+
+  <!-- Refresh bar -->
+  <div class="refresh-bar">
+    <span id="refresh-status">Actualizando...</span>
+    <button id="btn-refresh" class="btn-outline-sm" onclick="doRefresh()">↻ Ahora</button>
+    <button id="btn-nuclear" class="btn-nuclear hidden" onclick="nuclearStop()">☢ Stop All</button>
+  </div>
+
+  <!-- Pool health grid -->
+  <section class="pools-grid" id="pools-grid">
+    <div class="loading-msg">Cargando pools...</div>
+  </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

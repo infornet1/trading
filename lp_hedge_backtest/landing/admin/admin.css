@@ -1,0 +1,150 @@
+/* ── Admin Panel Styles ─────────────────────────────────────────────── */
+
+:root {
+  --green:  #00e676;
+  --yellow: #ffd600;
+  --red:    #ff3d00;
+  --gold:   #c9a84c;
+  --bg:     #0d0d0d;
+  --card:   #141414;
+  --border: #2a2a2a;
+  --text:   #e0e0e0;
+  --muted:  #666;
+}
+
+body { background: var(--bg); color: var(--text); font-family: 'Inter', monospace; margin: 0; }
+
+/* ── Navbar ─────────────────────────────────────────────────────────── */
+.dash-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 1.5rem; background: #111; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.dash-nav-left  { display: flex; align-items: center; gap: .75rem; }
+.dash-nav-right { display: flex; align-items: center; gap: .75rem; }
+.dash-logo      { height: 28px; }
+.dash-nav-title { font-size: .95rem; font-weight: 700; color: var(--gold); letter-spacing: .05em; }
+.admin-badge    {
+  font-size: .65rem; font-weight: 800; letter-spacing: .1em;
+  padding: .15rem .4rem; background: var(--red); color: #fff;
+  border-radius: 3px;
+}
+.wallet-chip    { font-size: .75rem; color: var(--muted); font-family: monospace; }
+.btn-outline-sm {
+  font-size: .75rem; padding: .3rem .7rem; border: 1px solid var(--border);
+  background: transparent; color: var(--text); border-radius: 4px;
+  cursor: pointer; text-decoration: none;
+}
+.btn-outline-sm:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── Sign-in gate ───────────────────────────────────────────────────── */
+.gate-wrap {
+  display: flex; align-items: center; justify-content: center;
+  min-height: calc(100vh - 60px);
+}
+.gate-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 2.5rem; text-align: center; max-width: 380px; width: 100%;
+}
+.gate-icon  { font-size: 2.5rem; margin-bottom: 1rem; }
+.gate-title { font-size: 1.2rem; color: var(--gold); margin: 0 0 .5rem; }
+.gate-sub   { color: var(--muted); font-size: .85rem; margin: 0 0 1.5rem; }
+.gate-error { color: var(--red); font-size: .8rem; margin-top: .75rem; }
+.btn-primary-lg {
+  width: 100%; padding: .75rem; background: var(--gold); color: #000;
+  font-weight: 700; font-size: .9rem; border: none; border-radius: 6px;
+  cursor: pointer; letter-spacing: .05em;
+}
+.btn-primary-lg:hover { opacity: .85; }
+
+/* ── Stats bar ──────────────────────────────────────────────────────── */
+.stats-bar {
+  display: flex; gap: 1rem; padding: 1.25rem 1.5rem; flex-wrap: wrap;
+}
+.stat-card {
+  flex: 1; min-width: 130px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem;
+}
+.stat-card--warn { border-color: rgba(255,214,0,.3); }
+.stat-card--gold { border-color: rgba(201,168,76,.4); }
+.stat-value {
+  font-size: 1.6rem; font-weight: 800; color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.stat-card--warn .stat-value { color: var(--yellow); }
+.stat-label { font-size: .72rem; color: var(--muted); margin-top: .25rem; text-transform: uppercase; letter-spacing: .07em; }
+
+/* ── Refresh bar ────────────────────────────────────────────────────── */
+.refresh-bar {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .5rem 1.5rem; border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); background: #111;
+}
+#refresh-status { font-size: .75rem; color: var(--muted); flex: 1; }
+.btn-nuclear {
+  font-size: .75rem; padding: .3rem .8rem; border: 1px solid var(--red);
+  background: transparent; color: var(--red); border-radius: 4px; cursor: pointer;
+  font-weight: 700;
+}
+.btn-nuclear:hover { background: var(--red); color: #fff; }
+
+/* ── Pool grid ──────────────────────────────────────────────────────── */
+.pools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem; padding: 1.25rem 1.5rem;
+}
+.loading-msg { color: var(--muted); font-size: .85rem; padding: 2rem; }
+
+/* ── Pool card ──────────────────────────────────────────────────────── */
+.pool-card {
+  background: var(--card); border-radius: 10px; padding: 1rem 1.25rem;
+  border-left: 4px solid var(--border); position: relative; overflow: hidden;
+}
+.pool-card--green  { border-left-color: var(--green); }
+.pool-card--yellow { border-left-color: var(--yellow); }
+.pool-card--red    { border-left-color: var(--red); }
+
+.pool-card-header  { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
+.health-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.health-dot--green  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.health-dot--yellow { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+.health-dot--red    { background: var(--red);    box-shadow: 0 0 6px var(--red); animation: blink 1.2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.pool-pair    { font-size: .9rem; font-weight: 700; color: var(--gold); }
+.pool-nft     { font-size: .7rem; color: var(--muted); margin-left: auto; }
+
+.pool-row     { display: flex; justify-content: space-between; font-size: .78rem; margin: .2rem 0; }
+.pool-label   { color: var(--muted); }
+.pool-val     { color: var(--text); font-family: monospace; }
+.pool-val--green  { color: var(--green); }
+.pool-val--yellow { color: var(--yellow); }
+.pool-val--red    { color: var(--red); }
+
+/* Range bar */
+.range-bar-wrap { margin: .6rem 0; }
+.range-bar-bg {
+  height: 5px; background: var(--border); border-radius: 3px; position: relative; overflow: hidden;
+}
+.range-bar-fill { height: 100%; background: var(--gold); border-radius: 3px; transition: width .4s; }
+.range-bar-cursor {
+  position: absolute; top: -2px; width: 3px; height: 9px;
+  background: #fff; border-radius: 2px; transform: translateX(-50%);
+}
+
+.pool-wallet { font-size: .68rem; color: var(--muted); font-family: monospace; margin-top: .5rem; word-break: break-all; }
+
+.pool-footer  { margin-top: .6rem; padding-top: .6rem; border-top: 1px solid var(--border); }
+.pool-footer  { display: flex; justify-content: space-between; font-size: .72rem; }
+.badge {
+  padding: .15rem .45rem; border-radius: 3px; font-size: .65rem;
+  font-weight: 700; letter-spacing: .06em;
+}
+.badge--green  { background: rgba(0,230,118,.15); color: var(--green); }
+.badge--yellow { background: rgba(255,214,0,.15);  color: var(--yellow); }
+.badge--red    { background: rgba(255,61,0,.15);   color: var(--red); }
+.badge--muted  { background: rgba(255,255,255,.07); color: var(--muted); }
+
+/* Utilities */
+.hidden { display: none !important; }
