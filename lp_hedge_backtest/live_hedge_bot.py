@@ -6,25 +6,30 @@ All configuration is read from environment variables so the SaaS
 BotManager can spawn isolated per-user processes.
 
 Required env vars (set by BotManager or .env for single-user mode):
-    HYPERLIQUID_SECRET_KEY    — HL API-wallet private key
+    HYPERLIQUID_SECRET_KEY      — HL API-wallet private key
     HYPERLIQUID_ACCOUNT_ADDRESS — HL main wallet address
 
 Optional env vars (have sensible defaults):
     UNISWAP_NFT_ID            — Uniswap v3 NFT token ID  (default: 5364087)
     ARBITRUM_RPC_URL          — Arbitrum JSON-RPC URL
-    LOWER_BOUND               — LP range floor in USD    (auto-fetch if absent)
-    UPPER_BOUND               — LP range ceiling in USD  (auto-fetch if absent)
     TRIGGER_OFFSET_PCT        — % below floor to trigger short (default: 0.5)
-    HEDGE_SIZE_ETH            — ETH size per hedge order  (default: 0.05)
-    LEVERAGE                  — Leverage for short        (default: 10)
+    HEDGE_RATIO               — % of max ETH exposure to hedge (default: 50.0)
+    MAX_LEVERAGE              — Hard cap on leverage (default: 3)
     SL_PCT                    — Stop-loss %               (default: 0.5)
     BREAKEVEN_PCT             — Profit % to move SL to entry (default: 1.0)
     BOT_MODE                  — aragan | avaro            (default: aragan)
     CHECK_INTERVAL            — Price-check interval secs (default: 30)
     CONFIG_ID                 — SaaS bot_config row ID    (optional, for logging)
     EMAIL_RECIPIENTS          — Comma-separated email list (overrides default)
+
+Position sizing (dynamic, LP-aware):
+    hedge_size_ETH = X_max_ETH × HEDGE_RATIO / 100
+    X_max_ETH      = max ETH held by LP when price is at lower bound (100% ETH)
+    leverage       = notional / HL_margin_balance  (capped at MAX_LEVERAGE)
+    Safety check   = HL margin ≥ (notional / leverage) × 1.5 buffer
 """
 
+import math
 import os
 import sys
 import time
@@ -53,25 +58,24 @@ if not HL_SECRET_KEY or not HL_ADDRESS:
 # ── Optional with defaults ────────────────────────────────────────────────
 RPC_URL        = os.getenv("ARBITRUM_RPC_URL",      "https://arb1.arbitrum.io/rpc")
 NFT_ID         = int(os.getenv("UNISWAP_NFT_ID",    "5364087"))
-CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL",    "30"))
+CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL",      "30"))
 TRIGGER_OFFSET = float(os.getenv("TRIGGER_OFFSET_PCT", "0.5")) / 100.0
-HEDGE_SIZE_ETH = float(os.getenv("HEDGE_SIZE_ETH",  "0.05"))
-LEVERAGE       = int(os.getenv("LEVERAGE",          "10"))
-DEFAULT_SL_PCT = float(os.getenv("SL_PCT",          "0.5")) / 100.0
-BREAKEVEN_PCT  = float(os.getenv("BREAKEVEN_PCT",   "1.0")) / 100.0
-BOT_MODE       = os.getenv("BOT_MODE",              "aragan").lower()
-CONFIG_ID      = os.getenv("CONFIG_ID")             # SaaS: bot_config row id
+HEDGE_RATIO    = float(os.getenv("HEDGE_RATIO",        "50.0"))   # % of X_max to hedge
+MAX_LEVERAGE   = int(os.getenv("MAX_LEVERAGE",         "3"))      # hard cap
+DEFAULT_SL_PCT = float(os.getenv("SL_PCT",             "0.5")) / 100.0
+BREAKEVEN_PCT  = float(os.getenv("BREAKEVEN_PCT",      "1.0")) / 100.0
+BOT_MODE       = os.getenv("BOT_MODE",                 "aragan").lower()
+CONFIG_ID      = os.getenv("CONFIG_ID")               # SaaS: bot_config row id
 
-# Bounds can be pre-loaded by BotManager (saves an RPC call) or auto-fetched
-LOWER_BOUND_ENV = os.getenv("LOWER_BOUND")
-UPPER_BOUND_ENV = os.getenv("UPPER_BOUND")
+MIN_HEDGE_ETH  = 0.001   # Hyperliquid minimum order size
+MARGIN_BUFFER  = 1.5     # require 1.5× the needed margin before opening
 
 # Email
 EMAIL_CONFIG_PATH = os.getenv("EMAIL_CONFIG_PATH", "/var/www/dev/trading/email_config.json")
 _recipients_env   = os.getenv("EMAIL_RECIPIENTS", "")
 RECIPIENTS = (
     [r.strip() for r in _recipients_env.split(",") if r.strip()]
-    or ["perdomo.gustavo@gmail.com", "carlosam81@gmail.com"]
+    or ["perdomo.gustavo@gmail.com"]
 )
 
 # ── Uniswap v3 Position Manager ABI (minimal) ─────────────────────────────
@@ -97,6 +101,23 @@ V3_ABI = [
 def tick_to_price(tick):
     return (1.0001 ** tick) * (10 ** 12)
 
+def calc_x_max_eth(liquidity, tick_lower, tick_upper):
+    """
+    Max ETH (token0=WETH) the LP position holds when price is at the lower
+    bound — i.e. worst-case ETH exposure before IL kicks in.
+
+    Formula (Uniswap v3 whitepaper):
+        x = L × (1/√Pa − 1/√Pb)
+    where Pa, Pb are raw prices (token1/token0, no decimal adjustment needed
+    because the 10^12 decimal factor cancels in the ratio).
+    """
+    if liquidity == 0:
+        return 0.0
+    sqrt_pa = math.sqrt(1.0001 ** tick_lower)
+    sqrt_pb = math.sqrt(1.0001 ** tick_upper)
+    x_raw   = liquidity * (1.0 / sqrt_pa - 1.0 / sqrt_pb)
+    return x_raw / 1e18   # wei → ETH
+
 # ── Structured event logging (parsed by BotManager tail loop) ─────────────
 def log_event(event_type: str, price: float = None, pnl: float = None, details: dict = None):
     """
@@ -114,7 +135,7 @@ def log_event(event_type: str, price: float = None, pnl: float = None, details: 
 
 class LiveHedgeBot:
     def __init__(self):
-        print(f"⚙️  Initializing Bot Aragan v1.3 | NFT #{NFT_ID} | Mode: {BOT_MODE.upper()}", flush=True)
+        print(f"⚙️  Initializing Bot Aragan v1.4 | NFT #{NFT_ID} | Mode: {BOT_MODE.upper()}", flush=True)
         self.w3           = Web3(Web3.HTTPProvider(RPC_URL))
         self.contract     = self.w3.eth.contract(address=V3_POS_MANAGER, abi=V3_ABI)
         self.info         = Info(constants.MAINNET_API_URL, skip_ws=True)
@@ -125,10 +146,15 @@ class LiveHedgeBot:
         )
         self.hedge_active      = False
         self.entry_price       = None
+        self.hedge_size_eth    = None   # set dynamically on each open
+        self.leverage_used     = None   # set dynamically on each open
         self.current_sl_price  = None
         self.breakeven_reached = False
-        self.lower_bound       = float(LOWER_BOUND_ENV) if LOWER_BOUND_ENV else None
-        self.upper_bound       = float(UPPER_BOUND_ENV) if UPPER_BOUND_ENV else None
+        self.lower_bound       = None
+        self.upper_bound       = None
+        self.tick_lower        = None   # needed for X_max calculation
+        self.tick_upper        = None
+        self.liquidity         = None
         self.email_config      = self._load_email_config()
 
     # ── Email ──────────────────────────────────────────────────────────────
@@ -162,14 +188,19 @@ class LiveHedgeBot:
     # ── On-chain ───────────────────────────────────────────────────────────
 
     def fetch_position_bounds(self):
-        """Fetch lower/upper bounds from chain. Only called if not pre-loaded."""
+        """Fetch range, ticks and liquidity from chain (always called on startup)."""
         try:
             pos = self.contract.functions.positions(NFT_ID).call()
-            self.lower_bound = tick_to_price(pos[5])
-            self.upper_bound = tick_to_price(pos[6])
-            print(f"✅ Range fetched: ${self.lower_bound:.2f} — ${self.upper_bound:.2f}", flush=True)
+            self.tick_lower  = pos[5]
+            self.tick_upper  = pos[6]
+            self.liquidity   = pos[7]
+            self.lower_bound = tick_to_price(self.tick_lower)
+            self.upper_bound = tick_to_price(self.tick_upper)
+            x_max = calc_x_max_eth(self.liquidity, self.tick_lower, self.tick_upper)
+            print(f"✅ Range: ${self.lower_bound:.2f} — ${self.upper_bound:.2f} | "
+                  f"Liquidity: {self.liquidity} | X_max: {x_max:.4f} ETH", flush=True)
         except Exception as e:
-            print(f"❌ Error fetching position bounds: {e}", flush=True)
+            print(f"❌ Error fetching position: {e}", flush=True)
             sys.exit(1)
 
     def get_eth_price(self):
@@ -178,33 +209,107 @@ class LiveHedgeBot:
         except Exception:
             return None
 
+    def get_hl_margin_balance(self):
+        """Return total account value (USDC) in the HL API wallet."""
+        try:
+            state = self.info.user_state(HL_ADDRESS)
+            return float(state["marginSummary"]["accountValue"])
+        except Exception as e:
+            print(f"⚠️  Could not fetch HL margin: {e}", flush=True)
+            return 0.0
+
     # ── Hedge logic ────────────────────────────────────────────────────────
 
     def open_hedge(self, price):
         print(f"🚨 TRIGGERED: ETH ${price:.2f} below range floor ${self.lower_bound:.2f}", flush=True)
         try:
-            self.exchange.update_leverage(LEVERAGE, "ETH")
-            result = self.exchange.market_open("ETH", False, HEDGE_SIZE_ETH, slippage=0.01)
+            # ── 1. Calculate X_max (worst-case ETH exposure at lower bound) ──
+            x_max = calc_x_max_eth(self.liquidity, self.tick_lower, self.tick_upper)
+            if x_max < MIN_HEDGE_ETH:
+                print(f"⚠️  X_max {x_max:.4f} ETH below minimum ({MIN_HEDGE_ETH} ETH) — skipping hedge", flush=True)
+                log_event("error", price=price, details={"msg": f"X_max too small: {x_max:.4f} ETH"})
+                return
+
+            # ── 2. Hedge size = X_max × ratio, clipped to valid range ────────
+            hedge_size = round(x_max * HEDGE_RATIO / 100.0, 4)
+            hedge_size = max(hedge_size, MIN_HEDGE_ETH)
+            hedge_size = min(hedge_size, x_max)   # never exceed 100% coverage
+
+            # ── 3. Dynamic leverage from HL margin balance ────────────────────
+            margin    = self.get_hl_margin_balance()
+            notional  = hedge_size * price
+            if margin <= 0:
+                print(f"❌ HL account has no margin — cannot open hedge", flush=True)
+                log_event("error", price=price, details={"msg": "Zero HL margin"})
+                self.send_email("⚠️ Hedge SKIPPED — No Margin",
+                    f"NFT #{NFT_ID}: HL API wallet has no USDC balance.\n"
+                    f"Please fund the API wallet to enable hedging.")
+                return
+
+            raw_leverage = notional / margin
+            leverage     = min(max(math.ceil(raw_leverage), 1), MAX_LEVERAGE)
+
+            # ── 4. Safety: margin must cover position with 1.5× buffer ───────
+            required_margin = notional / leverage
+            if margin < required_margin * MARGIN_BUFFER:
+                print(f"❌ Insufficient margin: have ${margin:.2f}, "
+                      f"need ${required_margin * MARGIN_BUFFER:.2f} — skipping", flush=True)
+                log_event("error", price=price, details={
+                    "msg": "Insufficient margin",
+                    "have_usd": round(margin, 2),
+                    "need_usd": round(required_margin * MARGIN_BUFFER, 2),
+                })
+                self.send_email("⚠️ Hedge SKIPPED — Low Margin",
+                    f"NFT #{NFT_ID}: Not enough USDC in HL API wallet.\n"
+                    f"Available: ${margin:.2f}\n"
+                    f"Required (×{MARGIN_BUFFER} buffer): ${required_margin * MARGIN_BUFFER:.2f}\n"
+                    f"Please top up to enable hedging.")
+                return
+
+            # ── 5. Open the short ─────────────────────────────────────────────
+            print(f"📐 Size: {hedge_size:.4f} ETH | X_max: {x_max:.4f} ETH | "
+                  f"Ratio: {HEDGE_RATIO}% | Leverage: {leverage}x | "
+                  f"Notional: ${notional:.2f} | Margin used: ${required_margin:.2f}", flush=True)
+
+            self.exchange.update_leverage(leverage, "ETH")
+            result = self.exchange.market_open("ETH", False, hedge_size, slippage=0.01)
+
             if result["status"] == "ok":
                 self.entry_price       = price
+                self.hedge_size_eth    = hedge_size
+                self.leverage_used     = leverage
                 self.hedge_active      = True
                 self.breakeven_reached = False
                 self.current_sl_price  = max(
                     self.entry_price * (1 + DEFAULT_SL_PCT),
-                    self.lower_bound
+                    self.lower_bound,
                 )
-                print(f"✅ Hedge OPENED | Entry: ${self.entry_price:.2f} | SL: ${self.current_sl_price:.2f}", flush=True)
+                print(f"✅ Hedge OPENED | Entry: ${self.entry_price:.2f} | "
+                      f"SL: ${self.current_sl_price:.2f}", flush=True)
                 log_event("hedge_opened", price=price, details={
-                    "entry": self.entry_price, "sl": self.current_sl_price,
-                    "size": HEDGE_SIZE_ETH, "leverage": LEVERAGE,
+                    "entry":    self.entry_price,
+                    "sl":       self.current_sl_price,
+                    "size_eth": hedge_size,
+                    "x_max":    round(x_max, 4),
+                    "ratio_pct": HEDGE_RATIO,
+                    "leverage": leverage,
+                    "notional": round(notional, 2),
+                    "margin":   round(required_margin, 2),
                 })
                 self.send_email(
                     "Hedge OPENED 🚨",
-                    f"10x SHORT opened\nEntry: ${self.entry_price:.2f}\nSL: ${self.current_sl_price:.2f}\nNFT #{NFT_ID}",
+                    f"SHORT opened on Hyperliquid\n"
+                    f"NFT #{NFT_ID}\n"
+                    f"Entry:    ${self.entry_price:.2f}\n"
+                    f"Size:     {hedge_size:.4f} ETH ({HEDGE_RATIO}% of {x_max:.4f} ETH max)\n"
+                    f"Leverage: {leverage}x\n"
+                    f"Notional: ${notional:.2f}\n"
+                    f"Stop-loss: ${self.current_sl_price:.2f}",
                 )
             else:
                 print(f"❌ Order failed: {result}", flush=True)
                 log_event("error", price=price, details={"msg": str(result)})
+
         except Exception as e:
             print(f"❌ open_hedge error: {e}", flush=True)
             log_event("error", price=price, details={"msg": str(e)})
@@ -225,7 +330,8 @@ class LiveHedgeBot:
             log_event("breakeven", price=price, pnl=pnl_est)
             self.send_email(
                 "Hedge Protected 🛡️",
-                f"Short profit ≥ {BREAKEVEN_PCT*100:.0f}%. SL moved to entry ${self.entry_price:.2f}. Trade is risk-free.",
+                f"Short profit ≥ {BREAKEVEN_PCT*100:.0f}%.\n"
+                f"SL moved to entry ${self.entry_price:.2f}. Trade is now risk-free.\nNFT #{NFT_ID}",
             )
 
         # C. Take profit — price back inside range
@@ -255,21 +361,37 @@ class LiveHedgeBot:
     # ── Main loop ──────────────────────────────────────────────────────────
 
     def run(self):
-        print(f"🚀 Bot Aragan v1.3 starting | NFT #{NFT_ID} | {BOT_MODE.upper()} mode", flush=True)
+        print(f"🚀 Bot Aragan v1.4 starting | NFT #{NFT_ID} | {BOT_MODE.upper()} mode", flush=True)
 
-        if self.lower_bound is None or self.upper_bound is None:
-            self.fetch_position_bounds()
+        self.fetch_position_bounds()   # always fetch — need ticks + liquidity for sizing
 
         trigger_price = self.lower_bound * (1 - TRIGGER_OFFSET)
-        print(f"📐 Range: ${self.lower_bound:.2f} — ${self.upper_bound:.2f} | Trigger: ${trigger_price:.2f}", flush=True)
+        x_max = calc_x_max_eth(self.liquidity, self.tick_lower, self.tick_upper)
+        print(f"📐 Range: ${self.lower_bound:.2f} — ${self.upper_bound:.2f} | "
+              f"Trigger: ${trigger_price:.2f} | "
+              f"X_max: {x_max:.4f} ETH | "
+              f"Hedge ratio: {HEDGE_RATIO}% → {x_max * HEDGE_RATIO / 100:.4f} ETH | "
+              f"Max leverage: {MAX_LEVERAGE}x", flush=True)
 
         log_event("started", details={
-            "nft_id": NFT_ID, "lower": self.lower_bound, "upper": self.upper_bound,
-            "trigger": trigger_price, "mode": BOT_MODE,
+            "nft_id":     NFT_ID,
+            "lower":      self.lower_bound,
+            "upper":      self.upper_bound,
+            "trigger":    trigger_price,
+            "mode":       BOT_MODE,
+            "x_max_eth":  round(x_max, 4),
+            "hedge_ratio": HEDGE_RATIO,
+            "max_leverage": MAX_LEVERAGE,
         })
         self.send_email(
-            "Bot v1.3 Started 🚀",
-            f"NFT #{NFT_ID}\nRange: ${self.lower_bound:.2f} — ${self.upper_bound:.2f}\nTrigger: ${trigger_price:.2f}\nMode: {BOT_MODE.upper()}",
+            "Bot v1.4 Started 🚀",
+            f"NFT #{NFT_ID}\n"
+            f"Range:       ${self.lower_bound:.2f} — ${self.upper_bound:.2f}\n"
+            f"Trigger:     ${trigger_price:.2f}\n"
+            f"Mode:        {BOT_MODE.upper()}\n"
+            f"X_max ETH:   {x_max:.4f} ETH (max LP exposure at lower bound)\n"
+            f"Hedge ratio: {HEDGE_RATIO}% → ~{x_max * HEDGE_RATIO / 100:.4f} ETH short\n"
+            f"Max leverage: {MAX_LEVERAGE}x",
         )
 
         while True:

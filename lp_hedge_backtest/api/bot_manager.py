@@ -56,6 +56,7 @@ class BotManager:
             "LOWER_BOUND":      config["lower_bound"],
             "UPPER_BOUND":      config["upper_bound"],
             "TRIGGER_OFFSET_PCT": str(abs(float(config["trigger_pct"]))),
+            "HEDGE_RATIO":      str(config["hedge_ratio"]),
             "BOT_MODE":         config["mode"],
             "CONFIG_ID":        str(config_id),
         }
@@ -150,16 +151,19 @@ class BotManager:
         except Exception as e:
             print(f"[BotManager] Tail error for config {config_id}: {e}", flush=True)
         finally:
-            # Process ended — mark inactive only if NOT a graceful API shutdown
+            # Process ended — only mark inactive if it crashed (not killed by signal/shutdown)
             if config_id in self._procs:
                 self._procs.pop(config_id, None)
                 self._tasks.pop(config_id, None)
-                if not self._shutting_down:
+                # Poll to get actual returncode (-15=SIGTERM, -9=SIGKILL, None=undetermined)
+                proc.poll()
+                killed_by_signal = proc.returncode is None or proc.returncode < 0
+                if not self._shutting_down and not killed_by_signal:
                     await self._mark_inactive(config_id)
                     await self._broadcast(config_id, {"event": "stopped", "config_id": config_id})
-                    print(f"[BotManager] Bot {config_id} exited unexpectedly", flush=True)
+                    print(f"[BotManager] Bot {config_id} crashed (rc={proc.returncode}), marked inactive", flush=True)
                 else:
-                    print(f"[BotManager] Bot {config_id} stopped for shutdown (active=True preserved)", flush=True)
+                    print(f"[BotManager] Bot {config_id} terminated (rc={proc.returncode}), active=True preserved", flush=True)
 
     async def _handle_event(self, config_id: int, record: dict):
         event_label = record.get("event", "")

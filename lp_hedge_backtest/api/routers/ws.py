@@ -27,7 +27,7 @@ async def ws_bot_events(
 ):
     # 1. Authenticate via JWT passed as query param (WS headers are awkward in browsers)
     try:
-        address = decode_token(token)
+        address = decode_token(token)["sub"]
     except Exception:
         await websocket.close(code=4001)
         return
