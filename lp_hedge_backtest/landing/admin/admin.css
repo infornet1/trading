@@ -112,10 +112,39 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
 
 /* ── Pool grid ──────────────────────────────────────────────────────── */
 .pools-grid {
+  padding: .5rem 1.5rem 1.5rem;
+  display: flex; flex-direction: column; gap: 1.5rem;
+}
+
+/* ── Pool section (Active / Historical) ─────────────────────────────── */
+.pools-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .4rem 0 .5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: .75rem;
+  font-size: .8rem; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text);
+}
+.pools-section-header--muted { color: var(--muted); cursor: pointer; }
+.pools-section-header--muted:hover { color: var(--text); }
+.pools-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.08); border-radius: 10px;
+  padding: .1rem .45rem; font-size: .7rem; margin-left: .35rem;
+  font-weight: 700; vertical-align: middle;
+}
+
+.pools-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1rem; padding: 1.25rem 1.5rem;
+  gap: 1rem;
 }
+
+/* Historical cards: slightly dimmed */
+.pool-card--historical {
+  opacity: .7;
+}
+.pool-card--historical:hover { opacity: 1; }
 .loading-msg { color: var(--muted); font-size: .85rem; padding: 2rem; }
 
 /* ── Pool card ──────────────────────────────────────────────────────── */

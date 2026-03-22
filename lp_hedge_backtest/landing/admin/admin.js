@@ -22,6 +22,7 @@ const state = {
   refreshInterval: parseInt(localStorage.getItem('vf_admin_refresh') || '30000', 10),
   expanded:        new Set(),   // config_ids with open detail drawers
   hlLoading:       new Set(),   // config_ids currently fetching HL data
+  historicalOpen:  false,       // whether the historical pools section is expanded
 };
 
 // ── Boot ───────────────────────────────────────────────────────────────────
@@ -187,6 +188,7 @@ function msToLabel(ms) {
 // ── Overview render ────────────────────────────────────────────────────────
 async function renderOverview() {
   const data = await apiGet('/admin/overview');
+  state.lastPools = data.pools;
   renderStats(data.stats);
   renderPools(data.pools);
   // Re-load HL detail for any currently expanded cards
@@ -213,8 +215,44 @@ function renderPools(pools) {
     grid.innerHTML = '<div class="loading-msg">No hay pools registrados aún.</div>';
     return;
   }
-  const price = state.ethPrice;
-  grid.innerHTML = pools.map(p => poolCard(p, price)).join('');
+
+  const price      = state.ethPrice;
+  const active     = pools.filter(p => p.active || p.running);
+  const historical = pools.filter(p => !p.active && !p.running);
+
+  let html = '';
+
+  // ── Active section ──────────────────────────────────────────────────
+  html += `<div class="pools-section">
+  <div class="pools-section-header">
+    <span>Active <span class="pools-count">${active.length}</span></span>
+  </div>
+  <div class="pools-cards-grid">
+    ${active.length
+      ? active.map(p => poolCard(p, price)).join('')
+      : '<div class="loading-msg">Sin pools activos.</div>'}
+  </div>
+</div>`;
+
+  // ── Historical section (collapsed by default) ───────────────────────
+  if (historical.length) {
+    html += `<div class="pools-section">
+  <div class="pools-section-header pools-section-header--muted" onclick="toggleHistorical()">
+    <span>Historical <span class="pools-count">${historical.length}</span></span>
+    <button class="btn-outline-sm" style="pointer-events:none">${state.historicalOpen ? '▲ Hide' : '▼ Show'}</button>
+  </div>
+  <div class="pools-cards-grid ${state.historicalOpen ? '' : 'hidden'}" id="historical-cards">
+    ${historical.map(p => poolCard(p, price, true)).join('')}
+  </div>
+</div>`;
+  }
+
+  grid.innerHTML = html;
+}
+
+function toggleHistorical() {
+  state.historicalOpen = !state.historicalOpen;
+  if (state.lastPools) renderPools(state.lastPools);
 }
 
 // ── Health logic ───────────────────────────────────────────────────────────
@@ -255,7 +293,7 @@ function poolHealth(p, currentPrice) {
 }
 
 // ── Pool card HTML ─────────────────────────────────────────────────────────
-function poolCard(p, ethPrice) {
+function poolCard(p, ethPrice, isHistorical = false) {
   const h = poolHealth(p, ethPrice);
   const isExpanded = state.expanded.has(p.config_id);
 
@@ -310,7 +348,7 @@ function poolCard(p, ethPrice) {
     </div>`).join('');
 
   return `
-<div class="pool-card pool-card--${h.level}" id="card-${p.config_id}">
+<div class="pool-card pool-card--${h.level}${isHistorical ? ' pool-card--historical' : ''}" id="card-${p.config_id}">
   <div class="pool-card-header">
     <div class="health-dot health-dot--${h.level}"></div>
     <span class="pool-pair">${p.pair}</span>
