@@ -25,13 +25,14 @@ VENV_PYTHON = os.path.join(_BASE, "venv", "bin", "python3")
 
 # Map event label from bot stdout → DB enum value
 _EVENT_MAP = {
-    "started":      "started",
-    "hedge_opened": "hedge_opened",
-    "breakeven":    "breakeven",
-    "tp_hit":       "tp_hit",
-    "sl_hit":       "sl_hit",
-    "stopped":      "stopped",
-    "error":        "error",
+    "started":       "started",
+    "hedge_opened":  "hedge_opened",
+    "breakeven":     "breakeven",
+    "tp_hit":        "tp_hit",
+    "sl_hit":        "sl_hit",
+    "trailing_stop": "trailing_stop",
+    "stopped":       "stopped",
+    "error":         "error",
 }
 
 
@@ -40,6 +41,7 @@ class BotManager:
         self._procs:  dict[int, subprocess.Popen]         = {}   # config_id → process
         self._tasks:  dict[int, asyncio.Task]              = {}   # config_id → tail task
         self._subscribers: dict[int, list[asyncio.Queue]] = {}   # config_id → WS queues
+        self._last_seen:   dict[int, datetime]             = {}   # config_id → last stdout ts
         self._shutting_down: bool = False
 
     # ── Lifecycle ─────────────────────────────────────────────────────────
@@ -116,6 +118,10 @@ class BotManager:
         proc = self._procs.get(config_id)
         return proc.pid if proc and proc.poll() is None else None
 
+    def last_seen(self, config_id: int) -> Optional[datetime]:
+        """Timestamp of the last stdout line received from the bot process."""
+        return self._last_seen.get(config_id)
+
     # ── Stdout tail ───────────────────────────────────────────────────────
 
     async def _tail(self, config_id: int, proc: subprocess.Popen):
@@ -134,6 +140,7 @@ class BotManager:
                     continue
 
                 print(f"[Bot {config_id}] {line}", flush=True)
+                self._last_seen[config_id] = datetime.now(timezone.utc)
 
                 if line.startswith("[EVENT] "):
                     try:

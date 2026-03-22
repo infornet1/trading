@@ -285,6 +285,18 @@ function poolCard(p, ethPrice) {
       ? `<span class="badge badge--red">CAÍDO</span>`
       : `<span class="badge badge--muted">DETENIDO</span>`;
 
+  let heartbeatBadge = '';
+  if (p.running) {
+    if (p.last_heartbeat) {
+      const ageSec = Math.floor((Date.now() - new Date(p.last_heartbeat).getTime()) / 1000);
+      const cls    = ageSec < 120 ? 'green' : ageSec < 300 ? 'yellow' : 'red';
+      const label  = ageSec < 60 ? `${ageSec}s` : `${Math.floor(ageSec / 60)}min`;
+      heartbeatBadge = `<span class="badge badge--${cls}" title="Último output del bot">⏱ ${label}</span>`;
+    } else {
+      heartbeatBadge = `<span class="badge badge--muted" title="Sin heartbeat registrado">⏱ —</span>`;
+    }
+  }
+
   const shortBadge = lastEvt?.type === 'hedge_opened' && p.running
     ? `<span class="badge badge--yellow">SHORT ACTIVO</span>` : '';
 
@@ -342,8 +354,8 @@ function poolCard(p, ethPrice) {
   ${recentEventsHtml ? `<div class="mini-events">${recentEventsHtml}</div>` : ''}
 
   <div class="pool-footer">
-    <div style="display:flex;gap:.4rem;align-items:center">
-      ${botStatus}${shortBadge}
+    <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+      ${botStatus}${heartbeatBadge}${shortBadge}
       <span class="badge badge--muted">${p.mode.toUpperCase()}</span>
       <span class="badge badge--muted">${chainName(p.chain_id)}</span>
     </div>
@@ -393,7 +405,7 @@ async function loadHlDetail(configId) {
 
   try {
     const d = await apiGet(`/admin/pool/${configId}/hl`);
-    contentEl.innerHTML = renderHlDetail(d);
+    contentEl.innerHTML = renderHlDetail(d, state.ethPrice);
     loadEl.classList.add('hidden');
     contentEl.classList.remove('hidden');
   } catch (e) {
@@ -404,7 +416,7 @@ async function loadHlDetail(configId) {
 }
 
 // ── HL detail content ──────────────────────────────────────────────────────
-function renderHlDetail(d) {
+function renderHlDetail(d, ethPrice = null) {
   const sections = [];
 
   // ── Active HL Position ──
@@ -417,9 +429,30 @@ function renderHlDetail(d) {
     const pos = d.hl_position;
     const pnlClass = pos.unrealized_pnl >= 0 ? 'green' : 'red';
     const roePct   = (pos.return_on_equity * 100).toFixed(2);
+
+    // Trail status: events are desc order, find if breakeven comes after last hedge_opened
+    const events      = d.events || [];
+    const openIdx     = events.findIndex(e => e.type === 'hedge_opened');
+    const trailActive = openIdx > 0 && events.slice(0, openIdx).some(e => e.type === 'breakeven');
+    const trailBadge  = `<span class="badge badge--${trailActive ? 'green' : 'muted'}">${trailActive ? '🛡️ Trail ACTIVO' : 'Trail inactivo'}</span>`;
+
+    // SL distance from native order trigger price
+    const slPx = d.hl_sl_order?.trigger_px || null;
+    let slDistHtml = '';
+    if (slPx && ethPrice) {
+      const distPct = ((slPx - ethPrice) / ethPrice * 100).toFixed(2);
+      const distUsd = (slPx - ethPrice).toFixed(2);
+      const distClass = Math.abs(distPct) < 1 ? 'red' : Math.abs(distPct) < 2 ? 'yellow' : 'green';
+      slDistHtml = `
+    <div class="hl-pos-item">
+      <span class="hl-pos-label">Distancia al SL</span>
+      <span class="hl-pos-val mono pool-val--${distClass}">+${distPct}% ($${distUsd})</span>
+    </div>`;
+    }
+
     sections.push(`
 <div class="detail-section">
-  <div class="detail-section-title">Posición Activa — Hyperliquid</div>
+  <div class="detail-section-title">Posición Activa — Hyperliquid ${trailBadge}</div>
   <div class="hl-pos-grid">
     <div class="hl-pos-item">
       <span class="hl-pos-label">Par</span>
@@ -458,6 +491,7 @@ function renderHlDetail(d) {
       <span class="hl-pos-label">Valor posición</span>
       <span class="hl-pos-val mono">$${fmtNum(pos.position_value)}</span>
     </div>
+    ${slDistHtml}
   </div>
   ${d.hl_margin?.account_value ? `
   <div class="hl-margin-bar">
@@ -466,6 +500,34 @@ function renderHlDetail(d) {
     <span>Exposición: <b>$${fmtNum(d.hl_margin.total_ntl_pos)}</b></span>
   </div>` : ''}
 </div>`);
+
+    // ── Native SL order status ──
+    const sl = d.hl_sl_order;
+    if (sl) {
+      sections.push(`
+<div class="detail-section">
+  <div class="detail-section-title">Stop-Loss Nativo — Hyperliquid</div>
+  <div class="hl-sl-row">
+    <span class="badge badge--green">✓ PROTEGIDO</span>
+    <span class="mono">Trigger: $${fmtNum(sl.trigger_px)}</span>
+    <span class="muted">·</span>
+    <span class="mono">${Math.abs(sl.size).toFixed(4)} ETH</span>
+    <span class="muted">·</span>
+    <span class="muted">condición: ${sl.trigger_cond || '—'}</span>
+    <span class="muted">·</span>
+    <span class="muted">oid: ${sl.oid}</span>
+  </div>
+</div>`);
+    } else {
+      sections.push(`
+<div class="detail-section">
+  <div class="detail-section-title">Stop-Loss Nativo — Hyperliquid</div>
+  <div class="hl-sl-row">
+    <span class="badge badge--red">⚠ SIN SL NATIVO</span>
+    <span class="muted">Solo protección por software (polling cada 30s). Implementar Opción A para cobertura nativa.</span>
+  </div>
+</div>`);
+    }
   } else if (!d.hl_error) {
     sections.push(`<div class="detail-section">
       <div class="detail-section-title">Posición Hyperliquid</div>
@@ -658,27 +720,31 @@ function chainName(id) {
 
 function evtLabel(type) {
   return {
-    started:       '🚀 Iniciado',
-    hedge_opened:  '🚨 Short abierto',
-    breakeven:     '🛡️ Breakeven',
-    tp_hit:        '🎯 TP alcanzado',
-    sl_hit:        '🛑 SL activado',
-    trailing_stop: '🛑 Trailing stop',
-    stopped:       '⏹ Detenido',
-    error:         '❌ Error',
+    started:               '🚀 Iniciado',
+    hedge_opened:          '🚨 Short abierto',
+    breakeven:             '🛡️ Breakeven',
+    tp_hit:                '🎯 TP alcanzado',
+    sl_hit:                '🛑 SL activado',
+    trailing_stop:         '🛑 Trailing stop',
+    bounds_refreshed:      '🔄 Rango actualizado',
+    reentry_guard_cleared: '🔓 Re-entry guard limpiado',
+    stopped:               '⏹ Detenido',
+    error:                 '❌ Error',
   }[type] || type;
 }
 
 function evtColor(type) {
   return {
-    started:       'muted',
-    hedge_opened:  'yellow',
-    breakeven:     'green',
-    tp_hit:        'green',
-    sl_hit:        'red',
-    trailing_stop: 'red',
-    stopped:       'muted',
-    error:         'red',
+    started:               'muted',
+    hedge_opened:          'yellow',
+    breakeven:             'green',
+    tp_hit:                'green',
+    sl_hit:                'red',
+    trailing_stop:         'red',
+    bounds_refreshed:      'muted',
+    reentry_guard_cleared: 'muted',
+    stopped:               'muted',
+    error:                 'red',
   }[type] || 'muted';
 }
 

@@ -26,11 +26,12 @@ async def _fetch_hl_data(wallet_addr: str) -> dict:
             from hyperliquid.info import Info
             from hyperliquid.utils import constants
             info = Info(constants.MAINNET_API_URL, skip_ws=True)
-            state = info.user_state(wallet_addr)
-            fills = info.user_fills(wallet_addr)
-            return {"state": state, "fills": fills[:30], "error": None}
+            state       = info.user_state(wallet_addr)
+            fills       = info.user_fills(wallet_addr)
+            open_orders = info.frontend_open_orders(wallet_addr)
+            return {"state": state, "fills": fills[:30], "open_orders": open_orders, "error": None}
         except Exception as e:
-            return {"state": None, "fills": [], "error": str(e)}
+            return {"state": None, "fills": [], "open_orders": [], "error": str(e)}
 
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _sync)
@@ -72,6 +73,28 @@ def _parse_margin_summary(state: dict) -> dict:
         "total_margin_used": float(ms.get("totalMarginUsed") or 0),
         "total_ntl_pos":     float(ms.get("totalNtlPos") or 0),
     }
+
+
+def _parse_sl_order(open_orders: list, coin: str = "ETH") -> dict | None:
+    """
+    Find the native stop-loss trigger order for a given coin.
+    For a short position, the SL fires when price rises above triggerPx
+    (triggerCondition == 'above'), reduce_only=True.
+    """
+    for o in open_orders:
+        if (o.get("coin", "").upper() == coin.upper()
+                and o.get("isTrigger")
+                and o.get("reduceOnly")):
+            return {
+                "oid":           o.get("oid"),
+                "trigger_px":    float(o.get("triggerPx") or 0),
+                "trigger_cond":  o.get("triggerCondition"),
+                "order_type":    o.get("orderType"),
+                "size":          float(o.get("sz") or 0),
+                "side":          o.get("side"),
+                "ts":            o.get("timestamp"),
+            }
+    return None
 
 
 # ── Stop all ───────────────────────────────────────────────────────────────
@@ -155,6 +178,8 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
             total_volume += config_volume
 
             running = cfg.id in manager._procs
+            hb = manager.last_seen(cfg.id)
+            last_heartbeat = hb.isoformat() if hb else None
 
             last_event_type = last_evt.event_type if last_evt else None
             if last_event_type == "hedge_opened" and running:
@@ -173,7 +198,8 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                 "active":       cfg.active,
                 "running":      running,
                 "hl_wallet_addr": cfg.hl_wallet_addr,
-                "created_at":   cfg.created_at.isoformat() if cfg.created_at else None,
+                "created_at":     cfg.created_at.isoformat() if cfg.created_at else None,
+                "last_heartbeat": last_heartbeat,
                 "last_event": {
                     "type":    last_evt.event_type,
                     "price":   float(last_evt.price_at_event) if last_evt.price_at_event else None,
@@ -274,10 +300,11 @@ async def pool_hl_detail(config_id: int, admin: str = Depends(get_current_admin)
     coin = cfg.pair.split("/")[0] if cfg.pair else "ETH"
 
     # Query HL if we have a wallet address
-    hl_position = None
-    hl_margin   = {}
-    hl_fills    = []
-    hl_error    = None
+    hl_position  = None
+    hl_margin    = {}
+    hl_fills     = []
+    hl_sl_order  = None
+    hl_error     = None
 
     if cfg.hl_wallet_addr:
         hl_data   = await _fetch_hl_data(cfg.hl_wallet_addr)
@@ -285,6 +312,7 @@ async def pool_hl_detail(config_id: int, admin: str = Depends(get_current_admin)
         if not hl_error:
             hl_position = _parse_hl_position(hl_data["state"], coin)
             hl_margin   = _parse_margin_summary(hl_data["state"])
+            hl_sl_order = _parse_sl_order(hl_data.get("open_orders", []), coin)
             # Format fills
             for f in hl_data.get("fills", []):
                 hl_fills.append({
@@ -297,6 +325,8 @@ async def pool_hl_detail(config_id: int, admin: str = Depends(get_current_admin)
                     "oid":   f.get("oid"),
                 })
 
+    hb = manager.last_seen(config_id)
+
     return {
         "config_id":      config_id,
         "pair":           cfg.pair,
@@ -304,8 +334,10 @@ async def pool_hl_detail(config_id: int, admin: str = Depends(get_current_admin)
         "hl_wallet_addr": cfg.hl_wallet_addr,
         "hl_position":    hl_position,
         "hl_margin":      hl_margin,
+        "hl_sl_order":    hl_sl_order,
         "hl_fills":       hl_fills,
         "hl_error":       hl_error,
+        "last_heartbeat": hb.isoformat() if hb else None,
         "events":         events_data,
     }
 

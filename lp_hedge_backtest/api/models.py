@@ -62,7 +62,7 @@ class BotEvent(Base):
     id            = Column(BigInteger, primary_key=True, autoincrement=True)
     config_id     = Column(Integer, ForeignKey("bot_configs.id", ondelete="CASCADE"), nullable=False)
     event_type    = Column(
-        Enum("started", "hedge_opened", "breakeven", "tp_hit", "sl_hit", "stopped", "error"),
+        Enum("started", "hedge_opened", "breakeven", "tp_hit", "sl_hit", "trailing_stop", "stopped", "error"),
         nullable=False,
     )
     price_at_event = Column(Numeric(20, 8), nullable=True)

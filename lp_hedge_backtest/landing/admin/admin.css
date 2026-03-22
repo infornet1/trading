@@ -209,6 +209,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
 }
 .hl-margin-bar b { color: var(--text); }
 
+/* ── Native SL order status row ──────────────────────────────────────── */
+.hl-sl-row {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .4rem .5rem; border-radius: 4px;
+  background: rgba(255,255,255,.03); font-size: .75rem;
+}
+
 /* ── Event history & fills tables ────────────────────────────────────── */
 .detail-table-wrap { overflow-x: auto; }
 .detail-table {
