@@ -1,5 +1,5 @@
 # VIZNAGO FURY — SaaS Option B: Hosted LP Hedge Bot Service
-> Architecture & Implementation Plan — v1.4 (2026-03-21)
+> Architecture & Implementation Plan — v1.5 (2026-03-21)
 > Status: **Steps 0–8.5 Complete · Step 8 (Unlock Protocol) + Step 9 (Telegram) Pending**
 
 ---
@@ -259,7 +259,11 @@ from environment variables (currently hardcoded). This is Step 2 of the build.
 
 ---
 
-### 8.2 Payment — Unlock Protocol NFT Key (crypto-native, no KYC)
+### 8.2 Payment — Unlock Protocol NFT Key on Arbitrum One
+
+**Network: Arbitrum One** — confirmed. Same network as users' LP pools and Uniswap v3
+positions. No bridging required — users pay subscriptions with the same wallet and USDC
+they already have on Arbitrum.
 
 Instead of a database subscription row, the user's plan is an **NFT sitting in their wallet**.
 Access is gated by on-chain NFT ownership — no payment database, no trust-the-server.
@@ -267,17 +271,18 @@ Access is gated by on-chain NFT ownership — no payment database, no trust-the-
 **How it works:**
 
 ```
-1. You deploy a "Lock" smart contract on Arbitrum (one-time, via Unlock dashboard)
-   → Starter Lock: 29 USDC / 30 days
-   → Pro Lock:     79 USDC / 30 days
+1. Deploy two "Lock" smart contracts on Arbitrum One (one-time, ~$0.10 total)
+   → Starter Lock: 29 USDC / 30 days  (contract address → STARTER_LOCK_ADDRESS in .env)
+   → Pro Lock:     79 USDC / 30 days  (contract address → PRO_LOCK_ADDRESS in .env)
+   Deploy via: app.unlock-protocol.com → Create Lock → select Arbitrum One
 
 2. User clicks "Subscribe" in dashboard
-   → Wallet prompts: approve 29 USDC → confirm
+   → Wallet prompts: approve 29 USDC on Arbitrum → confirm (~$0.01–$0.05 gas)
    → One transaction → NFT "Key" lands in their wallet
    → NFT shows: "VIZNAGO FURY — Starter — expires April 21 2026"
    → NFT has a Key ID (e.g. Key #42) — this IS their subscription identity
 
-3. API checks access (replaces tx_hash verification):
+3. API checks access on every sign-in (one on-chain call):
    lock.getHasValidKey(walletAddress) → true | false
    → true  → issue JWT with plan: starter
    → false → issue JWT with plan: free
@@ -285,21 +290,65 @@ Access is gated by on-chain NFT ownership — no payment database, no trust-the-
 4. Auto-renewal (optional):
    → User pre-approves contract to pull 29 USDC on expiry
    → Renews silently — no clicks, no support tickets
-   → Cancel = revoke the approval
+   → Cancel = revoke the ERC-20 approval. Done.
 ```
 
 **What Unlock Protocol handles vs what you build:**
 
 | Task | Owner |
 |---|---|
-| Collecting USDC | Unlock smart contract |
+| Collecting USDC on Arbitrum | Unlock smart contract |
 | Minting NFT Key to user | Unlock smart contract |
 | Expiry logic | Unlock smart contract |
 | Auto-renewal pulls | Unlock smart contract |
-| Withdrawing revenue to treasury | You (on-demand via Unlock UI) |
-| Checking if user has valid key | Your API (one `getHasValidKey()` call) |
+| Withdrawing revenue to your wallet | You (via Unlock UI or direct contract call) |
+| Checking if user has valid key | Your API — one `getHasValidKey()` call |
 
-**Cost:** ~$2–5 ETH gas to deploy Locks (one-time). Unlock Protocol takes 1% of subscription revenue (~$0.29 per Starter payment).
+---
+
+### 8.2.1 Cost Breakdown — Arbitrum One
+
+**One-time deployment (you pay once, ever):**
+
+| Action | Cost |
+|---|---|
+| Deploy Starter Lock contract | ~$0.03–$0.10 |
+| Deploy Pro Lock contract | ~$0.03–$0.10 |
+| **Total one-time** | **~$0.20** |
+
+**Per subscription payment (ongoing):**
+
+| Fee | Who pays | Starter | Pro |
+|---|---|---|---|
+| Unlock Protocol fee (1%) | Deducted from revenue | $0.29 | $0.79 |
+| Key purchase gas | User | ~$0.01–$0.05 | ~$0.01–$0.05 |
+| Revenue withdrawal gas | You | ~$0.01–$0.05 | ~$0.01–$0.05 |
+| Unlock Labs monthly platform fee | Nobody | **$0** | **$0** |
+
+**Net revenue per payment:**
+```
+Starter: $29.00 USDC collected → $28.71 to you (1% = $0.29 to Unlock DAO)
+Pro:     $79.00 USDC collected → $78.21 to you (1% = $0.79 to Unlock DAO)
+```
+
+The 1% protocol fee goes to the Unlock DAO treasury — partially burned as UP tokens.
+Not a SaaS fee. No company profits from it.
+
+**Compared to alternatives:**
+
+| Option | Fee | KYC | Privacy |
+|---|---|---|---|
+| **Unlock Protocol (Arbitrum)** | **1%** | **None** | **Full** |
+| Stripe | 2.9% + $0.30 | Business KYC | None |
+| Coinbase Commerce | 1% | Business KYC | None |
+| Manual tx_hash (original plan) | 0% | None | Full — but no auto-renewal |
+
+**Why Arbitrum is the right choice** (not Base, Polygon, or mainnet):
+- Users already have USDC on Arbitrum — zero bridging friction
+- Same wallet, same network as their Uniswap v3 LP positions
+- Low gas: key purchase costs users ~$0.01–$0.05
+- Native USDC (not bridged) — no wrapped token confusion
+- Ethereum L2 security guarantees (vs Polygon PoS)
 
 **Privacy:** No email, no KYC, no name. Wallet address + NFT Key ID = full identity.
 
@@ -652,8 +701,9 @@ Migration is low-friction:
 ## 14. Open Decisions (For Review)
 
 **Blocking Step 8 (Subscriptions):**
-- [ ] Deploy Starter Lock contract on Arbitrum → get contract address
-- [ ] Deploy Pro Lock contract on Arbitrum → get contract address
+- [x] Network confirmed: **Arbitrum One** (same network as users' LP pools)
+- [ ] Deploy Starter Lock on Arbitrum via app.unlock-protocol.com → add `STARTER_LOCK_ADDRESS` to `.env`
+- [ ] Deploy Pro Lock on Arbitrum via app.unlock-protocol.com → add `PRO_LOCK_ADDRESS` to `.env`
 - [ ] Confirm Starter plan price: $29 USDC/mo
 - [ ] Confirm Pro plan price: $79 USDC/mo
 - [ ] Free plan: monitor-only dashboard OR 7-day trial with 1 active bot?
