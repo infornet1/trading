@@ -56,16 +56,15 @@ import json
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv
 from web3 import Web3
 from eth_account import Account
 from hyperliquid.exchange import Exchange
 from hyperliquid.info import Info
 from hyperliquid.utils import constants
 
-load_dotenv()
-
 # ── Required ──────────────────────────────────────────────────────────────────
+# All config is injected via environment variables by BotManager (api/bot_manager.py).
+# This script must NOT be run directly — always launched by the API.
 HL_SECRET_KEY = os.getenv("HYPERLIQUID_SECRET_KEY")
 HL_ADDRESS    = os.getenv("HYPERLIQUID_ACCOUNT_ADDRESS")
 

@@ -50,17 +50,28 @@ class BotManager:
         if config_id in self._procs:
             return  # already running
 
+        # Build a clean environment — never inherit pool-specific vars from the
+        # parent process or any .env file. Only pass what the bot explicitly needs.
         env = {
-            **os.environ,
-            "HYPERLIQUID_SECRET_KEY":     config["hl_api_key"],
+            # System essentials
+            "PATH":             os.environ.get("PATH", "/usr/bin:/bin"),
+            "HOME":             os.environ.get("HOME", "/root"),
+            "LANG":             os.environ.get("LANG", "en_US.UTF-8"),
+            "PYTHONUNBUFFERED": "1",
+            # Global infrastructure (set at API level, safe to inherit)
+            "ARBITRUM_RPC_URL":   os.environ.get("ARBITRUM_RPC_URL",
+                                    "https://arb1.arbitrum.io/rpc"),
+            "EMAIL_CONFIG_PATH":  os.environ.get("EMAIL_CONFIG_PATH",
+                                    "/var/www/dev/trading/email_config.json"),
+            "EMAIL_RECIPIENTS":   os.environ.get("EMAIL_RECIPIENTS", ""),
+            # Per-bot config — sourced exclusively from DB, not from .env
+            "HYPERLIQUID_SECRET_KEY":      config["hl_api_key"],
             "HYPERLIQUID_ACCOUNT_ADDRESS": config["hl_wallet_addr"],
-            "UNISWAP_NFT_ID":   config["nft_token_id"],
-            "LOWER_BOUND":      config["lower_bound"],
-            "UPPER_BOUND":      config["upper_bound"],
-            "TRIGGER_OFFSET_PCT": str(abs(float(config["trigger_pct"]))),
-            "HEDGE_RATIO":      str(config["hedge_ratio"]),
-            "BOT_MODE":         config["mode"],
-            "CONFIG_ID":        str(config_id),
+            "UNISWAP_NFT_ID":              str(config["nft_token_id"]),
+            "TRIGGER_OFFSET_PCT":          str(abs(float(config["trigger_pct"]))),
+            "HEDGE_RATIO":                 str(config["hedge_ratio"]),
+            "BOT_MODE":                    config["mode"],
+            "CONFIG_ID":                   str(config_id),
         }
 
         proc = subprocess.Popen(
