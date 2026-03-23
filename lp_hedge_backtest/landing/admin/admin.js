@@ -58,6 +58,8 @@ function showContent() {
   document.getElementById('admin-wallet').textContent = shortAddr(p.sub || '');
   if (jwtIsAdmin(state.jwt)) {
     document.getElementById('btn-nuclear').classList.remove('hidden');
+    document.getElementById('btn-maintenance').classList.remove('hidden');
+    syncMaintenanceBtn();
   }
   renderRefreshControl();
 }
@@ -390,6 +392,17 @@ function poolCard(p, ethPrice, isHistorical = false) {
   </div>
 
   ${recentEventsHtml ? `<div class="mini-events">${recentEventsHtml}</div>` : ''}
+
+  <div class="pool-row pool-row--params">
+    <span class="pool-label">Params</span>
+    <span class="pool-val" style="font-size:.68rem;display:flex;gap:.5rem;flex-wrap:wrap">
+      <span title="Target leverage">${p.leverage ?? 10}x</span>
+      <span title="Stop Loss">SL ${p.sl_pct ?? 0.1}%</span>
+      ${p.tp_pct ? `<span title="Take Profit">TP ${p.tp_pct}%</span>` : ''}
+      <span title="Trailing Stop" style="color:${p.trailing_stop ? 'var(--green)' : 'var(--muted)'}">Trail ${p.trailing_stop ? '✓' : '✗'}</span>
+      <span title="Auto-rearm" style="color:${p.auto_rearm ? 'var(--green)' : 'var(--muted)'}">Rearm ${p.auto_rearm ? '✓' : '✗'}</span>
+    </span>
+  </div>
 
   <div class="pool-footer">
     <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
@@ -726,6 +739,59 @@ function planColor(plan) {
 }
 
 // ── Nuclear stop ───────────────────────────────────────────────────────────
+// ── Maintenance mode toggle ────────────────────────────────────────────────
+
+let _maintenanceActive = false;
+
+async function syncMaintenanceBtn() {
+  try {
+    const res  = await fetch(`${API_BASE}/status/maintenance`, { cache: 'no-store' });
+    const data = await res.json();
+    _maintenanceActive = data.maintenance;
+    _updateMaintenanceBtn();
+  } catch (_) {}
+}
+
+function _updateMaintenanceBtn() {
+  const btn = document.getElementById('btn-maintenance');
+  if (!btn) return;
+  if (_maintenanceActive) {
+    btn.textContent = '🔧 Maintenance: ON';
+    btn.classList.add('btn-maintenance--active');
+  } else {
+    btn.textContent = '🔧 Maintenance: OFF';
+    btn.classList.remove('btn-maintenance--active');
+  }
+}
+
+async function toggleMaintenance() {
+  const enable  = !_maintenanceActive;
+  const message = enable
+    ? prompt(
+        'Maintenance message (shown to users):',
+        'Protection bots temporarily suspended for a scheduled upgrade. Re-enable your protection after the update.'
+      )
+    : '';
+  if (enable && message === null) return; // user cancelled prompt
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/maintenance`, {
+      method:  'POST',
+      headers: { Authorization: `Bearer ${state.jwt}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ active: enable, message: message || '' }),
+    });
+    const d = await res.json();
+    _maintenanceActive = d.maintenance;
+    _updateMaintenanceBtn();
+    alert(enable
+      ? `✅ Maintenance mode ON. Users will see the amber banner.`
+      : `✅ Maintenance mode OFF. Banner hidden.`
+    );
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
 async function nuclearStop() {
   if (!confirm('¿Detener TODOS los bots? Esta acción es irreversible hasta reinicio manual.')) return;
   try {
