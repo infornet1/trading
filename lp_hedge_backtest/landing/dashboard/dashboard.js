@@ -567,17 +567,13 @@ async function fetchPositions() {
 
 async function fetchLivePrices() {
   try {
-    // CoinGecko free API — no key required for basic price endpoint
-    const res = await fetch(
-      'https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin&vs_currencies=usd',
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!res.ok) throw new Error('CoinGecko HTTP ' + res.status);
+    const res = await fetch(API_BASE + '/prices', { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error('Price API HTTP ' + res.status);
     const data = await res.json();
     state.prices.eth = data?.ethereum?.usd ?? null;
     state.prices.btc = data?.bitcoin?.usd   ?? null;
   } catch (err) {
-    console.warn('Price fetch failed (CoinGecko):', err.message);
+    console.warn('Price fetch failed:', err.message);
     // Silently fail — ticker will show last known value
   }
   renderPriceTicker();
@@ -1877,7 +1873,7 @@ window.resetTradingPanelDefaults = function (tokenId) {
 // Maintenance banner — checked once on dashboard load
 async function checkMaintenanceStatus() {
   try {
-    const res = await fetch('/status/maintenance', { cache: 'no-store' });
+    const res = await fetch(API_BASE + '/status/maintenance', { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json();
     const banner = document.getElementById('maintenance-banner');

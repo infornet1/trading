@@ -122,9 +122,7 @@ async function apiGet(path) {
 // ── Price fetch (CoinGecko free) ───────────────────────────────────────────
 async function fetchEthPrice() {
   try {
-    const r = await fetch(
-      'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
-    );
+    const r = await fetch(API_BASE + '/prices');
     const d = await r.json();
     state.ethPrice = d?.ethereum?.usd || null;
   } catch { /* keep last known price */ }

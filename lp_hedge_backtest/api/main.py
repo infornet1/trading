@@ -4,8 +4,11 @@ FastAPI app on port 8001.
 """
 
 import os
+import time
+import asyncio
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
@@ -151,3 +154,30 @@ async def set_maintenance(
         except FileNotFoundError:
             pass
     return {"maintenance": enable, "message": message}
+
+
+# ── Price proxy (avoids CORS + rate-limit exposure on the client) ─────────
+_price_cache: dict = {"data": None, "ts": 0.0}
+_PRICE_TTL = 30  # seconds
+
+
+@app.get("/prices")
+async def get_prices():
+    """Server-side proxy for CoinGecko prices — cached 30 s to avoid rate limits."""
+    now = time.monotonic()
+    if _price_cache["data"] and now - _price_cache["ts"] < _PRICE_TTL:
+        return _price_cache["data"]
+
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin&vs_currencies=usd"
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(url)
+            r.raise_for_status()
+            _price_cache["data"] = r.json()
+            _price_cache["ts"]   = now
+            return _price_cache["data"]
+    except Exception as e:
+        # Return last cached value if available, else empty
+        if _price_cache["data"]:
+            return _price_cache["data"]
+        return {"ethereum": {"usd": None}, "bitcoin": {"usd": None}}

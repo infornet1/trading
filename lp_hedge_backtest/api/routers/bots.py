@@ -233,6 +233,46 @@ async def delete_bot(
     await db.commit()
 
 
+@router.get("/hl-balance")
+async def hl_balance(
+    address: str = Depends(get_current_address),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns the live Hyperliquid margin balance for the authenticated user's
+    HL wallet address (sourced from any of their bot configs).
+    Used by the trading panel margin calculator.
+    """
+    result = await db.execute(
+        select(BotConfig)
+        .where(BotConfig.user_address == address)
+        .where(BotConfig.hl_wallet_addr.isnot(None))
+        .limit(1)
+    )
+    cfg = result.scalar_one_or_none()
+    if not cfg or not cfg.hl_wallet_addr:
+        return {"account_value": None, "total_margin_used": None, "error": "no_hl_wallet"}
+
+    def _sync():
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+            info  = Info(constants.MAINNET_API_URL, skip_ws=True)
+            state = info.user_state(cfg.hl_wallet_addr)
+            ms    = state.get("marginSummary", {})
+            return {
+                "account_value":     float(ms.get("accountValue")     or 0),
+                "total_margin_used": float(ms.get("totalMarginUsed")  or 0),
+                "error": None,
+            }
+        except Exception as e:
+            return {"account_value": None, "total_margin_used": None, "error": str(e)}
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _sync)
+
+
 @router.get("/{config_id}", response_model=BotConfigOut)
 async def get_bot(
     config_id: int,
@@ -330,46 +370,6 @@ async def start_bot(
     cfg.active = True
     await db.commit()
     return {"status": "started"}
-
-
-@router.get("/hl-balance")
-async def hl_balance(
-    address: str = Depends(get_current_address),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Returns the live Hyperliquid margin balance for the authenticated user's
-    HL wallet address (sourced from any of their bot configs).
-    Used by the trading panel margin calculator.
-    """
-    result = await db.execute(
-        select(BotConfig)
-        .where(BotConfig.user_address == address)
-        .where(BotConfig.hl_wallet_addr.isnot(None))
-        .limit(1)
-    )
-    cfg = result.scalar_one_or_none()
-    if not cfg or not cfg.hl_wallet_addr:
-        return {"account_value": None, "total_margin_used": None, "error": "no_hl_wallet"}
-
-    def _sync():
-        try:
-            from hyperliquid.info import Info
-            from hyperliquid.utils import constants
-            info  = Info(constants.MAINNET_API_URL, skip_ws=True)
-            state = info.user_state(cfg.hl_wallet_addr)
-            ms    = state.get("marginSummary", {})
-            return {
-                "account_value":     float(ms.get("accountValue")     or 0),
-                "total_margin_used": float(ms.get("totalMarginUsed")  or 0),
-                "error": None,
-            }
-        except Exception as e:
-            return {"account_value": None, "total_margin_used": None, "error": str(e)}
-
-    import asyncio
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _sync)
 
 
 @router.post("/{config_id}/stop", status_code=status.HTTP_200_OK)
