@@ -1442,13 +1442,25 @@ function buildProtectionDrawer(pos) {
         <!-- Hedge Size (slider) -->
         <div class="tp-slider-row">
           <div class="tp-slider-header">
-            <span class="tp-slider-label">Tamaño de Cobertura</span>
+            <span class="tp-slider-label">
+              Tamaño de Cobertura
+              <span class="tp-info-anchor" tabindex="0" aria-label="Qué es esto">❓
+                <span class="tp-info-popover">
+                  <strong>% de tu exposición máxima ETH que el bot cubrirá con un short.</strong><br><br>
+                  Cuando el precio cae a tu límite inferior, tu LP pasa a ser 100% ETH (IL máximo).
+                  El bot abre un short equivalente a este porcentaje de ese ETH para compensar.<br><br>
+                  <span style="color:#00d4ff">50%</span> → mitad cubierta, menor costo de margen.<br>
+                  <span style="color:#00d4ff">100%</span> → cobertura total, mayor margen requerido.
+                </span>
+              </span>
+            </span>
             <span class="tp-slider-value" id="tp-hedge-val-${tokenId}">${hedgeVal}%</span>
           </div>
           <input type="range" class="tp-slider" id="prot-hedge-${tokenId}"
                  min="10" max="100" step="5" value="${hedgeVal}"
                  oninput="onTradingPanelChange('${tokenId}')" />
           <div class="tp-slider-range-labels"><span>10%</span><span>100%</span></div>
+          <div class="tp-hedge-sublabel" id="tp-hedge-sub-${tokenId}">calculando…</div>
         </div>
 
         <!-- Leverage slider -->
@@ -1753,9 +1765,22 @@ function _updateMarginBox(tokenId, pos) {
   const availEl = document.getElementById(`tp-mb-avail-${tokenId}`);
   const rowEl   = document.getElementById(`tp-mb-avail-row-${tokenId}`);
   const capEl   = document.getElementById(`tp-capital-${tokenId}`);
+  const subEl   = document.getElementById(`tp-hedge-sub-${tokenId}`);
 
   if (capEl)  capEl.textContent  = notional > 0 ? `$${notional.toFixed(2)}` : '—';
   if (reqEl)  reqEl.textContent  = reqMargin > 0 ? `$${reqMargin.toFixed(2)}` : '—';
+
+  // Live hedge sub-label: show actual ETH and USD amounts
+  if (subEl) {
+    const hedgeEth = xMax * hedgeRatio;
+    if (hedgeEth > 0 && price > 0) {
+      subEl.textContent = `≈ ${hedgeEth.toFixed(4)} ETH  ≈  $${(hedgeEth * price).toFixed(2)} al precio actual`;
+      subEl.classList.remove('tp-hedge-sublabel--empty');
+    } else {
+      subEl.textContent = 'calculando…';
+      subEl.classList.add('tp-hedge-sublabel--empty');
+    }
+  }
 
   const bal = _hlBalanceCache?.account_value;
   if (balEl) {

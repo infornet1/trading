@@ -1198,6 +1198,64 @@
   color: var(--color-text-muted);
 }
 
+/* ❓ Info tooltip anchor + popover */
+.tp-info-anchor {
+  display: inline-block;
+  font-size: 0.6rem;
+  cursor: pointer;
+  margin-left: 4px;
+  vertical-align: middle;
+  position: relative;
+  line-height: 1;
+}
+.tp-info-popover {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  background: #1a1f2e;
+  border: 1px solid rgba(0,212,255,0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  z-index: 200;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  pointer-events: none;
+  white-space: normal;
+}
+.tp-info-popover::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(0,212,255,0.25);
+}
+.tp-info-anchor:hover .tp-info-popover,
+.tp-info-anchor:focus .tp-info-popover {
+  display: block;
+}
+
+/* Hedge size live sub-label */
+.tp-hedge-sublabel {
+  font-size: 0.65rem;
+  color: var(--color-neon-cyan);
+  margin-top: 5px;
+  letter-spacing: 0.02em;
+}
+.tp-hedge-sublabel--empty {
+  color: var(--color-text-muted);
+}
+
 /* Slider rows */
 .tp-slider-row {
   margin-bottom: 14px;
