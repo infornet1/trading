@@ -14,9 +14,7 @@
 
   // ── Language ─────────────────────────────────────────────────────────────
   function getLang() {
-    const stored = localStorage.getItem(LANG_KEY);
-    if (stored) return stored;
-    return (navigator.language || navigator.userLanguage || 'es').startsWith('en') ? 'en' : 'es';
+    return localStorage.getItem(LANG_KEY) || 'es';
   }
 
   const L = {
