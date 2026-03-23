@@ -50,8 +50,8 @@
           <a href="#strategies" class="btn btn-primary">
             &#9654;&nbsp; <span data-i18n="hero.btn.explore">Explorar Estrategias</span>
           </a>
-          <a href="#how-it-works" class="btn btn-outline">
-            &#128196;&nbsp; <span data-i18n="hero.btn.howto">Cómo Funciona</span>
+          <a href="#bot-explainer" class="btn btn-outline">
+            &#128737;&nbsp; <span data-i18n="hero.btn.howto">Cómo Funciona</span>
           </a>
         </div>
       </div>
@@ -190,6 +190,143 @@
         </div>
       </div>
     </div>
+  </section>
+
+  <hr class="divider" />
+
+
+  <!-- ============================================================
+       DELTA BOT DEFENSOR — INTERACTIVE EXPLAINER
+  ============================================================ -->
+  <section id="bot-explainer">
+    <div class="container">
+
+      <div class="section-label" data-i18n="bot.label">Delta Bot Defensor</div>
+      <h2 class="section-title text-gradient" data-i18n="bot.title">¿Cómo Te Protege el Bot?</h2>
+      <p class="section-desc text-muted" data-i18n="bot.desc">
+        Cuando el precio de ETH cae fuera de tu rango de liquidez, el bot abre automáticamente un SHORT en
+        Hyperliquid para compensar la pérdida impermanente. Mira la simulación en tiempo real y experimenta
+        con el slider para entenderlo de forma intuitiva.
+      </p>
+
+      <!-- ── Part 1: Animated chart + live stats ── -->
+      <div class="explainer-split">
+
+        <!-- Canvas chart -->
+        <div class="chart-wrap">
+          <div style="font-family:'Orbitron',sans-serif;font-size:0.58rem;letter-spacing:0.18em;color:var(--color-text-muted);text-transform:uppercase;margin-bottom:12px;" data-i18n="bot.chart.title">Simulación Animada en Vivo</div>
+          <canvas id="bot-chart"></canvas>
+          <div class="bot-status-row">
+            <span id="bot-status-pill" class="bot-status-pill bot-status-pill--idle">● Monitoring...</span>
+            <span style="font-size:0.68rem;color:var(--color-text-muted);" data-i18n="bot.chart.loop">↺ Loop automático</span>
+          </div>
+        </div>
+
+        <!-- Live stat cards -->
+        <div class="explainer-stats">
+          <div class="explainer-stat-card" id="ecard-lp">
+            <div class="explainer-stat-label" data-i18n="bot.stat.lp">Valor Posición LP</div>
+            <div class="explainer-stat-value" id="estat-lp" style="color:var(--color-neon-green);">$10,000</div>
+            <div class="explainer-stat-note" id="estat-lp-note" data-i18n="bot.stat.lp.note">En rango — acumulando comisiones</div>
+          </div>
+          <div class="explainer-stat-card" id="ecard-hedge">
+            <div class="explainer-stat-label" data-i18n="bot.stat.hedge">P&amp;G Cobertura SHORT</div>
+            <div class="explainer-stat-value" id="estat-hedge" style="color:var(--color-text-muted);">$0</div>
+            <div class="explainer-stat-note" id="estat-hedge-note" data-i18n="bot.stat.hedge.note">Bot inactivo — precio en rango</div>
+          </div>
+          <div class="explainer-stat-card">
+            <div class="explainer-stat-label" data-i18n="bot.stat.net">Resultado Neto</div>
+            <div class="explainer-stat-value" id="estat-net" style="color:var(--color-neon-cyan);">$10,000</div>
+            <div class="explainer-stat-note" data-i18n="bot.stat.net.note">LP + Cobertura combinados</div>
+          </div>
+        </div>
+
+      </div><!-- /explainer-split -->
+
+      <!-- ── Part 2: Interactive simulator ── -->
+      <div class="sim-panel">
+        <div class="sim-header">
+          <div>
+            <div class="sim-title" data-i18n="bot.sim.title">SIMULADOR INTERACTIVO</div>
+            <div class="sim-subtitle" data-i18n="bot.sim.sub">Arrastra el slider para ver cómo responde el bot a cada precio</div>
+          </div>
+          <div class="sim-price-badge">
+            <div class="sim-price-label" data-i18n="bot.sim.eth">Precio ETH</div>
+            <div class="sim-price-display" id="sim-price-display">$2,100</div>
+          </div>
+        </div>
+
+        <div class="sim-slider-wrap">
+          <input type="range" class="sim-slider" id="sim-slider"
+                 min="800" max="2800" value="2100" step="10"
+                 oninput="updateSim(+this.value)" />
+        </div>
+        <div class="sim-range-labels">
+          <span>$800</span>
+          <span class="lbl-lower">▲ Lower $1,800</span>
+          <span class="lbl-upper">▲ Upper $2,400</span>
+          <span>$2,800</span>
+        </div>
+
+        <div class="sim-meters">
+          <div class="sim-meter" id="sim-lp-meter">
+            <div class="sim-meter-label" data-i18n="bot.sim.lp">Posición LP</div>
+            <div class="sim-meter-value" id="sim-lp-val" style="color:var(--color-neon-green);">$10,000</div>
+            <div class="sim-meter-delta" id="sim-lp-delta" style="color:var(--color-neon-green);">En rango ✓</div>
+          </div>
+          <div class="sim-meter" id="sim-hedge-meter">
+            <div class="sim-meter-label" data-i18n="bot.sim.hedge">Cobertura SHORT</div>
+            <div class="sim-meter-value" id="sim-hedge-val" style="color:var(--color-text-muted);">Inactivo</div>
+            <div class="sim-meter-delta" id="sim-hedge-delta" style="color:var(--color-text-muted);">Bot en espera</div>
+          </div>
+          <div class="sim-meter" id="sim-net-meter">
+            <div class="sim-meter-label" data-i18n="bot.sim.net">Resultado Neto</div>
+            <div class="sim-meter-value" id="sim-net-val" style="color:var(--color-neon-cyan);">$10,000</div>
+            <div class="sim-meter-delta" id="sim-net-delta" style="color:var(--color-neon-green);">vs Sin Cobertura: igual</div>
+          </div>
+        </div>
+        <div class="sim-footnote" data-i18n="bot.sim.note">
+          * Simulación simplificada. Capital LP: $10,000 · Rango ETH: $1,800–$2,400 · Ratio cobertura: 80%
+        </div>
+      </div><!-- /sim-panel -->
+
+      <!-- ── Part 3: Bot lifecycle ── -->
+      <div class="lifecycle-title-row">
+        <div class="lifecycle-section-title" data-i18n="bot.lifecycle.title">CICLO DE VIDA DEL BOT</div>
+      </div>
+      <div class="lifecycle-grid">
+
+        <div class="lifecycle-card">
+          <div class="lifecycle-num">01</div>
+          <div class="lifecycle-icon">⚙️</div>
+          <div class="lifecycle-card-title" data-i18n="bot.lc.01.title">Configurar</div>
+          <div class="lifecycle-card-desc" data-i18n="bot.lc.01.desc">Defines tu rango LP, ratio de cobertura, apalancamiento y stop-loss. El bot aprende los parámetros de tu estrategia.</div>
+        </div>
+
+        <div class="lifecycle-card">
+          <div class="lifecycle-num">02</div>
+          <div class="lifecycle-icon">👁️</div>
+          <div class="lifecycle-card-title" data-i18n="bot.lc.02.title">Vigilar</div>
+          <div class="lifecycle-card-desc" data-i18n="bot.lc.02.desc">Precio dentro del rango. El LP acumula comisiones de trading. El bot monitorea el precio cada 30 segundos — sin acción necesaria.</div>
+        </div>
+
+        <div class="lifecycle-card lifecycle-card--trigger">
+          <div class="lifecycle-num lifecycle-num--trigger">03</div>
+          <div class="lifecycle-icon">⚡</div>
+          <div class="lifecycle-card-title" data-i18n="bot.lc.03.title">Disparar</div>
+          <div class="lifecycle-card-desc" data-i18n="bot.lc.03.desc">Precio sale del rango. El bot abre automáticamente un SHORT en Hyperliquid. La cobertura entra en acción al instante.</div>
+        </div>
+
+        <div class="lifecycle-card lifecycle-card--recover">
+          <div class="lifecycle-num lifecycle-num--recover">04</div>
+          <div class="lifecycle-icon">🔄</div>
+          <div class="lifecycle-card-title" data-i18n="bot.lc.04.title">Recuperar</div>
+          <div class="lifecycle-card-desc" data-i18n="bot.lc.04.desc">Precio vuelve al rango. El SHORT se cierra con ganancia. Auto-rearm activo: el bot se resetea y vuelve al paso 02.</div>
+        </div>
+
+      </div><!-- /lifecycle-grid -->
+
+    </div><!-- /container -->
   </section>
 
   <hr class="divider" />
@@ -375,12 +512,305 @@
       <div class="footer-links">
         <a href="#strategies" class="footer-link" data-i18n="footer.strategies">Estrategias</a>
         <a href="#metrics"    class="footer-link" data-i18n="footer.metrics">Métricas</a>
-        <a href="#how-it-works" class="footer-link" data-i18n="footer.docs">Docs</a>
+        <a href="#bot-explainer" class="footer-link" data-i18n="footer.docs">Docs</a>
       </div>
     </div>
   </footer>
 
   <script src="i18n.js"></script>
+
+  <!-- ── Delta Bot Defensor: animated chart + sim ──────────────────── -->
+  <script>
+  /* ────────────────────────────────────────────────────────────────────
+     ANIMATED CHART
+     Phases: idle (in-range) → trigger (drops) → active (below) → close
+  ──────────────────────────────────────────────────────────────────── */
+  (function () {
+    const canvas = document.getElementById('bot-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const P_LOWER   = 1800, P_UPPER = 2400;
+    const P_MIN     = 900,  P_MAX   = 2900;
+    const CAPITAL   = 10000;
+    const HEDGE_R   = 0.8;
+    const HIST_MAX  = 130;
+
+    // Each phase: duration (ms), target price, status class, label
+    const PHASES = [
+      { ms: 3200, price: 2100, cls: 'idle',    lbl: '● Monitoring...' },
+      { ms: 1400, price: 1550, cls: 'trigger', lbl: '⚡ Hedge Triggered' },
+      { ms: 3800, price: 1280, cls: 'active',  lbl: '🛡 Hedge Active' },
+      { ms: 2200, price: 2060, cls: 'close',   lbl: '✓ Short Closed' },
+    ];
+
+    let phaseIdx       = 0;
+    let phaseStart     = 0;
+    let phaseStartP    = PHASES[0].price;
+    let firstFrame     = true;
+    let priceHistory   = [];
+    let W = 0, H = 0;
+
+    function ease(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+    function getPrice(now) {
+      if (firstFrame) { phaseStart = now; firstFrame = false; }
+      let elapsed = now - phaseStart;
+      if (elapsed >= PHASES[phaseIdx].ms) {
+        phaseStartP = PHASES[phaseIdx].price;
+        phaseIdx    = (phaseIdx + 1) % PHASES.length;
+        phaseStart  = now;
+        elapsed     = 0;
+      }
+      const t    = elapsed / PHASES[phaseIdx].ms;
+      const base = phaseStartP + (PHASES[phaseIdx].price - phaseStartP) * ease(Math.min(t, 1));
+      // Add subtle oscillation in idle / active phases
+      const osc = (phaseIdx === 0 ? 35 : phaseIdx === 2 ? 18 : 0);
+      return base + osc * Math.sin(now * 0.0018);
+    }
+
+    function toY(p) { return H - ((p - P_MIN) / (P_MAX - P_MIN)) * H; }
+
+    function resize() {
+      const dpr  = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      W = rect.width; H = rect.height;
+      canvas.width  = W * dpr;
+      canvas.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      priceHistory = [];
+    }
+
+    function draw(now) {
+      ctx.clearRect(0, 0, W, H);
+
+      // background
+      ctx.fillStyle = '#071428';
+      ctx.fillRect(0, 0, W, H);
+
+      const yU = toY(P_UPPER), yL = toY(P_LOWER);
+
+      // LP range band
+      ctx.fillStyle = 'rgba(201,168,76,0.1)';
+      ctx.fillRect(0, yU, W, yL - yU);
+
+      // Range boundary lines
+      ctx.setLineDash([4, 5]);
+      ctx.strokeStyle = 'rgba(201,168,76,0.45)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, yU); ctx.lineTo(W, yU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, yL); ctx.lineTo(W, yL); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Range labels
+      ctx.font = '10px monospace';
+      ctx.fillStyle = 'rgba(201,168,76,0.65)';
+      ctx.fillText('▲ UPPER  $2,400', 8, yU - 5);
+      ctx.fillText('▼ LOWER  $1,800', 8, yL + 13);
+
+      // "Earning Fees" label inside range
+      ctx.font = '9px monospace';
+      ctx.fillStyle = 'rgba(0,255,179,0.35)';
+      ctx.fillText('◈ EARNING FEES', 8, (yU + yL) / 2 + 3);
+
+      // Current price + history
+      const price = getPrice(now);
+      priceHistory.push(price);
+      if (priceHistory.length > HIST_MAX) priceHistory.shift();
+
+      const below = price < P_LOWER;
+      const lineColor = below ? '#ffd600' : '#00d4ff';
+
+      if (priceHistory.length > 1) {
+        const step   = W / (HIST_MAX - 1);
+        const startX = W - (priceHistory.length - 1) * step;
+
+        ctx.shadowColor = lineColor;
+        ctx.shadowBlur  = 6;
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth   = 2;
+        ctx.beginPath();
+        priceHistory.forEach((p, i) => {
+          const x = startX + i * step;
+          i === 0 ? ctx.moveTo(x, toY(p)) : ctx.lineTo(x, toY(p));
+        });
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Price dot
+        const dotY = toY(price);
+        ctx.beginPath();
+        ctx.arc(W - 3, dotY, 5, 0, Math.PI * 2);
+        ctx.fillStyle   = lineColor;
+        ctx.shadowColor = lineColor;
+        ctx.shadowBlur  = 14;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Price label
+        const labelY = dotY + (below ? -10 : 16);
+        ctx.font      = 'bold 11px monospace';
+        ctx.fillStyle = lineColor;
+        ctx.fillText('$' + Math.round(price).toLocaleString(), W - 72, labelY);
+
+        // Below-range: hedge activation label
+        if (below) {
+          ctx.font      = '9px monospace';
+          ctx.fillStyle = 'rgba(255,214,0,0.55)';
+          ctx.fillText('⚡ SHORT ACTIVE', 8, yL + 30);
+        }
+      }
+
+      // Update status pill
+      const phase = PHASES[phaseIdx];
+      const pill  = document.getElementById('bot-status-pill');
+      if (pill && pill.textContent !== phase.lbl) {
+        pill.textContent = phase.lbl;
+        pill.className   = 'bot-status-pill bot-status-pill--' + phase.cls;
+      }
+
+      // Update live stat cards
+      const lpVal   = price >= P_LOWER ? CAPITAL : CAPITAL * (price / P_LOWER);
+      const lpLoss  = CAPITAL - lpVal;
+      const hedgeOn = price < P_LOWER;
+      const hedgeG  = hedgeOn ? lpLoss * HEDGE_R : 0;
+      const netVal  = lpVal + hedgeG;
+      const fmt     = v => '$' + Math.round(v).toLocaleString();
+
+      const el = id => document.getElementById(id);
+      if (el('estat-lp')) {
+        el('estat-lp').textContent      = fmt(lpVal);
+        el('estat-lp').style.color      = hedgeOn ? '#ffd600' : 'var(--color-neon-green)';
+        el('estat-lp-note').textContent = hedgeOn
+          ? `Fuera de rango — pérdida: -$${Math.round(lpLoss).toLocaleString()}`
+          : 'En rango — acumulando comisiones';
+      }
+      if (el('estat-hedge')) {
+        el('estat-hedge').textContent      = hedgeOn ? '+' + fmt(hedgeG) : '$0';
+        el('estat-hedge').style.color      = hedgeOn ? 'var(--color-neon-green)' : 'var(--color-text-muted)';
+        el('estat-hedge-note').textContent = hedgeOn ? 'SHORT activo — compensando pérdida' : 'Bot inactivo — precio en rango';
+      }
+      if (el('estat-net')) {
+        el('estat-net').textContent = fmt(netVal);
+        el('estat-net').style.color = netVal >= CAPITAL * 0.96 ? 'var(--color-neon-cyan)' : 'var(--color-neon-green)';
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+    requestAnimationFrame(draw);
+  })();
+
+  /* ────────────────────────────────────────────────────────────────────
+     INTERACTIVE SIMULATOR
+  ──────────────────────────────────────────────────────────────────── */
+  function updateSim(price) {
+    const P_LOWER = 1800, P_UPPER = 2400;
+    const MIN = 800, MAX = 2800;
+    const CAPITAL = 10000, HEDGE_R = 0.8;
+    const el  = id => document.getElementById(id);
+    const fmt = v  => '$' + Math.round(v).toLocaleString();
+    const pct = v  => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+
+    // Update price display
+    const below  = price < P_LOWER;
+    const above  = price > P_UPPER;
+    const inRng  = !below && !above;
+    const priceEl = el('sim-price-display');
+    if (priceEl) {
+      priceEl.textContent = fmt(price);
+      priceEl.style.color = below ? '#ffd600' : above ? 'var(--color-neon-green)' : 'var(--color-neon-cyan)';
+    }
+
+    // Slider track: dark | gold range band | green above
+    const slider  = el('sim-slider');
+    const valPct  = ((price - MIN) / (MAX - MIN)) * 100;
+    const loPct   = ((P_LOWER - MIN) / (MAX - MIN)) * 100;   // 50%
+    const hiPct   = ((P_UPPER - MIN) / (MAX - MIN)) * 100;   // 80%
+    const thumbC  = below ? '#ffd600' : above ? '#00ffb3' : '#00d4ff';
+    if (slider) {
+      slider.style.background =
+        `linear-gradient(to right,` +
+        `#1a2a3a 0%, #1a2a3a ${loPct}%,` +
+        `rgba(201,168,76,0.35) ${loPct}%, rgba(201,168,76,0.35) ${hiPct}%,` +
+        `rgba(0,255,179,0.2) ${hiPct}%, rgba(0,255,179,0.2) 100%)`;
+      // Also update thumb glow via CSS variable trick (re-apply inline style on pseudo won't work,
+      // but the color change on the display above is sufficient visual feedback)
+    }
+
+    // LP value calculation (Uniswap v3 simplified)
+    let lpVal, lpNote, lpColor;
+    if (inRng) {
+      lpVal   = CAPITAL;
+      lpNote  = 'En rango ✓ — acumulando comisiones';
+      lpColor = 'var(--color-neon-green)';
+    } else if (below) {
+      // Below range: all in ETH, value tracks price proportionally
+      lpVal   = CAPITAL * (price / P_LOWER);
+      lpNote  = `Pérdida Impermanente: ${pct(((lpVal / CAPITAL) - 1) * 100)}`;
+      lpColor = '#ffd600';
+    } else {
+      // Above range: all in USDC, capped upside
+      lpVal   = CAPITAL * (P_UPPER / price);
+      lpNote  = `Sobre rango — todo en USDC`;
+      lpColor = 'var(--color-neon-green)';
+    }
+
+    // Hedge (only active below range)
+    let hedgeVal, hedgeNote, hedgeColor;
+    if (below) {
+      const lpLoss = CAPITAL - lpVal;
+      hedgeVal  = lpLoss * HEDGE_R;
+      hedgeNote = `Compensando ${(HEDGE_R * 100).toFixed(0)}% de la pérdida`;
+      hedgeColor = 'var(--color-neon-green)';
+    } else {
+      hedgeVal  = 0;
+      hedgeNote = above ? 'Bot inactivo — sobre rango' : 'Bot en espera';
+      hedgeColor = 'var(--color-text-muted)';
+    }
+
+    const netVal  = lpVal + hedgeVal;
+    const saving  = hedgeVal;
+    let netNote, netColor;
+    if (below) {
+      const savPct = ((saving / CAPITAL) * 100).toFixed(1);
+      netNote  = `vs Sin Cobertura: protegido +$${Math.round(saving).toLocaleString()}`;
+      netColor = netVal >= CAPITAL * 0.92 ? 'var(--color-neon-cyan)' : 'var(--color-neon-green)';
+    } else {
+      netNote  = 'vs Sin Cobertura: igual';
+      netColor = 'var(--color-neon-cyan)';
+    }
+
+    // Render meters
+    if (el('sim-lp-val')) {
+      el('sim-lp-val').textContent   = fmt(lpVal);
+      el('sim-lp-val').style.color   = lpColor;
+      el('sim-lp-delta').textContent = lpNote;
+      el('sim-lp-delta').style.color = lpColor;
+      el('sim-lp-meter').style.borderColor = below ? 'rgba(255,214,0,0.35)' : above ? 'rgba(0,255,179,0.3)' : 'var(--color-border)';
+    }
+    if (el('sim-hedge-val')) {
+      el('sim-hedge-val').textContent   = hedgeVal > 0 ? '+' + fmt(hedgeVal) : 'Inactivo';
+      el('sim-hedge-val').style.color   = hedgeColor;
+      el('sim-hedge-delta').textContent = hedgeNote;
+      el('sim-hedge-delta').style.color = hedgeColor;
+      el('sim-hedge-meter').style.borderColor = hedgeVal > 0 ? 'rgba(0,255,179,0.35)' : 'var(--color-border)';
+    }
+    if (el('sim-net-val')) {
+      el('sim-net-val').textContent   = fmt(netVal);
+      el('sim-net-val').style.color   = netColor;
+      el('sim-net-delta').textContent = netNote;
+      el('sim-net-delta').style.color = netColor;
+      el('sim-net-meter').style.borderColor = 'rgba(0,212,255,0.2)';
+    }
+  }
+
+  // Initialize slider on load
+  updateSim(2100);
+  </script>
+
   <script>
     function submitWaitlist(e) {
       e.preventDefault();
