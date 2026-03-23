@@ -166,6 +166,13 @@
         <!-- Error banner -->
         <div id="error-banner" class="alert alert-error hidden"></div>
 
+        <!-- Maintenance banner (amber, persistent) -->
+        <div id="maintenance-banner" class="alert alert-maintenance hidden">
+          <span class="maintenance-icon">🔧</span>
+          <span id="maintenance-msg">Protection bots are temporarily suspended for a scheduled upgrade. Re-enable your protection after the update.</span>
+          <button class="maintenance-dismiss" onclick="this.parentElement.classList.add('hidden')" title="Dismiss">✕</button>
+        </div>
+
         <!-- Wrong network warning -->
         <div id="wrong-network-warning" class="alert alert-warning hidden">
           <span data-i18n-html="dash.wrongnet">&#9888;&nbsp; Cambia a <strong>Arbitrum One</strong>, Ethereum o Base para ver posiciones Uniswap&nbsp;v3. Red actual:</span>

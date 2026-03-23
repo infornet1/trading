@@ -48,6 +48,11 @@ class BotConfig(Base):
     hl_api_key      = Column(Text, nullable=True)         # AES-256 encrypted
     hl_wallet_addr  = Column(String(42), nullable=True)
     mode            = Column(Enum("aragan", "avaro"), default="aragan")
+    leverage        = Column(Integer, default=10)
+    sl_pct          = Column(Numeric(5, 3), default=0.100)    # % above entry → close short
+    tp_pct          = Column(Numeric(5, 3), nullable=True)    # optional fixed TP %
+    trailing_stop   = Column(Boolean, default=True)
+    auto_rearm      = Column(Boolean, default=True)
     active          = Column(Boolean, default=False)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

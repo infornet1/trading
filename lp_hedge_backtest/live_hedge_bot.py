@@ -85,14 +85,23 @@ UPPER_BUFFER        = float(os.getenv("UPPER_BUFFER_PCT",       "2.0")) / 100.0
 
 # Sizing
 HEDGE_RATIO         = float(os.getenv("HEDGE_RATIO",           "50.0"))
-MAX_LEVERAGE        = int(os.getenv("MAX_LEVERAGE",            "10"))
+TARGET_LEVERAGE     = int(os.getenv("TARGET_LEVERAGE",         "10"))   # user-set target
+MAX_LEVERAGE        = 15                                                  # hard cap, non-configurable
 MARGIN_BUFFER       = float(os.getenv("MARGIN_BUFFER",          "1.5"))
 
 # SL / trail
-DEFAULT_SL_PCT      = float(os.getenv("SL_PCT",                "0.5")) / 100.0
+DEFAULT_SL_PCT      = float(os.getenv("SL_PCT",                "0.1")) / 100.0
 BREAKEVEN_PCT       = float(os.getenv("BREAKEVEN_PCT",          "1.0")) / 100.0
 TRAIL_PCT           = float(os.getenv("TRAIL_PCT",              "1.5")) / 100.0
 REENTRY_BUFFER      = float(os.getenv("REENTRY_BUFFER_PCT",     "0.5")) / 100.0
+
+# Optional TP (empty string = disabled)
+_tp_env             = os.getenv("TP_PCT", "").strip()
+TP_PCT              = float(_tp_env) / 100.0 if _tp_env else None
+
+# Feature flags
+TRAILING_STOP       = os.getenv("TRAILING_STOP", "1").strip() not in ("0", "false", "False")
+AUTO_REARM          = os.getenv("AUTO_REARM",    "1").strip() not in ("0", "false", "False")
 
 MIN_HEDGE_ETH = 0.001
 
@@ -275,18 +284,42 @@ class LiveHedgeBot:
                 f"Please fund the wallet to enable hedging.")
             return None
 
-        raw_leverage    = notional / margin
-        leverage        = min(max(math.ceil(raw_leverage), 1), MAX_LEVERAGE)
-        required_margin = notional / leverage
+        # Use user's target leverage (capped at hard MAX_LEVERAGE).
+        # Auto-reduce step by step if margin is insufficient, logging a warning event.
+        target_lev = min(TARGET_LEVERAGE, MAX_LEVERAGE)
+        leverage   = target_lev
 
+        required_margin = notional / leverage
         if margin < required_margin * MARGIN_BUFFER:
-            print(f"❌ Insufficient margin: have ${margin:.2f}, "
-                  f"need ${required_margin * MARGIN_BUFFER:.2f}", flush=True)
-            self.send_email("⚠️ Short SKIPPED — Low Margin",
-                f"NFT #{NFT_ID}: Not enough USDC.\n"
-                f"Available: ${margin:.2f}\n"
-                f"Required (×{MARGIN_BUFFER}): ${required_margin * MARGIN_BUFFER:.2f}")
-            return None
+            # Try to find a lower leverage that fits
+            reduced = False
+            for lev in range(leverage - 1, 0, -1):
+                req = notional / lev
+                if margin >= req * MARGIN_BUFFER:
+                    log_event("error", details={
+                        "warning": f"Leverage auto-reduced from {target_lev}x to {lev}x — "
+                                   f"insufficient margin (have ${margin:.2f}, "
+                                   f"need ${(notional/target_lev)*MARGIN_BUFFER:.2f})"
+                    })
+                    self.send_email(
+                        "⚠️ Leverage Auto-Reduced",
+                        f"NFT #{NFT_ID}: Target leverage {target_lev}x exceeded available margin.\n"
+                        f"Auto-reduced to {lev}x.\n"
+                        f"Available: ${margin:.2f} | Notional: ${notional:.2f}"
+                    )
+                    leverage        = lev
+                    required_margin = req
+                    reduced         = True
+                    break
+
+            if not reduced:
+                print(f"❌ Insufficient margin even at 1x: have ${margin:.2f}, "
+                      f"need ${(notional/1)*MARGIN_BUFFER:.2f}", flush=True)
+                self.send_email("⚠️ Short SKIPPED — Low Margin",
+                    f"NFT #{NFT_ID}: Not enough USDC even at 1x leverage.\n"
+                    f"Available: ${margin:.2f}\n"
+                    f"Notional: ${notional:.2f}")
+                return None
 
         return size, leverage, notional, required_margin, x_max
 
@@ -375,14 +408,25 @@ class LiveHedgeBot:
                           f"(min ${self.short_min_price:.2f} + {TRAIL_PCT*100:.1f}%)",
                           flush=True)
 
-        # ── 2. SL check ────────────────────────────────────────────────────
+        # ── 2. Fixed TP check (optional) ───────────────────────────────────
+        if TP_PCT is not None:
+            tp_price = self.entry_price * (1 - TP_PCT)
+            if price <= tp_price:
+                print(f"🎯 TP HIT at ${price:.2f} (target ${tp_price:.2f})", flush=True)
+                self.close_hedge(price, reason="tp_hit")
+                return
+
+        # ── 3. SL check ────────────────────────────────────────────────────
         if price >= self.current_sl_price:
             reason = "trailing_stop" if self.breakeven_reached else "sl_hit"
             print(f"🛑 SL FIRED at ${price:.2f} | SL was ${self.current_sl_price:.2f}", flush=True)
             self.close_hedge(price, reason=reason)
             return
 
-        # ── 3. Breakeven → activate trailing SL ───────────────────────────
+        # ── 4. Breakeven → activate trailing SL (only when enabled) ───────
+        if not TRAILING_STOP:
+            return  # fixed SL only — skip trailing logic
+
         if not self.breakeven_reached and price <= self.entry_price * (1 - BREAKEVEN_PCT):
             self.breakeven_reached = True
             # Set SL = min(entry, trail from current min)
@@ -430,6 +474,12 @@ class LiveHedgeBot:
                 # Reset direction flag so upper-cross trigger also needs a fresh setup
                 self.price_was_above = False
 
+                # If auto-rearm is disabled, stop the bot after the first close
+                if not AUTO_REARM:
+                    print("🛑 AUTO_REARM disabled — bot stopping after position close.", flush=True)
+                    log_event("stopped", price=price, details={"reason": "auto_rearm_disabled"})
+                    sys.exit(0)
+
                 pnl_str = f"{pnl_est:.2f}%" if pnl_est is not None else "n/a"
                 print(f"✅ SHORT CLOSED | Reason: {reason} | "
                       f"Exit: ${close_price:.2f} | PnL est: {pnl_str}", flush=True)
@@ -468,11 +518,13 @@ class LiveHedgeBot:
               f"FROM ABOVE @ ${upper_trigger:.2f} (2% buffer)", flush=True)
         print(f"📐 X_max: {x_max:.4f} ETH | "
               f"Hedge ratio: {HEDGE_RATIO}% → {x_max * HEDGE_RATIO / 100:.4f} ETH | "
-              f"Max leverage: {MAX_LEVERAGE}x", flush=True)
-        print(f"📐 SL: {DEFAULT_SL_PCT*100:.1f}% | "
-              f"Breakeven: {BREAKEVEN_PCT*100:.1f}% | "
-              f"Trail: {TRAIL_PCT*100:.1f}% from min | "
-              f"Re-entry buffer: {REENTRY_BUFFER*100:.1f}%", flush=True)
+              f"Target leverage: {TARGET_LEVERAGE}x (hard cap {MAX_LEVERAGE}x)", flush=True)
+        print(f"📐 SL: {DEFAULT_SL_PCT*100:.2f}% | "
+              f"TP: {TP_PCT*100:.2f}% (fixed)" if TP_PCT else f"📐 SL: {DEFAULT_SL_PCT*100:.2f}% | TP: off",
+              flush=True)
+        print(f"📐 Trailing stop: {'on' if TRAILING_STOP else 'OFF'} | "
+              f"Breakeven: {BREAKEVEN_PCT*100:.1f}% | Trail: {TRAIL_PCT*100:.1f}% | "
+              f"Auto-rearm: {'on' if AUTO_REARM else 'OFF'}", flush=True)
 
         log_event("started", details={
             "nft_id":          NFT_ID,
@@ -482,8 +534,11 @@ class LiveHedgeBot:
             "upper_trigger":   upper_trigger,
             "x_max_eth":       round(x_max, 4),
             "hedge_ratio":     HEDGE_RATIO,
-            "max_leverage":    MAX_LEVERAGE,
+            "target_leverage": TARGET_LEVERAGE,
             "sl_pct":          DEFAULT_SL_PCT * 100,
+            "tp_pct":          TP_PCT * 100 if TP_PCT else None,
+            "trailing_stop":   TRAILING_STOP,
+            "auto_rearm":      AUTO_REARM,
             "breakeven_pct":   BREAKEVEN_PCT * 100,
             "trail_pct":       TRAIL_PCT * 100,
         })

@@ -35,6 +35,11 @@ class BotConfigCreate(BaseModel):
     hl_api_key:     Optional[str] = None   # plaintext — encrypted before storage
     hl_wallet_addr: Optional[str] = None
     mode:           str = "aragan"
+    leverage:       int   = 10
+    sl_pct:         float = 0.10
+    tp_pct:         Optional[float] = None
+    trailing_stop:  bool  = True
+    auto_rearm:     bool  = True
 
     @field_validator("mode")
     @classmethod
@@ -58,6 +63,11 @@ class BotConfigUpdate(BaseModel):
     hl_api_key:     Optional[str]   = None
     hl_wallet_addr: Optional[str]   = None
     mode:           Optional[str]   = None
+    leverage:       Optional[int]   = None
+    sl_pct:         Optional[float] = None
+    tp_pct:         Optional[float] = None
+    trailing_stop:  Optional[bool]  = None
+    auto_rearm:     Optional[bool]  = None
 
     @field_validator("mode")
     @classmethod
@@ -79,6 +89,11 @@ class BotConfigOut(BaseModel):
     hedge_exchange: str
     hl_wallet_addr: Optional[str]
     mode:           str
+    leverage:       int
+    sl_pct:         float
+    tp_pct:         Optional[float]
+    trailing_stop:  bool
+    auto_rearm:     bool
     active:         bool
     created_at:     datetime
     updated_at:     datetime
@@ -162,6 +177,11 @@ async def create_bot(
         hl_api_key     = encrypted_key,
         hl_wallet_addr = body.hl_wallet_addr,
         mode           = body.mode,
+        leverage       = max(1, min(body.leverage, 15)),
+        sl_pct         = body.sl_pct,
+        tp_pct         = body.tp_pct,
+        trailing_stop  = body.trailing_stop,
+        auto_rearm     = body.auto_rearm,
     )
     db.add(cfg)
     await db.commit()
@@ -180,15 +200,20 @@ async def update_bot(
     if cfg.active:
         raise HTTPException(status_code=409, detail="Stop the bot before editing its config")
 
-    if body.lower_bound  is not None: cfg.lower_bound    = body.lower_bound
-    if body.upper_bound  is not None: cfg.upper_bound    = body.upper_bound
-    if body.trigger_pct  is not None: cfg.trigger_pct    = body.trigger_pct
-    if body.hedge_ratio  is not None: cfg.hedge_ratio    = body.hedge_ratio
+    if body.lower_bound    is not None: cfg.lower_bound    = body.lower_bound
+    if body.upper_bound    is not None: cfg.upper_bound    = body.upper_bound
+    if body.trigger_pct    is not None: cfg.trigger_pct    = body.trigger_pct
+    if body.hedge_ratio    is not None: cfg.hedge_ratio    = body.hedge_ratio
     if body.hl_wallet_addr is not None: cfg.hl_wallet_addr = body.hl_wallet_addr
-    if body.hl_api_key   is not None: cfg.hl_api_key     = encrypt(body.hl_api_key)
-    if body.mode         is not None:
+    if body.hl_api_key     is not None: cfg.hl_api_key     = encrypt(body.hl_api_key)
+    if body.mode           is not None:
         _enforce_golden_rules(cfg.pair, body.mode)
         cfg.mode = body.mode
+    if body.leverage       is not None: cfg.leverage       = max(1, min(body.leverage, 15))
+    if body.sl_pct         is not None: cfg.sl_pct         = body.sl_pct
+    if body.tp_pct         is not None: cfg.tp_pct         = body.tp_pct
+    if body.trailing_stop  is not None: cfg.trailing_stop  = body.trailing_stop
+    if body.auto_rearm     is not None: cfg.auto_rearm     = body.auto_rearm
 
     await db.commit()
     await db.refresh(cfg)
@@ -295,11 +320,56 @@ async def start_bot(
         "hl_wallet_addr": cfg.hl_wallet_addr,
         "mode":           cfg.mode,
         "pair":           cfg.pair,
+        "leverage":       str(cfg.leverage   or 10),
+        "sl_pct":         str(cfg.sl_pct     or 0.1),
+        "tp_pct":         str(cfg.tp_pct)    if cfg.tp_pct else "",
+        "trailing_stop":  "1" if cfg.trailing_stop else "0",
+        "auto_rearm":     "1" if cfg.auto_rearm    else "0",
     }
     await manager.start(config_id, config_dict)
     cfg.active = True
     await db.commit()
     return {"status": "started"}
+
+
+@router.get("/hl-balance")
+async def hl_balance(
+    address: str = Depends(get_current_address),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns the live Hyperliquid margin balance for the authenticated user's
+    HL wallet address (sourced from any of their bot configs).
+    Used by the trading panel margin calculator.
+    """
+    result = await db.execute(
+        select(BotConfig)
+        .where(BotConfig.user_address == address)
+        .where(BotConfig.hl_wallet_addr.isnot(None))
+        .limit(1)
+    )
+    cfg = result.scalar_one_or_none()
+    if not cfg or not cfg.hl_wallet_addr:
+        return {"account_value": None, "total_margin_used": None, "error": "no_hl_wallet"}
+
+    def _sync():
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+            info  = Info(constants.MAINNET_API_URL, skip_ws=True)
+            state = info.user_state(cfg.hl_wallet_addr)
+            ms    = state.get("marginSummary", {})
+            return {
+                "account_value":     float(ms.get("accountValue")     or 0),
+                "total_margin_used": float(ms.get("totalMarginUsed")  or 0),
+                "error": None,
+            }
+        except Exception as e:
+            return {"account_value": None, "total_margin_used": None, "error": str(e)}
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _sync)
 
 
 @router.post("/{config_id}/stop", status_code=status.HTTP_200_OK)

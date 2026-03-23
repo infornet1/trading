@@ -320,6 +320,9 @@ function onWalletConnected() {
   updateNuclearBtn();
   saasLoadBots();
 
+  // Check maintenance flag and show banner if active
+  checkMaintenanceStatus();
+
   // Initial data load
   fetchLivePrices();
   fetchPositions();
@@ -1342,12 +1345,24 @@ function buildProtectionDrawer(pos) {
           <span class="prot-info-value">${bot.mode === 'aragan' ? 'Defensor Bajista' : 'Avaro'}</span>
         </div>
         <div class="prot-info-item">
+          <span class="prot-info-label">Leverage</span>
+          <span class="prot-info-value">${bot.leverage ?? 10}x</span>
+        </div>
+        <div class="prot-info-item">
+          <span class="prot-info-label">Stop Loss</span>
+          <span class="prot-info-value">${bot.sl_pct ?? 0.1}%</span>
+        </div>
+        <div class="prot-info-item">
           <span class="prot-info-label">${t('prot.trigger.label')}</span>
           <span class="prot-info-value">${bot.trigger_pct}%</span>
         </div>
         <div class="prot-info-item">
           <span class="prot-info-label">${t('prot.hedgesize.label')}</span>
           <span class="prot-info-value">${bot.hedge_ratio}%</span>
+        </div>
+        <div class="prot-info-item">
+          <span class="prot-info-label">Trailing / Rearm</span>
+          <span class="prot-info-value">${bot.trailing_stop ? '✓' : '✗'} / ${bot.auto_rearm ? '✓' : '✗'}</span>
         </div>
       </div>
       <button class="btn btn-outline btn-sm prot-btn-full prot-btn-stop" id="prot-stop-btn-${bot.id}"
@@ -1356,19 +1371,35 @@ function buildProtectionDrawer(pos) {
       </button>`;
 
   } else {
-    // No active bot (or inactive) — show config form
-    const modeVal   = bot?.mode        || 'aragan';
-    const trigVal   = bot?.trigger_pct ?? -0.50;
-    const hedgeVal  = bot?.hedge_ratio ?? 50;
-    const hlWallet  = bot?.hl_wallet_addr || '';
-    const apiKeyPH  = bot
+    // No active bot (or inactive) — show trading panel form
+    const modeVal      = bot?.mode          || 'aragan';
+    const trigVal      = Math.abs(bot?.trigger_pct ?? 0.50);
+    const hedgeVal     = bot?.hedge_ratio   ?? 50;
+    const hlWallet     = bot?.hl_wallet_addr || '';
+    const leverageVal  = bot?.leverage      ?? 10;
+    const slVal        = bot?.sl_pct        ?? 0.10;
+    const tpVal        = bot?.tp_pct        ?? '';
+    const trailVal     = bot?.trailing_stop ?? true;
+    const rearmVal     = bot?.auto_rearm    ?? true;
+    const apiKeyPH     = bot
       ? t('prot.apikey.keepcurrent')
       : t('prot.apikey.placeholder');
+
+    const pair  = `${pos.token0Info.symbol}/${pos.token1Info.symbol}`;
+    const range = `${formatPrice(pos.priceLower)} – ${formatPrice(pos.priceUpper)}`;
 
     bodyHtml = `
       ${isBTC ? `<p class="prot-btc-warning">⚠&nbsp; ${t('prot.btc.warning')}</p>` : ''}
       <div class="prot-form" id="prot-form-${tokenId}">
-        <div class="prot-field">
+
+        <!-- Header: pair + range -->
+        <div class="tp-header">
+          <div class="tp-pair">${pair}</div>
+          <div class="tp-range">Range ${range}</div>
+        </div>
+
+        <!-- Mode toggle -->
+        <div class="prot-field" style="margin-bottom:10px">
           <label class="prot-label">${t('prot.mode.label')}</label>
           <div class="prot-mode-toggle">
             <label class="prot-mode-opt ${modeVal === 'aragan' ? 'prot-mode-opt--active' : ''}">
@@ -1386,41 +1417,130 @@ function buildProtectionDrawer(pos) {
             </label>
           </div>
         </div>
-        <div class="prot-field-row">
-          <div class="prot-field">
-            <label class="prot-label">${t('prot.trigger.label')}</label>
-            <div class="prot-input-group">
-              <input type="number" class="prot-input" id="prot-trigger-${tokenId}"
-                     value="${trigVal}" step="0.1" max="-0.1" min="-5" />
-              <span class="prot-input-suffix">%</span>
-            </div>
+
+        <!-- Capital por Operación -->
+        <div class="tp-capital-row">
+          <span class="tp-capital-label">Capital por Operación</span>
+          <span>
+            <span class="tp-capital-value" id="tp-capital-${tokenId}">—</span>
+            <span class="tp-capital-hint"> = hedge notional</span>
+          </span>
+        </div>
+
+        <!-- Buffer de Breakout (trigger offset slider) -->
+        <div class="tp-slider-row">
+          <div class="tp-slider-header">
+            <span class="tp-slider-label">Buffer de Breakout</span>
+            <span class="tp-slider-value" id="tp-buf-val-${tokenId}">${trigVal.toFixed(1)}%</span>
           </div>
-          <div class="prot-field">
-            <label class="prot-label">${t('prot.hedgesize.label')}</label>
-            <div class="prot-input-group">
-              <input type="number" class="prot-input" id="prot-hedge-${tokenId}"
-                     value="${hedgeVal}" step="5" min="10" max="100" />
-              <span class="prot-input-suffix">%</span>
+          <input type="range" class="tp-slider" id="prot-trigger-${tokenId}"
+                 min="0" max="5" step="0.1" value="${trigVal}"
+                 oninput="onTradingPanelChange('${tokenId}')" />
+          <div class="tp-slider-range-labels"><span>0%</span><span>5% max</span></div>
+        </div>
+
+        <!-- Hedge Size (slider) -->
+        <div class="tp-slider-row">
+          <div class="tp-slider-header">
+            <span class="tp-slider-label">Tamaño de Cobertura</span>
+            <span class="tp-slider-value" id="tp-hedge-val-${tokenId}">${hedgeVal}%</span>
+          </div>
+          <input type="range" class="tp-slider" id="prot-hedge-${tokenId}"
+                 min="10" max="100" step="5" value="${hedgeVal}"
+                 oninput="onTradingPanelChange('${tokenId}')" />
+          <div class="tp-slider-range-labels"><span>10%</span><span>100%</span></div>
+        </div>
+
+        <!-- Leverage slider -->
+        <div class="tp-slider-row">
+          <div class="tp-slider-header">
+            <span class="tp-slider-label">Leverage (Isolated)</span>
+            <span class="tp-slider-value" id="tp-lev-val-${tokenId}" style="color:#f59e0b">${leverageVal}x</span>
+          </div>
+          <input type="range" class="tp-slider tp-slider-lev" id="prot-lev-${tokenId}"
+                 min="1" max="15" step="1" value="${leverageVal}"
+                 oninput="onTradingPanelChange('${tokenId}')" />
+          <div class="tp-slider-range-labels"><span>1x</span><span>15x max</span></div>
+
+          <!-- Margin calculator box -->
+          <div class="tp-margin-box" id="tp-margin-box-${tokenId}">
+            <div class="tp-margin-row">
+              <span>Margen requerido:</span>
+              <span id="tp-mb-req-${tokenId}">—</span>
             </div>
+            <div class="tp-margin-row">
+              <span>Balance wallet:</span>
+              <span id="tp-mb-bal-${tokenId}">cargando…</span>
+            </div>
+            <div class="tp-margin-row tp-margin-row--available" id="tp-mb-avail-row-${tokenId}">
+              <span>Disponible después:</span>
+              <span id="tp-mb-avail-${tokenId}">—</span>
+            </div>
+            <div class="tp-margin-note">Auto-ajustado. Siempre isolated.</div>
           </div>
         </div>
+
+        <!-- Stop Loss Fijo -->
+        <div class="prot-field">
+          <label class="prot-label prot-label--danger">Stop Loss Fijo (%) <span style="color:#f87171">*</span></label>
+          <div class="prot-input-group">
+            <input type="number" class="prot-input" id="prot-sl-${tokenId}"
+                   value="${slVal}" step="0.01" min="0.01" max="10"
+                   oninput="onTradingPanelChange('${tokenId}')" />
+            <span class="prot-input-suffix">%</span>
+          </div>
+          <span style="font-size:0.6rem;color:var(--color-text-muted);margin-top:2px">
+            Cierra la posición si pierde este % desde la entrada
+          </span>
+        </div>
+
+        <!-- Trailing Stop checkbox -->
+        <div class="tp-check-row">
+          <input type="checkbox" id="prot-trail-${tokenId}" ${trailVal ? 'checked' : ''}
+                 onchange="onTradingPanelChange('${tokenId}')" />
+          <label class="tp-check-label" for="prot-trail-${tokenId}">Trailing Stop</label>
+        </div>
+
+        <!-- Take Profit (optional) -->
+        <div class="prot-field">
+          <label class="prot-label">Take Profit (%) <span style="color:var(--color-text-muted);font-size:0.55rem">opcional</span></label>
+          <div class="prot-input-group">
+            <input type="number" class="prot-input" id="prot-tp-${tokenId}"
+                   value="${tpVal}" step="0.1" min="0.1" placeholder="—"
+                   oninput="onTradingPanelChange('${tokenId}')" />
+            <span class="prot-input-suffix">%</span>
+          </div>
+        </div>
+
+        <!-- Auto-rearm checkbox -->
+        <div class="tp-check-row" style="margin-bottom:12px">
+          <input type="checkbox" id="prot-rearm-${tokenId}" ${rearmVal ? 'checked' : ''} />
+          <label class="tp-check-label" for="prot-rearm-${tokenId}">Auto-rearm</label>
+          <span class="tp-check-hint">Tras SL, el bot vuelve a buscar breakouts</span>
+        </div>
+
+        <!-- HL Credentials -->
         <div class="prot-field">
           <label class="prot-label prot-label--danger">${t('prot.apikey.label')}</label>
           <input type="password" class="prot-input prot-input-full"
                  id="prot-apikey-${tokenId}" placeholder="${apiKeyPH}" autocomplete="off" />
         </div>
-        <div class="prot-field">
+        <div class="prot-field" style="margin-bottom:4px">
           <label class="prot-label prot-label--warning">${t('prot.wallet.label')}</label>
           <input type="text" class="prot-input prot-input-full"
                  id="prot-wallet-${tokenId}" value="${hlWallet}"
                  placeholder="${t('prot.wallet.placeholder')}" />
         </div>
+
         <button class="btn btn-primary btn-sm prot-btn-full"
                 id="prot-activate-btn-${tokenId}"
                 onclick="activateProtection('${tokenId}')">
           🛡&nbsp; ${t('prot.btn.activate')}
         </button>
       </div>`;
+
+    // Kick off async HL balance fetch and capital estimate after render
+    setTimeout(() => initTradingPanel(tokenId, pos), 0);
   }
 
   const isActive = bot?.active;
@@ -1476,11 +1596,18 @@ window.activateProtection = async function (tokenId) {
   if (btn) { btn.disabled = true; btn.textContent = t('prot.btn.activating'); }
 
   try {
-    const mode     = document.querySelector(`input[name="prot-mode-${tokenId}"]:checked`)?.value || 'aragan';
-    const trigger  = parseFloat(document.getElementById(`prot-trigger-${tokenId}`)?.value || '-0.5');
-    const hedge    = parseFloat(document.getElementById(`prot-hedge-${tokenId}`)?.value  || '50');
-    const apiKey   = document.getElementById(`prot-apikey-${tokenId}`)?.value.trim();
-    const hlWallet = document.getElementById(`prot-wallet-${tokenId}`)?.value.trim();
+    const mode         = document.querySelector(`input[name="prot-mode-${tokenId}"]:checked`)?.value || 'aragan';
+    const triggerRaw   = parseFloat(document.getElementById(`prot-trigger-${tokenId}`)?.value || '0.5');
+    const trigger      = -Math.abs(triggerRaw);   // stored as negative pct
+    const hedge        = parseFloat(document.getElementById(`prot-hedge-${tokenId}`)?.value  || '50');
+    const leverage     = parseInt(document.getElementById(`prot-lev-${tokenId}`)?.value       || '10', 10);
+    const slPct        = parseFloat(document.getElementById(`prot-sl-${tokenId}`)?.value      || '0.1');
+    const tpRaw        = document.getElementById(`prot-tp-${tokenId}`)?.value.trim();
+    const tpPct        = tpRaw ? parseFloat(tpRaw) : null;
+    const trailingStop = document.getElementById(`prot-trail-${tokenId}`)?.checked ?? true;
+    const autoRearm    = document.getElementById(`prot-rearm-${tokenId}`)?.checked ?? true;
+    const apiKey       = document.getElementById(`prot-apikey-${tokenId}`)?.value.trim();
+    const hlWallet     = document.getElementById(`prot-wallet-${tokenId}`)?.value.trim();
 
     const existingBot = saas.bots[tokenId];
 
@@ -1511,7 +1638,10 @@ window.activateProtection = async function (tokenId) {
 
     if (existingBot) {
       // Update existing config
-      const payload = { trigger_pct: trigger, hedge_ratio: hedge, hl_wallet_addr: hlWallet, mode };
+      const payload = {
+        trigger_pct: trigger, hedge_ratio: hedge, hl_wallet_addr: hlWallet, mode,
+        leverage, sl_pct: slPct, tp_pct: tpPct, trailing_stop: trailingStop, auto_rearm: autoRearm,
+      };
       if (apiKey) payload.hl_api_key = apiKey;
       await apiCall('PUT', `/bots/${existingBot.id}`, payload);
       configId = existingBot.id;
@@ -1529,11 +1659,17 @@ window.activateProtection = async function (tokenId) {
         hl_api_key:     apiKey,
         hl_wallet_addr: hlWallet,
         mode,
+        leverage,
+        sl_pct:         slPct,
+        tp_pct:         tpPct,
+        trailing_stop:  trailingStop,
+        auto_rearm:     autoRearm,
       });
       configId = res.id;
     }
 
     // Start the bot
+    _hlBalanceCache = null; // invalidate balance cache after config change
     await apiCall('POST', `/bots/${configId}/start`);
 
     // Refresh bot list and re-render
@@ -1551,6 +1687,185 @@ window.activateProtection = async function (tokenId) {
     }
   }
 };
+
+// ── Trading Panel helpers ──────────────────────────────────────────────────
+
+// x_max_eth: max ETH position holds when price is at lower bound (worst-case IL)
+function calcXMaxEth(liquidity, tickLower, tickUpper) {
+  const L    = Number(liquidity) / 1e18;
+  const sqrtA = Math.sqrt(Math.pow(1.0001, tickLower));
+  const sqrtB = Math.sqrt(Math.pow(1.0001, tickUpper));
+  if (sqrtA === 0 || sqrtB === 0) return 0;
+  return L * (1 / sqrtA - 1 / sqrtB);
+}
+
+// Cache for HL balance so we don't hammer the API on every slider move
+let _hlBalanceCache = null;
+let _hlBalanceFetching = false;
+
+async function fetchHLBalance() {
+  if (_hlBalanceFetching) return _hlBalanceCache;
+  if (_hlBalanceCache !== null) return _hlBalanceCache;
+  if (!saas.jwt) return null;
+  _hlBalanceFetching = true;
+  try {
+    const data = await apiCall('GET', '/bots/hl-balance');
+    _hlBalanceCache = data;
+    return data;
+  } catch (_) {
+    return null;
+  } finally {
+    _hlBalanceFetching = false;
+  }
+}
+
+// Called once after the trading panel is injected into DOM
+async function initTradingPanel(tokenId, pos) {
+  // Compute capital estimate
+  const xMax    = calcXMaxEth(pos.liquidity, pos.tickLower, pos.tickUpper);
+  const hedgeEl = document.getElementById(`prot-hedge-${tokenId}`);
+  const hedgeRatio = hedgeEl ? parseFloat(hedgeEl.value) / 100 : 0.5;
+  const price   = pos.priceCurrent || 0;
+  const capital = xMax * hedgeRatio * price;
+
+  const capEl = document.getElementById(`tp-capital-${tokenId}`);
+  if (capEl) capEl.textContent = capital > 0 ? `$${capital.toFixed(2)}` : '—';
+
+  // Fetch HL balance and update margin box
+  const hlData = await fetchHLBalance();
+  _updateMarginBox(tokenId, pos);
+}
+
+function _updateMarginBox(tokenId, pos) {
+  const levEl   = document.getElementById(`prot-lev-${tokenId}`);
+  const hedgeEl = document.getElementById(`prot-hedge-${tokenId}`);
+  if (!levEl || !hedgeEl) return;
+
+  const leverage   = parseInt(levEl.value, 10);
+  const hedgeRatio = parseFloat(hedgeEl.value) / 100;
+  const price      = pos.priceCurrent || 0;
+  const xMax       = calcXMaxEth(pos.liquidity, pos.tickLower, pos.tickUpper);
+  const notional   = xMax * hedgeRatio * price;
+  const reqMargin  = notional > 0 && leverage > 0 ? notional / leverage : 0;
+
+  const reqEl   = document.getElementById(`tp-mb-req-${tokenId}`);
+  const balEl   = document.getElementById(`tp-mb-bal-${tokenId}`);
+  const availEl = document.getElementById(`tp-mb-avail-${tokenId}`);
+  const rowEl   = document.getElementById(`tp-mb-avail-row-${tokenId}`);
+  const capEl   = document.getElementById(`tp-capital-${tokenId}`);
+
+  if (capEl)  capEl.textContent  = notional > 0 ? `$${notional.toFixed(2)}` : '—';
+  if (reqEl)  reqEl.textContent  = reqMargin > 0 ? `$${reqMargin.toFixed(2)}` : '—';
+
+  const bal = _hlBalanceCache?.account_value;
+  if (balEl) {
+    balEl.textContent = bal != null ? `$${Number(bal).toFixed(2)}` : '—';
+  }
+  if (availEl && rowEl) {
+    if (bal != null && reqMargin > 0) {
+      const avail = bal - reqMargin;
+      availEl.textContent = `$${avail.toFixed(2)}`;
+      rowEl.classList.toggle('tp-margin-row--warn', avail < 0);
+      rowEl.classList.toggle('tp-margin-row--available', avail >= 0);
+    } else {
+      availEl.textContent = '—';
+    }
+  }
+}
+
+// Called by oninput on any trading panel control
+window.onTradingPanelChange = function (tokenId) {
+  // Update displayed slider labels
+  const lev  = document.getElementById(`prot-lev-${tokenId}`);
+  const buf  = document.getElementById(`prot-trigger-${tokenId}`);
+  const hdg  = document.getElementById(`prot-hedge-${tokenId}`);
+
+  const levValEl = document.getElementById(`tp-lev-val-${tokenId}`);
+  const bufValEl = document.getElementById(`tp-buf-val-${tokenId}`);
+  const hdgValEl = document.getElementById(`tp-hedge-val-${tokenId}`);
+
+  if (lev && levValEl) levValEl.textContent = `${lev.value}x`;
+  if (buf && bufValEl) bufValEl.textContent = `${parseFloat(buf.value).toFixed(1)}%`;
+  if (hdg && hdgValEl) hdgValEl.textContent = `${hdg.value}%`;
+
+  // Recalculate margin box using cached pos from state
+  const pos = state.positions?.find(p => p.tokenId === tokenId);
+  if (pos) _updateMarginBox(tokenId, pos);
+
+  // Check if user deviated from safe defaults
+  checkDeviationAdvisory(tokenId);
+};
+
+// Deviation thresholds vs bot defaults
+const DEVIATION_THRESHOLDS = { leverage: 12, sl_pct: 1.0 };
+
+function checkDeviationAdvisory(tokenId) {
+  const lev   = parseInt(document.getElementById(`prot-lev-${tokenId}`)?.value  || '10', 10);
+  const sl    = parseFloat(document.getElementById(`prot-sl-${tokenId}`)?.value  || '0.1');
+  const tp    = document.getElementById(`prot-tp-${tokenId}`)?.value.trim();
+  const trail = document.getElementById(`prot-trail-${tokenId}`)?.checked ?? true;
+
+  const deviated = lev > DEVIATION_THRESHOLDS.leverage
+    || sl > DEVIATION_THRESHOLDS.sl_pct
+    || (tp && !trail);    // fixed TP with trailing off
+
+  const existing = document.getElementById('deviation-advisory');
+  if (deviated && !existing) {
+    showDeviationAdvisory(tokenId);
+  } else if (!deviated && existing) {
+    existing.remove();
+  }
+}
+
+function showDeviationAdvisory(tokenId) {
+  if (document.getElementById('deviation-advisory')) return;
+  const el = document.createElement('div');
+  el.className = 'deviation-advisory';
+  el.id = 'deviation-advisory';
+  el.innerHTML = `
+    <div class="deviation-advisory-title">⚠ Custom Parameters Detected</div>
+    <div class="deviation-advisory-body">
+      You've changed settings from the bot's calibrated defaults.
+      High leverage (&gt;12x) or wide SL (&gt;1%) may behave unexpectedly
+      in volatile conditions.
+    </div>
+    <div class="deviation-advisory-actions">
+      <button onclick="resetTradingPanelDefaults('${tokenId}')">Keep Defaults</button>
+      <button onclick="document.getElementById('deviation-advisory')?.remove()">I Understand</button>
+    </div>`;
+  document.body.appendChild(el);
+}
+
+window.resetTradingPanelDefaults = function (tokenId) {
+  const lev  = document.getElementById(`prot-lev-${tokenId}`);
+  const sl   = document.getElementById(`prot-sl-${tokenId}`);
+  const tp   = document.getElementById(`prot-tp-${tokenId}`);
+  const trail = document.getElementById(`prot-trail-${tokenId}`);
+  if (lev)  { lev.value   = '10'; }
+  if (sl)   { sl.value    = '0.1'; }
+  if (tp)   { tp.value    = ''; }
+  if (trail){ trail.checked = true; }
+  onTradingPanelChange(tokenId);
+  document.getElementById('deviation-advisory')?.remove();
+};
+
+// Maintenance banner — checked once on dashboard load
+async function checkMaintenanceStatus() {
+  try {
+    const res = await fetch('/status/maintenance', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const banner = document.getElementById('maintenance-banner');
+    if (!banner) return;
+    if (data.maintenance) {
+      const msgEl = document.getElementById('maintenance-msg');
+      if (msgEl && data.message) msgEl.textContent = data.message;
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  } catch (_) { /* ignore network errors for optional banner */ }
+}
 
 // ── Stop bot ──────────────────────────────────────────────────────────────
 

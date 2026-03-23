@@ -72,6 +72,12 @@ class BotManager:
             "HEDGE_RATIO":                 str(config["hedge_ratio"]),
             "BOT_MODE":                    config["mode"],
             "CONFIG_ID":                   str(config_id),
+            # Trading panel parameters (user-configured, with safe defaults)
+            "TARGET_LEVERAGE":             str(config.get("leverage", "10")),
+            "SL_PCT":                      str(config.get("sl_pct",  "0.1")),
+            "TP_PCT":                      str(config.get("tp_pct",  "")),
+            "TRAILING_STOP":               str(config.get("trailing_stop", "1")),
+            "AUTO_REARM":                  str(config.get("auto_rearm",    "1")),
         }
 
         proc = subprocess.Popen(
