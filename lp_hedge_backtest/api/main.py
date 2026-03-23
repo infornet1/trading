@@ -19,6 +19,7 @@ from api.routers import auth as auth_router
 from api.routers import bots as bots_router
 from api.routers import ws as ws_router
 from api.routers import admin as admin_router
+from api.routers import assistant as assistant_router
 
 
 async def _run_column_migrations():
@@ -112,6 +113,7 @@ app.include_router(auth_router.router)
 app.include_router(bots_router.router)
 app.include_router(ws_router.router)
 app.include_router(admin_router.router)
+app.include_router(assistant_router.router)
 
 
 @app.get("/health")
