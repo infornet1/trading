@@ -22,7 +22,7 @@ const state = {
   refreshInterval: parseInt(localStorage.getItem('vf_admin_refresh') || '30000', 10),
   expanded:        new Set(),   // config_ids with open detail drawers
   hlLoading:       new Set(),   // config_ids currently fetching HL data
-  historicalOpen:  false,       // whether the historical pools section is expanded
+  historicalOpen:  true,        // Configured (stopped) section open by default
 };
 
 // ── Boot ───────────────────────────────────────────────────────────────────
@@ -218,33 +218,33 @@ function renderPools(pools) {
     return;
   }
 
-  const price      = state.ethPrice;
-  const active     = pools.filter(p => p.active || p.running);
-  const historical = pools.filter(p => !p.active && !p.running);
+  const price   = state.ethPrice;
+  const running = pools.filter(p => p.running);
+  const stopped = pools.filter(p => !p.running);
 
   let html = '';
 
-  // ── Active section ──────────────────────────────────────────────────
+  // ── Running section ─────────────────────────────────────────────────
   html += `<div class="pools-section">
   <div class="pools-section-header">
-    <span>Active <span class="pools-count">${active.length}</span></span>
+    <span>Running <span class="pools-count">${running.length}</span></span>
   </div>
   <div class="pools-cards-grid">
-    ${active.length
-      ? active.map(p => poolCard(p, price)).join('')
-      : '<div class="loading-msg">Sin pools activos.</div>'}
+    ${running.length
+      ? running.map(p => poolCard(p, price)).join('')
+      : '<div class="loading-msg">Sin bots corriendo ahora.</div>'}
   </div>
 </div>`;
 
-  // ── Historical section (collapsed by default) ───────────────────────
-  if (historical.length) {
+  // ── Configured / stopped section (always visible) ───────────────────
+  if (stopped.length) {
     html += `<div class="pools-section">
   <div class="pools-section-header pools-section-header--muted" onclick="toggleHistorical()">
-    <span>Historical <span class="pools-count">${historical.length}</span></span>
+    <span>Configured <span class="pools-count">${stopped.length}</span></span>
     <button class="btn-outline-sm" style="pointer-events:none">${state.historicalOpen ? '▲ Hide' : '▼ Show'}</button>
   </div>
   <div class="pools-cards-grid ${state.historicalOpen ? '' : 'hidden'}" id="historical-cards">
-    ${historical.map(p => poolCard(p, price, true)).join('')}
+    ${stopped.map(p => poolCard(p, price, true)).join('')}
   </div>
 </div>`;
   }
