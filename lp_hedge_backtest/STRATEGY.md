@@ -32,13 +32,13 @@ Price keeps falling → SHORT keeps covering
 
 ## Two Bot Modes
 
-### Bot Aragan (Hedge Only — Recommended)
+### Bot Defensor Bajista (Hedge Only — Recommended)
 - SHORT when price drops below lower bound
 - No trading on upper breakout
 - For passive investors who want capital protection
 - **Best performer in backtests** (+361% vs +340% LP Only)
 
-### Bot Avaro (Hedge + Trading)
+### Bot Defensor Alcista (Hedge + Trading)
 - SHORT when price drops below lower bound
 - LONG when price breaks above upper bound (with trailing stop)
 - For active traders who want to maximize returns
@@ -64,7 +64,7 @@ Price keeps falling → SHORT keeps covering
 | Take Profit | lower_bound price | Close when price returns to range |
 | Leverage | 2x | Conservative, avoid liquidation |
 
-### Long (Avaro Only)
+### Long (Defensor Alcista Only)
 | Parameter | Value | Notes |
 |-----------|-------|-------|
 | Trigger | upper_bound + 0.5% | Breakout confirmation |
@@ -143,13 +143,13 @@ Tested on full 2025 data (8,733 hourly candles, $1,418 - $4,934 price range):
 |----------|--------|--------|--------|---------|
 | HODL 50/50 | -5.6% | 32.5% | -0.01 | -0.01 |
 | LP Only | +340% | 39.4% | 2.55 | 3.64 |
-| **Bot Aragan** | **+361%** | **29.4%** | **2.88** | **4.69** |
-| Bot Avaro | +357% | 34.9% | 2.82 | 4.89 |
+| **Bot Defensor Bajista** | **+361%** | **29.4%** | **2.88** | **4.69** |
+| Bot Defensor Alcista | +357% | 34.9% | 2.82 | 4.89 |
 
 ### Key Findings
 - Hedge adds **+$2,083** vs LP Only and reduces max drawdown by **10 points**
 - Dynamic rebalancing (42 rebalances) keeps position in range **75%** of the time
-- Avaro long trading has 24% win rate — needs parameter tuning
+- Defensor Alcista long trading has 24% win rate — needs parameter tuning
 - Static ranges fail (23% time in range without rebalancing)
 
 ---
@@ -233,8 +233,8 @@ Long trigger: $95,978 (+0.5% above upper)
 
 | Term | Definition |
 |------|-----------|
-| **Bot Aragan** | Hedge-only mode (short when price drops below range) |
-| **Bot Avaro** | Hedge + long trading mode (short below, long above) |
+| **Bot Defensor Bajista** | Hedge-only mode (short when price drops below range) |
+| **Bot Defensor Alcista** | Hedge + long trading mode (short below, long above) |
 | **IL** | Impermanent Loss — value lost vs holding when price moves |
 | **Concentrated LP** | Uniswap v3 — provide liquidity in a specific price range |
 | **Trailing Stop** | Stop loss that moves up with price, closes on X% drop from max |

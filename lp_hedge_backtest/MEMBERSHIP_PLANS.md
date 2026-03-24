@@ -15,7 +15,7 @@ A managed LP hedging service where users connect their Hyperliquid API key and t
 |---------|---------|
 | Price | $0/month |
 | Pools | 1 pool max |
-| Bot Mode | Bot Aragan only (hedge) |
+| Bot Mode | Bot Defensor Bajista only (hedge) |
 | Pairs | ETH/USDC only |
 | Notifications | Email only |
 | Dashboard | Basic (PnL, pool status) |
@@ -27,12 +27,12 @@ A managed LP hedging service where users connect their Hyperliquid API key and t
 
 ---
 
-### Starter Tier — "Aragan"
+### Starter Tier — "Defensor Bajista"
 | Feature | Details |
 |---------|---------|
 | Price | $19/month or $190/year (save 17%) |
 | Pools | Up to 3 pools |
-| Bot Mode | Bot Aragan (hedge) |
+| Bot Mode | Bot Defensor Bajista (hedge) |
 | Pairs | ETH/USDC, BTC/USDC |
 | Notifications | Email + Telegram |
 | Dashboard | Full (PnL, APR, IL, hedge history, ADX chart) |
@@ -43,12 +43,12 @@ A managed LP hedging service where users connect their Hyperliquid API key and t
 
 ---
 
-### Pro Tier — "Avaro"
+### Pro Tier — "Defensor Alcista"
 | Feature | Details |
 |---------|---------|
 | Price | $49/month or $490/year (save 17%) |
 | Pools | Up to 10 pools |
-| Bot Mode | Bot Aragan + Bot Avaro (hedge + long trading) |
+| Bot Mode | Bot Defensor Bajista + Bot Defensor Alcista (hedge + long trading) |
 | Pairs | ETH/USDC, BTC/USDC, + selected altcoin pools |
 | Networks | Arbitrum + Base |
 | Notifications | Email + Telegram + WhatsApp |
@@ -142,7 +142,7 @@ A managed LP hedging service where users connect their Hyperliquid API key and t
 6. Configure pool parameters:
    - Select pair (ETH/USDC or BTC/USDC)
    - Set range (or use AI-suggested range)
-   - Choose bot mode (Aragan or Avaro)
+   - Choose bot mode (Defensor Bajista or Defensor Alcista)
          |
 7. Bot activates → monitoring begins
          |
@@ -190,7 +190,7 @@ RESULT: User maintains full custody at all times
 - [ ] Single-user bot (own capital)
 - [ ] Hyperliquid API integration
 - [ ] Uniswap v3 pool monitoring (via RPC)
-- [ ] Bot Aragan mode (hedge on exit below range)
+- [ ] Bot Defensor Bajista mode (hedge on exit below range)
 - [ ] Basic web dashboard (FastAPI + Jinja2)
 - [ ] Email notifications
 
@@ -203,7 +203,7 @@ RESULT: User maintains full custody at all times
 - [ ] ADX regime alerts
 
 ### Phase 3 — Pro Features (Month 5-6)
-- [ ] Bot Avaro mode (long trading on breakout)
+- [ ] Bot Defensor Alcista mode (long trading on breakout)
 - [ ] Auto-rebalancing
 - [ ] AI-suggested ranges (based on AT)
 - [ ] Pro tier launch

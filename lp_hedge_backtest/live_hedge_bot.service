@@ -1,5 +1,5 @@
 [Unit]
-Description=Uniswap v3 LP Perps Hedge Bot (Bot Aragan)
+Description=Uniswap v3 LP Perps Hedge Bot (Bot Defensor Bajista)
 After=network.target
 
 [Service]

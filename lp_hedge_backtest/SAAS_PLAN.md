@@ -8,7 +8,7 @@
 
 Allow any user to connect their wallet to the VIZNAGO FURY dashboard, select a
 Uniswap v3 LP position, configure hedge parameters, and activate a managed Bot
-Defensor Bajista/Avaro instance — without running anything locally.
+Defensor Bajista/Defensor Alcista instance — without running anything locally.
 
 Revenue model: monthly subscription paid in USDC on Arbitrum (crypto-first),
 Stripe as secondary option once validated.
@@ -555,7 +555,7 @@ These rules from Bootcamp Cripto 2026 are enforced server-side regardless
 of user config — not just UI hints:
 
 - **BTC: NEVER short** — bot refuses to open SHORT on BTC pairs
-- **ETH:** long + short OK (Defensor Bajista + Avaro modes)
+- **ETH:** long + short OK (Defensor Bajista + Defensor Alcista modes)
 - **Hedge wallet:** 10–20% of pool value maximum
 - **API key only:** Hyperliquid API key stored, never private key
 - **Min deposit:** $10 hedge balance enforced before bot starts
@@ -610,7 +610,7 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 
 - **Auth flow**: wallet sign-in button in drawer → `GET /auth/nonce` → `signMessage("Sign in to VIZNAGO FURY\nNonce: {nonce}")` → `POST /auth/verify` → JWT stored in `localStorage['vf_jwt']`
 - **Collapsible drawer** on every active position card; open/closed state persists across re-renders
-- **Mode toggle**: Defensor Bajista / Avaro radio buttons (Avaro disabled for BTC pairs — golden rule enforced in UI and API)
+- **Mode toggle**: Defensor Bajista / Defensor Alcista radio buttons (Defensor Alcista disabled for BTC pairs — golden rule enforced in UI and API)
 - **Config form**: trigger %, hedge size %, HL API Key (64-hex private key, password field, red label), HL wallet address (yellow label)
 - **Key validation**: 64-hex length check client-side before submit (prevents "20 bytes" bot crash)
 - **Create or update**: `POST /bots` (new) or `PUT /bots/{id}` (existing inactive bot) → `POST /bots/{id}/start`

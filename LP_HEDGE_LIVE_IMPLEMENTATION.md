@@ -23,7 +23,7 @@
 
 ---
 
-## 🤖 Bot Aragan v1.2 — Active Configuration
+## 🤖 Bot Defensor Bajista v1.2 — Active Configuration
 
 Custom Python execution engine monitoring the position 24/7 as a systemd service.
 

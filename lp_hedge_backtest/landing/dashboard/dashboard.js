@@ -1134,7 +1134,7 @@ function renderLiveBots() {
   const cards = activeBots.map(bot => {
     const modeName  = bot.mode === 'aragan'
       ? t('dash.hedge.mode.val')
-      : 'Avaro (Cobertura + Long)';
+      : 'Defensor Alcista (Cobertura + Long)';
     const triggerPx = (bot.lower_bound * (1 + bot.trigger_pct / 100)).toFixed(2);
     const rangePct  = (((bot.upper_bound - bot.lower_bound) / bot.lower_bound) * 100).toFixed(1);
     const chainName = { 42161: 'Arbitrum', 1: 'Ethereum', 8453: 'Base' }[bot.chain_id] || `Chain ${bot.chain_id}`;
@@ -1151,7 +1151,7 @@ function renderLiveBots() {
         <div class="hedge-panel-header">
           <div class="section-label">${t('dash.hedge.label')}</div>
           <h3 class="hedge-panel-title">
-            ${bot.mode === 'aragan' ? 'Defensor Bajista' : 'Avaro'} v1.3
+            ${bot.mode === 'aragan' ? 'Defensor Bajista' : 'Defensor Alcista'} v1.3
             <span class="status-dot dot-green"></span>
             <span class="status-live-tag">LIVE</span>
           </h3>
@@ -1338,7 +1338,7 @@ function buildProtectionDrawer(pos) {
       <div class="prot-active-info">
         <div class="prot-info-item">
           <span class="prot-info-label">${t('prot.mode.label')}</span>
-          <span class="prot-info-value">${bot.mode === 'aragan' ? 'Defensor Bajista' : 'Avaro'}</span>
+          <span class="prot-info-value">${bot.mode === 'aragan' ? 'Defensor Bajista' : 'Defensor Alcista'}</span>
         </div>
         <div class="prot-info-item">
           <span class="prot-info-label">Leverage</span>

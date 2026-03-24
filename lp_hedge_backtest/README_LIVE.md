@@ -1,6 +1,6 @@
 # LP + Perps Hedge: Live Bot Guide
 
-**Bot Haragán v2.0** — dual-trigger hedge bot for Uniswap v3 LP positions.
+**Bot Defensor Bajista v2.0** — dual-trigger hedge bot for Uniswap v3 LP positions.
 
 ---
 
