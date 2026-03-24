@@ -1349,7 +1349,16 @@ function buildProtectionDrawer(pos) {
           <span class="prot-info-value">${bot.sl_pct ?? 0.1}%</span>
         </div>
         <div class="prot-info-item">
-          <span class="prot-info-label">${t('prot.trigger.label')}</span>
+          <span class="prot-info-label">${t('prot.trigger.label')}
+            <span class="tp-info-anchor" tabindex="0" aria-label="Qué es esto">❓
+              <span class="tp-info-popover">
+                <strong>¿Cuándo dispara el bot?</strong><br><br>
+                Cuando el precio cae este % por debajo del <em>piso</em> de tu rango LP, el bot abre la cobertura SHORT automáticamente.<br><br>
+                <span style="color:#00d4ff">Ej: Piso $2,030 · -0.5% → SHORT se abre en $2,020</span><br><br>
+                ⚠️ <strong>No es el Stop Loss</strong> — el SL es un campo separado.
+              </span>
+            </span>
+          </span>
           <span class="prot-info-value">${bot.trigger_pct}%</span>
         </div>
         <div class="prot-info-item">
@@ -1426,7 +1435,16 @@ function buildProtectionDrawer(pos) {
         <!-- Buffer de Breakout (trigger offset slider) -->
         <div class="tp-slider-row">
           <div class="tp-slider-header">
-            <span class="tp-slider-label">Buffer de Breakout</span>
+            <span class="tp-slider-label">Buffer de Breakout
+              <span class="tp-info-anchor" tabindex="0" aria-label="Qué es esto">❓
+                <span class="tp-info-popover">
+                  <strong>¿Cuándo dispara el bot?</strong><br><br>
+                  Cuando el precio cae este % por debajo del <em>piso</em> de tu rango LP, el bot abre la cobertura SHORT automáticamente.<br><br>
+                  <span style="color:#00d4ff">Ej: Piso $2,030 · -0.5% → SHORT se abre en $2,020</span><br><br>
+                  ⚠️ <strong>No es el Stop Loss</strong> — el SL es un campo separado.
+                </span>
+              </span>
+            </span>
             <span class="tp-slider-value" id="tp-buf-val-${tokenId}">${trigVal.toFixed(1)}%</span>
           </div>
           <input type="range" class="tp-slider" id="prot-trigger-${tokenId}"
