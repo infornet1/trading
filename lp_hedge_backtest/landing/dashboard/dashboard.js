@@ -1351,7 +1351,7 @@ function buildProtectionDrawer(pos) {
         <div class="prot-info-item">
           <span class="prot-info-label">${t('prot.trigger.label')}
             <span class="tp-info-anchor" tabindex="0" aria-label="Qué es esto">❓
-              <span class="tp-info-popover">
+              <span class="tp-info-popover tp-info-popover--left">
                 <strong>¿Cuándo dispara el bot?</strong><br><br>
                 Cuando el precio cae este % por debajo del <em>piso</em> de tu rango LP, el bot abre la cobertura SHORT automáticamente.<br><br>
                 <span style="color:#00d4ff">Ej: Piso $2,030 · -0.5% → SHORT se abre en $2,020</span><br><br>

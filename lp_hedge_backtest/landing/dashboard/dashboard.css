@@ -1244,6 +1244,14 @@
 .tp-info-anchor:focus .tp-info-popover {
   display: block;
 }
+.tp-info-popover--left {
+  left: 0;
+  transform: none;
+}
+.tp-info-popover--left::after {
+  left: 12px;
+  transform: none;
+}
 
 /* Hedge size live sub-label */
 .tp-hedge-sublabel {
