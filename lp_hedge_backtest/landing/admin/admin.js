@@ -405,7 +405,7 @@ function poolCard(p, ethPrice, isHistorical = false) {
   <div class="pool-footer">
     <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
       ${botStatus}${heartbeatBadge}${shortBadge}
-      <span class="badge badge--muted">${p.mode.toUpperCase()}</span>
+      <span class="badge badge--muted">${p.mode === 'aragan' ? 'Defensor Bajista' : p.mode === 'avaro' ? 'Defensor Alcista' : p.mode.toUpperCase()}</span>
       <span class="badge badge--muted">${chainName(p.chain_id)}</span>
     </div>
     <span style="color:var(--muted);font-size:.7rem">${p.user_plan.toUpperCase()}</span>
