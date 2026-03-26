@@ -32,9 +32,12 @@ window.addEventListener('DOMContentLoaded', () => {
     doRefresh();
     applyRefreshInterval();
   } else {
+    const reason = state.jwt
+      ? (jwtExpired(state.jwt) ? 'expired' : 'not-admin')
+      : 'none';
     state.jwt = null;
     localStorage.removeItem('vf_jwt');
-    showGate();
+    showGate(reason);
   }
 
   document.getElementById('btn-signin').addEventListener('click', signIn);
@@ -47,7 +50,17 @@ function jwtPayload(token) {
 function jwtIsAdmin(token)  { return jwtPayload(token).is_admin === true; }
 function jwtExpired(token)  { return (jwtPayload(token).exp || 0) * 1000 < Date.now(); }
 
-function showGate()    {
+// reason: 'none' | 'expired' | 'not-admin' | 'api-expired' | 'api-forbidden'
+function showGate(reason = 'none') {
+  const subtitles = {
+    'expired':      '⏰ Tu sesión expiró. Vuelve a conectar tu wallet para continuar.',
+    'not-admin':    '⛔ Esta wallet no tiene permisos de administrador.',
+    'api-expired':  '⏰ Sesión expirada mientras usabas el panel. Reconecta para continuar.',
+    'api-forbidden':'⛔ Acceso denegado — la wallet no tiene permisos de administrador.',
+    'none':         'Solo wallets administradoras pueden acceder a este panel.',
+  };
+  const sub = document.getElementById('gate-sub');
+  if (sub) sub.textContent = subtitles[reason] ?? subtitles['none'];
   document.getElementById('signin-gate').classList.remove('hidden');
   document.getElementById('admin-content').classList.add('hidden');
 }
@@ -105,17 +118,37 @@ async function signIn() {
 }
 
 // ── API calls ──────────────────────────────────────────────────────────────
+function _handleAuthError(status) {
+  state.jwt = null;
+  localStorage.removeItem('vf_jwt');
+  showGate(status === 403 ? 'api-forbidden' : 'api-expired');
+}
+
 async function apiGet(path) {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${state.jwt}` },
   });
   if (res.status === 401 || res.status === 403) {
-    state.jwt = null;
-    localStorage.removeItem('vf_jwt');
-    showGate();
+    _handleAuthError(res.status);
     throw new Error('Session expired');
   }
   if (!res.ok) throw new Error(`API ${res.status}`);
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const opts = {
+    method:  'POST',
+    headers: { Authorization: `Bearer ${state.jwt}`, 'Content-Type': 'application/json' },
+  };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(`${API_BASE}${path}`, opts);
+  if (res.status === 401 || res.status === 403) {
+    _handleAuthError(res.status);
+    throw new Error('Session expired');
+  }
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  if (res.status === 204) return null;
   return res.json();
 }
 
@@ -773,12 +806,7 @@ async function toggleMaintenance() {
   if (enable && message === null) return; // user cancelled prompt
 
   try {
-    const res = await fetch(`${API_BASE}/admin/maintenance`, {
-      method:  'POST',
-      headers: { Authorization: `Bearer ${state.jwt}`, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ active: enable, message: message || '' }),
-    });
-    const d = await res.json();
+    const d = await apiPost('/admin/maintenance', { active: enable, message: message || '' });
     _maintenanceActive = d.maintenance;
     _updateMaintenanceBtn();
     alert(enable
@@ -786,22 +814,18 @@ async function toggleMaintenance() {
       : `✅ Maintenance mode OFF. Banner hidden.`
     );
   } catch (e) {
-    alert('Error: ' + e.message);
+    if (e.message !== 'Session expired') alert('Error: ' + e.message);
   }
 }
 
 async function nuclearStop() {
   if (!confirm('¿Detener TODOS los bots? Esta acción es irreversible hasta reinicio manual.')) return;
   try {
-    const res = await fetch(`${API_BASE}/admin/stop-all`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${state.jwt}` },
-    });
-    const d = await res.json();
+    const d = await apiPost('/admin/stop-all');
     alert(`✅ Detenidos: ${d.stopped_count} bots.`);
     doRefresh();
   } catch (e) {
-    alert('Error: ' + e.message);
+    if (e.message !== 'Session expired') alert('Error: ' + e.message);
   }
 }
 
