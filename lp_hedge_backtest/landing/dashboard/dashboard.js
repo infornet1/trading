@@ -123,11 +123,12 @@ const state = {
 const API_BASE = '/trading/lp-hedge/api';
 
 const saas = {
-  jwt:      localStorage.getItem('vf_jwt') || null,
-  bots:     {},    // nft_token_id (string) → BotConfigOut
-  sockets:  {},    // config_id (number) → WebSocket
-  statuses: {},    // config_id → last event payload
-  logs:     {},    // config_id → array of log line strings (max 50)
+  jwt:            localStorage.getItem('vf_jwt') || null,
+  sessionExpired: false,   // true when a prior JWT expired — bot may still be running
+  bots:           {},      // nft_token_id (string) → BotConfigOut
+  sockets:        {},      // config_id (number) → WebSocket
+  statuses:       {},      // config_id → last event payload
+  logs:           {},      // config_id → array of log line strings (max 50)
 };
 const LOG_MAX = 50;
 
@@ -310,20 +311,21 @@ function registerWalletListeners() {
   window.ethereum.on('chainChanged',    handleChainChanged);
 }
 
-function onWalletConnected() {
+async function onWalletConnected() {
   setWalletBtnLoading(false);
   renderWalletConnected();
 
   registerWalletListeners();
 
-  // Load SaaS bots if JWT exists (silently, no prompt)
+  // Load bots FIRST (if JWT exists) so protection drawers render correct
+  // state on first paint — avoids the "activate bot" flash on tab return.
   updateNuclearBtn();
-  saasLoadBots();
+  await saasLoadBots();
 
   // Check maintenance flag and show banner if active
   checkMaintenanceStatus();
 
-  // Initial data load
+  // Initial data load (positions rendered after bots are known)
   fetchLivePrices();
   fetchPositions();
 
@@ -906,6 +908,18 @@ function showError(msg) {
   el._timer = setTimeout(() => el.classList.add('hidden'), 8000);
 }
 
+function showSessionExpiredBanner() {
+  const t  = window.t || (k => k);
+  const el = document.getElementById('session-expired-banner');
+  if (!el) return;
+  el.classList.remove('hidden');
+}
+
+function hideSessionExpiredBanner() {
+  const el = document.getElementById('session-expired-banner');
+  if (el) el.classList.add('hidden');
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 
 function init() {
@@ -971,8 +985,10 @@ async function apiCall(method, path, body) {
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(API_BASE + path, opts);
   if (res.status === 401) {
+    saas.sessionExpired = true;
     saas.jwt = null;
     localStorage.removeItem('vf_jwt');
+    showSessionExpiredBanner();
     renderPositions();
     throw new Error('Session expired — please sign in again.');
   }
@@ -1012,7 +1028,9 @@ window.saasSignIn = async function () {
     const { access_token } = await verRes.json();
 
     saas.jwt = access_token;
+    saas.sessionExpired = false;
     localStorage.setItem('vf_jwt', access_token);
+    hideSessionExpiredBanner();
     updateNuclearBtn();
 
     await saasLoadBots();
@@ -1311,8 +1329,19 @@ function buildProtectionDrawer(pos) {
     // Watch mode — no protection available
     bodyHtml = `<p class="prot-info-msg">${t('prot.watch.disabled')}</p>`;
 
+  } else if (!saas.jwt && saas.sessionExpired) {
+    // Session expired — bot may still be running server-side
+    bodyHtml = `
+      <div class="prot-session-expired">
+        <span class="prot-session-expired-icon">⏰</span>
+        <p class="prot-session-expired-msg">${t('prot.session.expired.msg')}</p>
+      </div>
+      <button class="btn btn-primary btn-sm prot-btn-full" onclick="saasSignIn()">
+        🔐&nbsp; ${t('prot.btn.reauth')}
+      </button>`;
+
   } else if (!saas.jwt) {
-    // Not signed in
+    // New user — never signed in
     bodyHtml = `
       <p class="prot-info-msg">${t('prot.drawer.signin.hint')}</p>
       <button class="btn btn-primary btn-sm prot-btn-full" onclick="saasSignIn()">

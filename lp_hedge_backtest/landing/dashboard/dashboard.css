@@ -1134,6 +1134,31 @@
 /* Sign-in section */
 .prot-signin-section { display: flex; flex-direction: column; gap: 10px; }
 
+/* ── Session-Expired Banner ──────────────────────────────────── */
+.alert-session-expired {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(99, 179, 237, 0.08);
+  border: 1px solid rgba(99, 179, 237, 0.40);
+  color: #63b3ed;
+  position: relative;
+}
+
+/* ── Session-Expired Drawer State ────────────────────────────── */
+.prot-session-expired {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(99, 179, 237, 0.06);
+  border: 1px solid rgba(99, 179, 237, 0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.prot-session-expired-icon { font-size: 1.1rem; flex-shrink: 0; line-height: 1.5; }
+.prot-session-expired-msg  { font-size: 0.8rem; color: #93c5fd; line-height: 1.5; margin: 0; }
+
 /* ── Maintenance Banner ──────────────────────────────────────── */
 .alert-maintenance {
   display: flex;

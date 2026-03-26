@@ -260,6 +260,9 @@ const TRANSLATIONS = {
     'prot.btc.warning':           'Pares BTC: solo modo Defensor Bajista (regla de oro: BTC nunca short).',
     'prot.no.hlkey':              'Ingresa tu API Key y dirección de billetera HL.',
     'prot.signin.required':       'Inicia sesión para activar la protección del bot.',
+    'prot.session.expired.msg':   'Tu sesión expiró pero el bot sigue corriendo en el servidor. Vuelve a conectarte para ver el estado en vivo y gestionar la protección.',
+    'prot.btn.reauth':            'Reconectar Sesión',
+    'dash.session.expired.banner':'Tu sesión expiró — tus bots siguen corriendo. Re-conéctate en cualquier pool para continuar.',
   },
 
   /* ══════════════════════════════════════════════════════════════
@@ -509,6 +512,9 @@ const TRANSLATIONS = {
     'prot.btc.warning':           'BTC pairs: Defensor Bajista only (golden rule: never short BTC).',
     'prot.no.hlkey':              'Enter your HL API Key and wallet address.',
     'prot.signin.required':       'Sign in to enable bot protection.',
+    'prot.session.expired.msg':   'Your session expired but the bot is still running on the server. Re-sign to view live status and manage your protection.',
+    'prot.btn.reauth':            'Reconnect Session',
+    'dash.session.expired.banner':'Your session expired — your bots are still running. Re-connect on any pool to continue.',
   },
 };
 

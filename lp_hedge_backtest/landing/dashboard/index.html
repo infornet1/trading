@@ -166,6 +166,13 @@
         <!-- Error banner -->
         <div id="error-banner" class="alert alert-error hidden"></div>
 
+        <!-- Session-expired banner (shown when JWT expires on tab return) -->
+        <div id="session-expired-banner" class="alert alert-session-expired hidden">
+          <span class="maintenance-icon">⏰</span>
+          <span id="session-expired-msg" data-i18n="dash.session.expired.banner">Tu sesión expiró — tus bots siguen corriendo. Re-conéctate en cualquier pool para continuar.</span>
+          <button class="maintenance-dismiss" onclick="this.parentElement.classList.add('hidden')" title="Dismiss">✕</button>
+        </div>
+
         <!-- Maintenance banner (amber, persistent) -->
         <div id="maintenance-banner" class="alert alert-maintenance hidden">
           <span class="maintenance-icon">🔧</span>

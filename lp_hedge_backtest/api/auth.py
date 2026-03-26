@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 SECRET_KEY  = os.getenv("SECRET_KEY", "")
 ALGORITHM   = "HS256"
-EXPIRE_HOURS = 24
+EXPIRE_HOURS = 168  # 7 days — reduces re-auth friction on dashboard revisit
 
 _ADMIN_WALLETS = {
     w.strip().lower()
