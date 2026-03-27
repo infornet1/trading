@@ -90,7 +90,10 @@ MAX_LEVERAGE        = 15                                                  # hard
 MARGIN_BUFFER       = float(os.getenv("MARGIN_BUFFER",          "1.5"))
 
 # SL / trail
-DEFAULT_SL_PCT      = float(os.getenv("SL_PCT",                "0.1")) / 100.0
+# Minimum SL floor: anything below 0.3% is smaller than normal price noise on HL
+# and will trigger immediately (whipsaw). The user-set value is clamped to this floor.
+_SL_FLOOR_PCT       = 0.003   # 0.3% hard minimum — never configurable
+DEFAULT_SL_PCT      = max(float(os.getenv("SL_PCT", "0.5")) / 100.0, _SL_FLOOR_PCT)
 BREAKEVEN_PCT       = float(os.getenv("BREAKEVEN_PCT",          "1.0")) / 100.0
 TRAIL_PCT           = float(os.getenv("TRAIL_PCT",              "1.5")) / 100.0
 REENTRY_BUFFER      = float(os.getenv("REENTRY_BUFFER_PCT",     "0.5")) / 100.0
@@ -196,6 +199,14 @@ class LiveHedgeBot:
         # After a short closes, price must recover above this level before
         # the below-range trigger can fire again. None = guard inactive.
         self.reentry_guard_price = None
+
+        # ── Margin failure guard ────────────────────────────────────────────
+        # Tracks consecutive "Sizing/margin check failed" outcomes.
+        # After MAX_MARGIN_FAILURES consecutive failures, the bot backs off
+        # for MARGIN_BACKOFF_SECS and sends a single email alert instead of
+        # hammering the API every 30 s indefinitely.
+        self._margin_fail_count    = 0
+        self._margin_backoff_until = 0.0   # epoch seconds; 0 = not in backoff
 
         self.email_config = self._load_email_config()
 
@@ -343,16 +354,46 @@ class LiveHedgeBot:
 
     # ── Short open ─────────────────────────────────────────────────────────────
 
+    # Margin failure guard constants
+    _MAX_MARGIN_FAILURES  = 5      # consecutive failures before backoff
+    _MARGIN_BACKOFF_SECS  = 300    # 5-minute pause after max failures
+
     def open_hedge(self, price, trigger):
         """
         trigger: "from_above" | "below_range"
         """
+        # ── Margin failure backoff check ────────────────────────────────────
+        if time.time() < self._margin_backoff_until:
+            remaining = int(self._margin_backoff_until - time.time())
+            print(f"⏸️  Margin backoff active — {remaining}s remaining", flush=True)
+            return
+
         label = "FROM ABOVE" if trigger == "from_above" else "BELOW RANGE"
         print(f"🚨 SHORT TRIGGERED ({label}): ETH ${price:.2f}", flush=True)
         try:
             params = self._calc_order_params(price)
             if params is None:
-                log_event("error", price=price, details={"msg": "Sizing/margin check failed"})
+                self._margin_fail_count += 1
+                log_event("error", price=price, details={
+                    "msg": "Sizing/margin check failed",
+                    "consecutive_failures": self._margin_fail_count,
+                })
+                if self._margin_fail_count >= self._MAX_MARGIN_FAILURES:
+                    self._margin_backoff_until = time.time() + self._MARGIN_BACKOFF_SECS
+                    self._margin_fail_count    = 0
+                    print(f"🔴 Margin failed {self._MAX_MARGIN_FAILURES}x — pausing "
+                          f"{self._MARGIN_BACKOFF_SECS}s", flush=True)
+                    log_event("error", price=price, details={
+                        "msg": f"Margin check failed {self._MAX_MARGIN_FAILURES} times — "
+                               f"pausing {self._MARGIN_BACKOFF_SECS}s. Fund HL wallet to resume."
+                    })
+                    self.send_email(
+                        "⚠️ Bot Paused — Repeated Margin Failures",
+                        f"NFT #{NFT_ID}: margin check failed {self._MAX_MARGIN_FAILURES} consecutive times.\n"
+                        f"Bot paused for {self._MARGIN_BACKOFF_SECS // 60} minutes.\n\n"
+                        f"Action required: fund the HL wallet ({HL_ADDRESS}) with USDC.\n"
+                        f"Bot will resume automatically after the pause.",
+                    )
                 return
             size, leverage, notional, req_margin, x_max = params
 
@@ -364,6 +405,8 @@ class LiveHedgeBot:
             order = self.exchange.market_open("ETH", False, size, slippage=0.01)
 
             if order["status"] == "ok":
+                self._margin_fail_count    = 0   # reset on successful open
+                self._margin_backoff_until = 0.0
                 self.entry_price       = price
                 self.hedge_size_eth    = size
                 self.leverage_used     = leverage
