@@ -1935,15 +1935,94 @@ async function checkMaintenanceStatus() {
   } catch (_) { /* ignore network errors for optional banner */ }
 }
 
-// ── Stop bot ──────────────────────────────────────────────────────────────
+// ── Stop bot — confirmation modal with live HL position re-query ───────────
+
+let _stopConfirmState = { configId: null, tokenId: null };
 
 window.stopProtection = async function (configId, tokenId) {
-  const t   = window.t || (k => k);
-  const btn = document.getElementById(`prot-stop-btn-${configId}`);
+  // Store for use after confirmation
+  _stopConfirmState = { configId, tokenId };
+
+  const modal      = document.getElementById('stop-confirm-modal');
+  const loading    = document.getElementById('stop-confirm-loading');
+  const posEl      = document.getElementById('stop-confirm-position');
+  const bodyEl     = document.getElementById('stop-confirm-body');
+  const noPosEl    = document.getElementById('stop-confirm-no-position');
+  const okBtn      = document.getElementById('stop-confirm-ok');
+
+  // Reset modal to loading state
+  loading.classList.remove('hidden');
+  posEl.classList.add('hidden');
+  bodyEl.classList.add('hidden');
+  noPosEl.classList.add('hidden');
+  okBtn.disabled = false;
+  modal.classList.remove('hidden');
+
+  // Query live HL position
+  let pos = null;
+  try {
+    pos = await apiCall('GET', `/bots/${configId}/hl-position`);
+  } catch (_) { /* show modal anyway — let user decide */ }
+
+  loading.classList.add('hidden');
+
+  if (pos && pos.has_position) {
+    const pnl     = pos.unrealized_pnl || 0;
+    const pnlCls  = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+    const pnlSign = pnl >= 0 ? '+' : '';
+    posEl.innerHTML = `
+      <div class="pos-row">
+        <span class="pos-label">Par</span>
+        <span class="pos-value">${pos.coin}/USDC — ${pos.side}</span>
+      </div>
+      <div class="pos-row">
+        <span class="pos-label">Tamaño</span>
+        <span class="pos-value">${pos.size.toFixed(4)} ${pos.coin}</span>
+      </div>
+      <div class="pos-row">
+        <span class="pos-label">Precio entrada</span>
+        <span class="pos-value">$${pos.entry_px.toFixed(2)}</span>
+      </div>
+      <div class="pos-row">
+        <span class="pos-label">Precio actual</span>
+        <span class="pos-value">$${pos.mark_px.toFixed(2)}</span>
+      </div>
+      <div class="pos-row">
+        <span class="pos-label">PnL no realizado</span>
+        <span class="pos-value ${pnlCls}">${pnlSign}$${pnl.toFixed(4)}</span>
+      </div>
+      <div class="pos-row">
+        <span class="pos-label">Balance wallet HL</span>
+        <span class="pos-value">$${(pos.account_value || 0).toFixed(2)}</span>
+      </div>`;
+    posEl.classList.remove('hidden');
+    document.getElementById('stop-confirm-coin').textContent = pos.coin;
+    bodyEl.classList.remove('hidden');
+  } else {
+    noPosEl.classList.remove('hidden');
+  }
+};
+
+window.closeStopConfirmModal = function () {
+  document.getElementById('stop-confirm-modal').classList.add('hidden');
+  _stopConfirmState = { configId: null, tokenId: null };
+};
+
+window.confirmStopProtection = async function () {
+  const { configId, tokenId } = _stopConfirmState;
+  if (!configId) return;
+
+  const t      = window.t || (k => k);
+  const okBtn  = document.getElementById('stop-confirm-ok');
+  const btn    = document.getElementById(`prot-stop-btn-${configId}`);
+  okBtn.disabled = true;
+  okBtn.textContent = t('prot.btn.stopping');
   if (btn) { btn.disabled = true; btn.textContent = t('prot.btn.stopping'); }
 
   try {
     await apiCall('POST', `/bots/${configId}/stop`);
+
+    closeStopConfirmModal();
 
     // Close WebSocket
     const ws = saas.sockets[configId];
@@ -1954,6 +2033,8 @@ window.stopProtection = async function (configId, tokenId) {
 
   } catch (err) {
     showError('Stop failed: ' + (err.message || err));
+    okBtn.disabled = false;
+    okBtn.textContent = 'Sí, desactivar y cerrar';
     if (btn) { btn.disabled = false; btn.textContent = t('prot.btn.stop'); }
   }
 };

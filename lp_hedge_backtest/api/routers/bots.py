@@ -317,6 +317,84 @@ async def hl_balance(
     return await loop.run_in_executor(None, _sync)
 
 
+@router.get("/{config_id}/hl-position")
+async def hl_position(
+    config_id: int,
+    address: str = Depends(get_current_address),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns the live Hyperliquid open position for this bot's wallet + coin.
+    Called by the stop-confirmation modal to show the user what they are about
+    to close before they confirm.
+
+    Response fields:
+      has_position  — bool: True if HL shows an open position for this coin
+      coin          — "ETH" | "BTC"
+      side          — "SHORT" | "LONG" | null
+      size          — absolute contract size (positive)
+      entry_px      — average entry price
+      mark_px       — current mark price from all_mids()
+      unrealized_pnl — USD P&L at mark price
+      account_value — total wallet account value
+    """
+    cfg = await _get_own_config(config_id, address, db)
+    coin = "ETH"
+    if cfg.pair:
+        pair_upper = cfg.pair.upper()
+        if "BTC" in pair_upper:
+            coin = "BTC"
+
+    def _sync():
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+            info  = Info(constants.MAINNET_API_URL, skip_ws=True)
+            state = info.user_state(cfg.hl_wallet_addr)
+            mids  = info.all_mids()
+            mark_px = float(mids.get(coin, 0))
+
+            account_value = float(state.get("marginSummary", {}).get("accountValue", 0))
+
+            # Find open position for our coin
+            for ap in state.get("assetPositions", []):
+                pos = ap.get("position", {})
+                if pos.get("coin") != coin:
+                    continue
+                szi = float(pos.get("szi", 0))
+                if szi == 0:
+                    continue
+                return {
+                    "has_position":    True,
+                    "coin":            coin,
+                    "side":            "SHORT" if szi < 0 else "LONG",
+                    "size":            abs(szi),
+                    "entry_px":        float(pos.get("entryPx") or 0),
+                    "mark_px":         mark_px,
+                    "unrealized_pnl":  float(pos.get("unrealizedPnl") or 0),
+                    "account_value":   account_value,
+                    "error":           None,
+                }
+
+            return {
+                "has_position": False, "coin": coin, "side": None,
+                "size": 0, "entry_px": 0, "mark_px": mark_px,
+                "unrealized_pnl": 0, "account_value": account_value,
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "has_position": False, "coin": coin, "side": None,
+                "size": 0, "entry_px": 0, "mark_px": 0,
+                "unrealized_pnl": 0, "account_value": 0,
+                "error": str(e),
+            }
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _sync)
+
+
 @router.get("/{config_id}", response_model=BotConfigOut)
 async def get_bot(
     config_id: int,
