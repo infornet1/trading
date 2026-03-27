@@ -30,6 +30,13 @@ async def _run_column_migrations():
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS tp_pct DECIMAL(5,3) NULL",
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS trailing_stop TINYINT(1) NOT NULL DEFAULT 1",
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS auto_rearm TINYINT(1) NOT NULL DEFAULT 1",
+        # FURY mode columns
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS fury_symbol VARCHAR(5) NULL",
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS fury_rsi_period INT NULL DEFAULT 9",
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS fury_rsi_long_th DECIMAL(5,2) NULL DEFAULT 35.00",
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS fury_rsi_short_th DECIMAL(5,2) NULL DEFAULT 65.00",
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS fury_leverage_max INT NULL DEFAULT 12",
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS fury_risk_pct DECIMAL(5,2) NULL DEFAULT 2.00",
     ]
     async with engine.begin() as conn:
         for sql in migrations:
@@ -64,6 +71,13 @@ async def _auto_restart_bots():
                     "tp_pct":         str(bot.tp_pct)    if bot.tp_pct else "",
                     "trailing_stop":  "1" if bot.trailing_stop else "0",
                     "auto_rearm":     "1" if bot.auto_rearm    else "0",
+                    # FURY config (only used when mode='fury')
+                    "fury_symbol":       bot.fury_symbol       or "ETH",
+                    "fury_rsi_period":   str(bot.fury_rsi_period   or 9),
+                    "fury_rsi_long_th":  str(bot.fury_rsi_long_th  or 35),
+                    "fury_rsi_short_th": str(bot.fury_rsi_short_th or 65),
+                    "fury_leverage_max": str(bot.fury_leverage_max or 12),
+                    "fury_risk_pct":     str(bot.fury_risk_pct     or 2.0),
                 }
                 await manager.start(bot.id, config)
                 print(f"[Startup] Auto-restarted bot {bot.id} (NFT #{bot.nft_token_id})", flush=True)

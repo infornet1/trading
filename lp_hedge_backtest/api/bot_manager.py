@@ -18,21 +18,27 @@ from typing import Optional
 from api.database import AsyncSessionLocal
 from api.models import BotConfig, BotEvent
 
-# Path to the bot script and venv Python
+# Path to bot scripts and venv Python
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BOT_SCRIPT  = os.path.join(_BASE, "live_hedge_bot.py")
-VENV_PYTHON = os.path.join(_BASE, "venv", "bin", "python3")
+BOT_SCRIPT       = os.path.join(_BASE, "live_hedge_bot.py")
+FURY_BOT_SCRIPT  = os.path.join(_BASE, "live_fury_bot.py")
+VENV_PYTHON      = os.path.join(_BASE, "venv", "bin", "python3")
 
 # Map event label from bot stdout → DB enum value
 _EVENT_MAP = {
-    "started":       "started",
-    "hedge_opened":  "hedge_opened",
-    "breakeven":     "breakeven",
-    "tp_hit":        "tp_hit",
-    "sl_hit":        "sl_hit",
-    "trailing_stop": "trailing_stop",
-    "stopped":       "stopped",
-    "error":         "error",
+    "started":              "started",
+    "hedge_opened":         "hedge_opened",
+    "breakeven":            "breakeven",
+    "tp_hit":               "tp_hit",
+    "sl_hit":               "sl_hit",
+    "trailing_stop":        "trailing_stop",
+    "stopped":              "stopped",
+    "error":                "error",
+    # FURY events
+    "fury_entry":           "fury_entry",
+    "fury_sl":              "fury_sl",
+    "fury_tp":              "fury_tp",
+    "fury_circuit_breaker": "fury_circuit_breaker",
 }
 
 
@@ -80,8 +86,21 @@ class BotManager:
             "AUTO_REARM":                  str(config.get("auto_rearm",    "1")),
         }
 
+        # Select bot script based on mode; inject fury-specific vars if needed
+        bot_mode = config.get("mode", "aragan")
+        if bot_mode == "fury":
+            script = FURY_BOT_SCRIPT
+            env["FURY_SYMBOL"]       = str(config.get("fury_symbol", "ETH"))
+            env["FURY_RSI_PERIOD"]   = str(config.get("fury_rsi_period", "9"))
+            env["FURY_RSI_LONG_TH"]  = str(config.get("fury_rsi_long_th", "35"))
+            env["FURY_RSI_SHORT_TH"] = str(config.get("fury_rsi_short_th", "65"))
+            env["FURY_LEVERAGE_MAX"] = str(config.get("fury_leverage_max", "12"))
+            env["FURY_RISK_PCT"]     = str(config.get("fury_risk_pct", "2.0"))
+        else:
+            script = BOT_SCRIPT
+
         proc = subprocess.Popen(
-            [VENV_PYTHON, BOT_SCRIPT],
+            [VENV_PYTHON, script],
             env=env,
             stdout=PIPE,
             stderr=STDOUT,

@@ -47,12 +47,19 @@ class BotConfig(Base):
     hedge_exchange  = Column(String(20), default="hyperliquid")
     hl_api_key      = Column(Text, nullable=True)         # AES-256 encrypted
     hl_wallet_addr  = Column(String(42), nullable=True)
-    mode            = Column(Enum("aragan", "avaro"), default="aragan")
+    mode            = Column(Enum("aragan", "avaro", "fury"), default="aragan")
     leverage        = Column(Integer, default=10)
     sl_pct          = Column(Numeric(5, 3), default=0.100)    # % above entry → close short
     tp_pct          = Column(Numeric(5, 3), nullable=True)    # optional fixed TP %
     trailing_stop   = Column(Boolean, default=True)
     auto_rearm      = Column(Boolean, default=True)
+    # FURY-specific config (nullable — only used when mode='fury')
+    fury_symbol     = Column(String(5),    nullable=True)     # 'BTC' | 'ETH'
+    fury_rsi_period = Column(Integer,      nullable=True, default=9)
+    fury_rsi_long_th  = Column(Numeric(5, 2), nullable=True, default=35.0)
+    fury_rsi_short_th = Column(Numeric(5, 2), nullable=True, default=65.0)
+    fury_leverage_max = Column(Integer,    nullable=True, default=12)
+    fury_risk_pct   = Column(Numeric(5, 2), nullable=True, default=2.0)
     active          = Column(Boolean, default=False)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -67,7 +74,12 @@ class BotEvent(Base):
     id            = Column(BigInteger, primary_key=True, autoincrement=True)
     config_id     = Column(Integer, ForeignKey("bot_configs.id", ondelete="CASCADE"), nullable=False)
     event_type    = Column(
-        Enum("started", "hedge_opened", "breakeven", "tp_hit", "sl_hit", "trailing_stop", "stopped", "error"),
+        Enum(
+            "started", "hedge_opened", "breakeven", "tp_hit", "sl_hit",
+            "trailing_stop", "stopped", "error",
+            # FURY events
+            "fury_entry", "fury_sl", "fury_tp", "fury_circuit_breaker",
+        ),
         nullable=False,
     )
     price_at_event = Column(Numeric(20, 8), nullable=True)

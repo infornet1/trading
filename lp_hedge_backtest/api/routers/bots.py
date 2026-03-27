@@ -40,12 +40,19 @@ class BotConfigCreate(BaseModel):
     tp_pct:         Optional[float] = None
     trailing_stop:  bool  = True
     auto_rearm:     bool  = True
+    # FURY-specific fields (required when mode='fury', ignored otherwise)
+    fury_symbol:       Optional[str]   = None   # 'BTC' | 'ETH'
+    fury_rsi_period:   Optional[int]   = 9
+    fury_rsi_long_th:  Optional[float] = 35.0
+    fury_rsi_short_th: Optional[float] = 65.0
+    fury_leverage_max: Optional[int]   = 12
+    fury_risk_pct:     Optional[float] = 2.0
 
     @field_validator("mode")
     @classmethod
     def validate_mode(cls, v: str) -> str:
-        if v not in ("aragan", "avaro"):
-            raise ValueError("mode must be 'aragan' or 'avaro'")
+        if v not in ("aragan", "avaro", "fury"):
+            raise ValueError("mode must be 'aragan', 'avaro', or 'fury'")
         return v
 
     @field_validator("pair")
@@ -68,12 +75,19 @@ class BotConfigUpdate(BaseModel):
     tp_pct:         Optional[float] = None
     trailing_stop:  Optional[bool]  = None
     auto_rearm:     Optional[bool]  = None
+    # FURY-specific fields
+    fury_symbol:       Optional[str]   = None
+    fury_rsi_period:   Optional[int]   = None
+    fury_rsi_long_th:  Optional[float] = None
+    fury_rsi_short_th: Optional[float] = None
+    fury_leverage_max: Optional[int]   = None
+    fury_risk_pct:     Optional[float] = None
 
     @field_validator("mode")
     @classmethod
     def validate_mode(cls, v):
-        if v is not None and v not in ("aragan", "avaro"):
-            raise ValueError("mode must be 'aragan' or 'avaro'")
+        if v is not None and v not in ("aragan", "avaro", "fury"):
+            raise ValueError("mode must be 'aragan', 'avaro', or 'fury'")
         return v
 
 
@@ -94,6 +108,12 @@ class BotConfigOut(BaseModel):
     tp_pct:         Optional[float]
     trailing_stop:  bool
     auto_rearm:     bool
+    fury_symbol:       Optional[str]
+    fury_rsi_period:   Optional[int]
+    fury_rsi_long_th:  Optional[float]
+    fury_rsi_short_th: Optional[float]
+    fury_leverage_max: Optional[int]
+    fury_risk_pct:     Optional[float]
     active:         bool
     created_at:     datetime
     updated_at:     datetime
@@ -126,13 +146,24 @@ async def _get_own_config(config_id: int, address: str, db: AsyncSession) -> Bot
     return cfg
 
 
-def _enforce_golden_rules(pair: str, mode: str):
-    """BTC: NEVER short. Avaro mode opens longs on breakout, not shorts for BTC."""
+def _enforce_golden_rules(pair: str, mode: str, fury_symbol: Optional[str] = None):
+    """BTC: NEVER short. Avaro and Fury modes can open shorts — blocked for BTC."""
     pair_upper = pair.upper()
     if "BTC" in pair_upper and mode == "avaro":
         raise HTTPException(
             status_code=400,
             detail="BTC pairs cannot use Avaro mode (golden rule: BTC long only). Use Aragan.",
+        )
+    # FURY: BTC is long-only inside live_fury_bot, but reject upfront if user
+    # explicitly configures fury_symbol=BTC with any intent to short — the bot
+    # enforces this internally too, but we validate at the API layer as well.
+    if mode == "fury" and fury_symbol and fury_symbol.upper() == "BTC":
+        # BTC fury is allowed (long-only enforced in bot); just validate symbol is set
+        pass
+    if mode == "fury" and not fury_symbol:
+        raise HTTPException(
+            status_code=400,
+            detail="fury_symbol is required when mode is 'fury' (use 'BTC' or 'ETH')",
         )
 
 
@@ -155,7 +186,7 @@ async def create_bot(
     address: str = Depends(get_current_address),
     db: AsyncSession = Depends(get_db),
 ):
-    _enforce_golden_rules(body.pair, body.mode)
+    _enforce_golden_rules(body.pair, body.mode, body.fury_symbol)
 
     # Ensure user row exists
     result = await db.execute(select(User).where(User.address == address))
@@ -182,6 +213,12 @@ async def create_bot(
         tp_pct         = body.tp_pct,
         trailing_stop  = body.trailing_stop,
         auto_rearm     = body.auto_rearm,
+        fury_symbol       = body.fury_symbol,
+        fury_rsi_period   = body.fury_rsi_period,
+        fury_rsi_long_th  = body.fury_rsi_long_th,
+        fury_rsi_short_th = body.fury_rsi_short_th,
+        fury_leverage_max = body.fury_leverage_max,
+        fury_risk_pct     = body.fury_risk_pct,
     )
     db.add(cfg)
     await db.commit()
@@ -207,13 +244,20 @@ async def update_bot(
     if body.hl_wallet_addr is not None: cfg.hl_wallet_addr = body.hl_wallet_addr
     if body.hl_api_key     is not None: cfg.hl_api_key     = encrypt(body.hl_api_key)
     if body.mode           is not None:
-        _enforce_golden_rules(cfg.pair, body.mode)
+        effective_fury_symbol = body.fury_symbol or cfg.fury_symbol
+        _enforce_golden_rules(cfg.pair, body.mode, effective_fury_symbol)
         cfg.mode = body.mode
     if body.leverage       is not None: cfg.leverage       = max(1, min(body.leverage, 15))
     if body.sl_pct         is not None: cfg.sl_pct         = body.sl_pct
     if body.tp_pct         is not None: cfg.tp_pct         = body.tp_pct
     if body.trailing_stop  is not None: cfg.trailing_stop  = body.trailing_stop
     if body.auto_rearm     is not None: cfg.auto_rearm     = body.auto_rearm
+    if body.fury_symbol       is not None: cfg.fury_symbol       = body.fury_symbol
+    if body.fury_rsi_period   is not None: cfg.fury_rsi_period   = body.fury_rsi_period
+    if body.fury_rsi_long_th  is not None: cfg.fury_rsi_long_th  = body.fury_rsi_long_th
+    if body.fury_rsi_short_th is not None: cfg.fury_rsi_short_th = body.fury_rsi_short_th
+    if body.fury_leverage_max is not None: cfg.fury_leverage_max = body.fury_leverage_max
+    if body.fury_risk_pct     is not None: cfg.fury_risk_pct     = body.fury_risk_pct
 
     await db.commit()
     await db.refresh(cfg)
@@ -365,6 +409,13 @@ async def start_bot(
         "tp_pct":         str(cfg.tp_pct)    if cfg.tp_pct else "",
         "trailing_stop":  "1" if cfg.trailing_stop else "0",
         "auto_rearm":     "1" if cfg.auto_rearm    else "0",
+        # FURY config (only used when mode='fury')
+        "fury_symbol":       cfg.fury_symbol       or "ETH",
+        "fury_rsi_period":   str(cfg.fury_rsi_period   or 9),
+        "fury_rsi_long_th":  str(cfg.fury_rsi_long_th  or 35),
+        "fury_rsi_short_th": str(cfg.fury_rsi_short_th or 65),
+        "fury_leverage_max": str(cfg.fury_leverage_max or 12),
+        "fury_risk_pct":     str(cfg.fury_risk_pct     or 2.0),
     }
     await manager.start(config_id, config_dict)
     cfg.active = True

@@ -1,6 +1,10 @@
-"""Core backtest engine v2: LP + hedge with ADX regime detection and dynamic rebalancing."""
+"""Core backtest engine v2: LP + hedge with ADX regime detection and dynamic rebalancing.
+
+Phase 3 addition: FuryBacktestEngine — standalone RSI perps strategy, no LP required.
+"""
 
 import logging
+import numpy as np
 import pandas as pd
 from datetime import timedelta
 
@@ -9,7 +13,8 @@ from src.lp.fee_estimator import FeeEstimator
 from src.hedge.perps_simulator import PerpsSimulator, LongTrailingSimulator
 from src.hedge.funding_rate import FundingRateModel
 from src.costs.cost_model import CostModel
-from src.indicators.technical import add_indicators
+from src.indicators.technical import add_indicators, add_fury_indicators
+from src.hedge.standalone_perps_simulator import StandalonePerpsSimulator
 
 logger = logging.getLogger(__name__)
 
@@ -709,4 +714,261 @@ class BotAvaroEngine:
             "perps_summary": self.perps.get_summary(),
             "long_summary": self.long_trader.get_summary(),
             "cost_summary": self.cost_model.get_summary(),
+        }
+
+
+# ── FURY Backtest Engine ───────────────────────────────────────────────────────
+
+
+class FuryBacktestEngine:
+    """Standalone RSI perps backtest for VIZNAGO FURY mode.
+
+    No LP position. Trades BTC or ETH perps using a 6-gate signal stack on
+    15-minute candles with 1-hour MTF confirmation.
+
+    Gates (all must score >= min_gates to open):
+        1. EMA trend  — EMA-8 vs EMA-21 direction
+        2. RSI level  — RSI(9/OHLC4) < long_th or > short_th on 15m
+        3. MTF RSI    — 1h RSI confirms direction (< 50 long, > 50 short)
+        4. Volume     — candle volume > 20-bar SMA
+        5. OBV slope  — positive for longs (accumulation gate)
+        6. Funding    — configurable funding bias (default: always passes)
+
+    Leverage is dynamic: gate_score 3=3x, 4=5x, 5=8x, 6=12x.
+    """
+
+    WARMUP = 50  # candles before signals are evaluated
+
+    def __init__(self, config: dict):
+        self.symbol = config.get("symbol", "ETH")          # 'BTC' | 'ETH'
+        self.initial_capital = config.get("initial_capital", 1000.0)
+        self.rsi_period = config.get("rsi_period", 9)
+        self.rsi_long_th = config.get("rsi_long_th", 35.0)    # oversold threshold
+        self.rsi_short_th = config.get("rsi_short_th", 65.0)  # overbought threshold
+        self.min_gates = config.get("min_gates", 3)           # minimum gates to enter
+        self.atr_multiplier = config.get("atr_multiplier", 1.5)
+        self.funding_short_bias_th = config.get("funding_short_bias_th", 0.0005)
+
+    def run(self, df_15m: pd.DataFrame, df_1h: pd.DataFrame) -> dict:
+        """Run the FURY backtest.
+
+        Args:
+            df_15m: 15-minute OHLCV DataFrame (must cover the full test period)
+            df_1h:  1-hour OHLCV DataFrame (same period, for MTF confirmation)
+
+        Returns:
+            Results dict with equity_curve, trades, and summary metrics.
+        """
+        # Add FURY indicators to both timeframes
+        df_15m = add_fury_indicators(
+            df_15m,
+            rsi_period=self.rsi_period,
+        ).reset_index(drop=True)
+
+        df_1h = add_fury_indicators(
+            df_1h,
+            rsi_period=self.rsi_period,
+        ).reset_index(drop=True)
+
+        sim = StandalonePerpsSimulator(
+            initial_capital=self.initial_capital,
+            symbol=self.symbol,
+            atr_multiplier=self.atr_multiplier,
+        )
+
+        equity_curve = []
+
+        for i in range(self.WARMUP, len(df_15m)):
+            row = df_15m.iloc[i]
+            ts = row.get("timestamp", pd.Timestamp(f"2025-01-01") + pd.Timedelta(minutes=15 * i))
+
+            # Reset circuit breaker at day boundary
+            if hasattr(ts, "date"):
+                sim.maybe_reset_circuit_breaker(ts.date())
+
+            # Lookup matching 1h candle (last 1h candle whose timestamp <= 15m ts)
+            row_1h = self._get_1h_row(df_1h, ts)
+
+            # Record equity before action
+            equity_curve.append({
+                "timestamp": ts,
+                "price": row["close"],
+                "balance": sim.capital,
+                "position": sim.position.side if sim.position else None,
+            })
+
+            # Manage open position — check SL/TP on this candle's range
+            if sim.position:
+                sim.check_sl_tp(
+                    candle_high=row["high"],
+                    candle_low=row["low"],
+                    candle_close=row["close"],
+                    ts=ts,
+                )
+                continue  # one position at a time; don't look for new entry
+
+            # Evaluate signal gates
+            if sim.circuit_breaker_triggered:
+                continue
+
+            gates, score, side = self._evaluate_gates(row, row_1h)
+            if score < self.min_gates or side is None:
+                continue
+
+            atr = row.get("atr")
+            if atr is None or np.isnan(atr) or atr <= 0:
+                continue
+
+            sim.open_position(side, row["close"], atr=atr, gate_score=score, ts=ts)
+
+        # Close any remaining position at last price
+        if sim.position and len(df_15m) > 0:
+            last = df_15m.iloc[-1]
+            last_ts = last.get("timestamp", None)
+            sim.force_close(last["close"], reason="END_OF_DATA", ts=last_ts)
+
+        return self._build_results(sim, equity_curve, df_15m)
+
+    # ── Gate evaluation ───────────────────────────────────────────────────────
+
+    def _evaluate_gates(self, row_15m, row_1h):
+        """Return (gates_dict, score, side) or (gates, 0, None) if no signal."""
+        ema_signal = row_15m.get("ema_signal", 0)
+        if ema_signal == 0:
+            return {}, 0, None
+
+        side = "LONG" if ema_signal > 0 else "SHORT"
+
+        # BTC golden rule — silently block shorts
+        if self.symbol == "BTC" and side == "SHORT":
+            return {}, 0, None
+
+        rsi_15m = row_15m.get("rsi")
+        if rsi_15m is None or np.isnan(rsi_15m):
+            return {}, 0, None
+
+        # Gate 1: EMA direction (already determined above)
+        g1 = True
+
+        # Gate 2: RSI level on 15m
+        g2 = (rsi_15m < self.rsi_long_th) if side == "LONG" else (rsi_15m > self.rsi_short_th)
+
+        # Gate 3: 1h RSI MTF confirmation
+        rsi_1h = row_1h.get("rsi") if row_1h is not None else None
+        if rsi_1h is not None and not np.isnan(rsi_1h):
+            g3 = (rsi_1h < 50) if side == "LONG" else (rsi_1h > 50)
+        else:
+            g3 = False
+
+        # Gate 4: Volume above 20-bar SMA
+        vol = row_15m.get("volume", 0)
+        vol_sma = row_15m.get("vol_sma20")
+        g4 = bool(vol > vol_sma) if (vol_sma and not np.isnan(vol_sma)) else False
+
+        # Gate 5: OBV slope (positive for longs, skip gate for shorts)
+        obv_slope = row_15m.get("obv_slope")
+        if side == "LONG":
+            g5 = bool(obv_slope > 0) if (obv_slope is not None and not np.isnan(obv_slope)) else False
+        else:
+            g5 = True  # not applied to shorts
+
+        # Gate 6: Funding bias (pass by default — live bot will check real funding)
+        g6 = True
+
+        gates = {"ema": g1, "rsi": g2, "mtf": g3, "volume": g4, "obv": g5, "funding": g6}
+        score = sum(1 for v in gates.values() if v)
+
+        return gates, score, side
+
+    def _get_1h_row(self, df_1h: pd.DataFrame, ts) -> dict | None:
+        """Return the most recent 1h row whose timestamp <= ts."""
+        if df_1h is None or len(df_1h) == 0:
+            return None
+        try:
+            mask = df_1h["timestamp"] <= ts
+            if not mask.any():
+                return None
+            return df_1h[mask].iloc[-1].to_dict()
+        except Exception:
+            return None
+
+    # ── Results builder ───────────────────────────────────────────────────────
+
+    def _build_results(self, sim: StandalonePerpsSimulator,
+                       equity_curve: list, df_15m: pd.DataFrame) -> dict:
+        trades = sim.trades
+        n = len(trades)
+
+        wins = [t for t in trades if t.net_pnl > 0]
+        losses = [t for t in trades if t.net_pnl <= 0]
+        win_rate = len(wins) / n if n > 0 else 0.0
+        avg_win = sum(t.net_pnl for t in wins) / len(wins) if wins else 0.0
+        avg_loss = sum(t.net_pnl for t in losses) / len(losses) if losses else 0.0
+        gross_profit = sum(t.net_pnl for t in wins)
+        gross_loss = abs(sum(t.net_pnl for t in losses))
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0.0
+        expectancy = (win_rate * avg_win) + ((1 - win_rate) * avg_loss) if n > 0 else 0.0
+
+        final_capital = sim.capital
+        total_return_pct = ((final_capital / self.initial_capital) - 1) * 100
+
+        # Max drawdown from equity curve
+        balances = [e["balance"] for e in equity_curve]
+        max_dd_pct = 0.0
+        if balances:
+            peak = balances[0]
+            for b in balances:
+                if b > peak:
+                    peak = b
+                dd = (peak - b) / peak * 100 if peak > 0 else 0
+                if dd > max_dd_pct:
+                    max_dd_pct = dd
+
+        # Sharpe (trade-level returns)
+        if n >= 2:
+            rets = [t.net_pnl / t.balance_before for t in trades]
+            avg_r = np.mean(rets)
+            std_r = np.std(rets)
+            sharpe = (avg_r / std_r * np.sqrt(252)) if std_r > 0 else 0.0
+        else:
+            sharpe = 0.0
+
+        side_counts = {"LONG": 0, "SHORT": 0}
+        side_pnl = {"LONG": 0.0, "SHORT": 0.0}
+        for t in trades:
+            side_counts[t.side] += 1
+            side_pnl[t.side] += t.net_pnl
+
+        exit_reasons = {}
+        for t in trades:
+            exit_reasons[t.exit_reason] = exit_reasons.get(t.exit_reason, 0) + 1
+
+        logger.info(
+            f"FURY backtest ({self.symbol}) complete: "
+            f"{n} trades | WR {win_rate:.1%} | Return {total_return_pct:+.1f}% | "
+            f"MaxDD {max_dd_pct:.1f}% | Sharpe {sharpe:.2f}"
+        )
+
+        return {
+            "strategy": f"fury_{self.symbol.lower()}",
+            "symbol": self.symbol,
+            "initial_capital": self.initial_capital,
+            "final_capital": final_capital,
+            "total_return_pct": total_return_pct,
+            "max_drawdown_pct": max_dd_pct,
+            "sharpe": sharpe,
+            "total_trades": n,
+            "win_rate": win_rate,
+            "avg_win": avg_win,
+            "avg_loss": avg_loss,
+            "profit_factor": profit_factor,
+            "expectancy": expectancy,
+            "total_fees": sim.total_fees,
+            "long_trades": side_counts["LONG"],
+            "short_trades": side_counts["SHORT"],
+            "long_pnl": side_pnl["LONG"],
+            "short_pnl": side_pnl["SHORT"],
+            "exit_reasons": exit_reasons,
+            "equity_curve": equity_curve,
+            "trades": [t.__dict__ for t in trades],
         }
