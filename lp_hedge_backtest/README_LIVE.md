@@ -108,6 +108,34 @@ Uniswap NFT from Arbitrum to pick up any LP range changes.
 
 ## Changelog
 
+### 2026-03-27 — SL floor + margin failure guard + stop confirmation modal
+
+**4. SL hard floor (0.3% minimum)**
+A new `_SL_FLOOR_PCT = 0.003` constant prevents the bot from operating with a stop-loss
+smaller than 0.3% above entry. Users who set `SL_PCT` below this value have it silently
+raised to 0.3%. The default `SL_PCT` was also changed from 0.1% → 0.5%.
+This eliminates whipsaw losses caused by tiny SL gaps (e.g. NFT #5374616 had 0.05%,
+producing a $0.99 gap — smaller than normal Hyperliquid price noise).
+
+**5. Margin failure guard (5 retries → 5-minute backoff + email)**
+If sizing/margin checks fail 5 consecutive times, the bot pauses for 5 minutes and
+sends an email alert instead of retrying every 30 seconds. The counter resets on any
+successful order. Prevents flooding Hyperliquid with 269-error requests when the wallet
+is empty.
+
+**6. Stop confirmation modal with live position query**
+The dashboard "Stop Bot" button now shows a confirmation modal that queries the live
+Hyperliquid position before the user confirms. The modal shows: coin, side (SHORT/LONG),
+size, entry price, mark price, and unrealized PnL. If no open position exists, the modal
+still requires confirmation but shows a "no open position" message. New API endpoint:
+`GET /bots/{config_id}/hl-position`.
+
+**7. Bot renamed to VIZNAGO Defensor Bajista**
+All references in email subjects, email bodies, console output, and file docstrings
+updated from "Haragán v2.0" to "VIZNAGO Defensor Bajista".
+
+---
+
 ### 2026-03-27 — Three order-placement bugs fixed
 
 **1. Unified account balance (`get_hl_margin_balance`)**

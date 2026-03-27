@@ -30,19 +30,36 @@ Price keeps falling → SHORT keeps covering
 
 ---
 
-## Two Bot Modes
+## Three Bot Modes
 
-### Bot Defensor Bajista (Hedge Only — Recommended)
-- SHORT when price drops below lower bound
-- No trading on upper breakout
+### VIZNAGO Defensor Bajista (Hedge Only — Recommended for LP holders)
+- SHORT when price drops below lower bound OR crosses upper bound downward
+- Bear hedge with bullish bias — on upside, SL exits quickly and LP keeps all gains
 - For passive investors who want capital protection
 - **Best performer in backtests** (+361% vs +340% LP Only)
+- Requires a Uniswap v3 LP position (NFT)
 
-### Bot Defensor Alcista (Hedge + Trading)
+### VIZNAGO Defensor Alcista (Hedge + Trading)
 - SHORT when price drops below lower bound
 - LONG when price breaks above upper bound (with trailing stop)
 - For active traders who want to maximize returns
 - Requires parameter tuning per market conditions
+- Requires a Uniswap v3 LP position (NFT)
+
+### VIZNAGO FURY (Standalone RSI Perps — No LP Required)
+- Pure perpetuals trading on Hyperliquid — **does NOT require a Uniswap LP position**
+- 6-gate signal stack on 15-minute candles with 1-hour MTF confirmation:
+  - Gate 1: EMA-8 vs EMA-21 trend direction
+  - Gate 2: RSI(9/OHLC4) < 35 LONG | > 65 SHORT on 15m
+  - Gate 3: 1h RSI confirms (< 50 LONG, > 50 SHORT)
+  - Gate 4: Volume spike > 20-bar average
+  - Gate 5: OBV 5-bar slope (longs only)
+  - Gate 6: Funding rate bias (> +0.05% → SHORT only)
+- Dynamic leverage: 3 gates=3x, 4=5x, 5=8x, 6=12x
+- ATR-12 hybrid stop with 3R target
+- BTC golden rule strictly enforced: LONG only, never SHORT BTC
+- Circuit breaker: pauses on 5% daily drawdown OR 3 consecutive losses
+- **Status as of March 2026:** Paper trading phase (not live) — ETH approved for paper trade, BTC not yet approved
 
 ---
 
@@ -233,14 +250,19 @@ Long trigger: $95,978 (+0.5% above upper)
 
 | Term | Definition |
 |------|-----------|
-| **Bot Defensor Bajista** | Hedge-only mode (short when price drops below range) |
-| **Bot Defensor Alcista** | Hedge + long trading mode (short below, long above) |
+| **VIZNAGO Defensor Bajista** | LP hedge bot — short-only when price drops below range or re-enters from above |
+| **VIZNAGO Defensor Alcista** | LP hedge + long trading mode (short below, long above range) |
+| **VIZNAGO FURY** | Standalone RSI perps bot — no LP required, 6-gate signal stack on 15m candles |
 | **IL** | Impermanent Loss — value lost vs holding when price moves |
 | **Concentrated LP** | Uniswap v3 — provide liquidity in a specific price range |
 | **Trailing Stop** | Stop loss that moves up with price, closes on X% drop from max |
+| **SL Floor** | Hard minimum stop-loss of 0.3% — prevents whipsaw from tiny SL gaps |
 | **ADX** | Average Directional Index — measures trend strength (not direction) |
 | **Regime** | Market state: lateral (ADX<20), trending (ADX>30) |
 | **Rebalance** | Close pool and reopen at new range when price exits |
+| **Circuit Breaker** | FURY safety — pauses trading after 5% daily loss or 3 consecutive losses |
+| **OHLC4** | (Open+High+Low+Close)/4 — RSI source used in FURY for smoother signals |
+| **MTF** | Multi-timeframe — FURY uses 15m signals confirmed by 1h trend |
 | **DeFi Suite** | Raúl's platform that automates pool hedging |
 | **Talentoso** | AI assistant from bootcamp (Claude Opus 4.6 based) |
 
