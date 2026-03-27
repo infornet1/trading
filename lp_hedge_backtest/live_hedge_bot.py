@@ -1,5 +1,5 @@
 """
-VIZNAGO FURY — Bot Haragán v2.0
+VIZNAGO — Bot Defensor Bajista
 LP + Directional Bear Hedge Bot
 
 Strategy overview:
@@ -161,7 +161,7 @@ def log_event(event_type: str, price: float = None, pnl: float = None, details: 
 
 class LiveHedgeBot:
     def __init__(self):
-        print(f"⚙️  Initializing Bot Haragán v2.0 | NFT #{NFT_ID}", flush=True)
+        print(f"⚙️  Initializing VIZNAGO Defensor Bajista | NFT #{NFT_ID}", flush=True)
         self.w3       = Web3(Web3.HTTPProvider(RPC_URL))
         self.contract = self.w3.eth.contract(address=V3_POS_MANAGER, abi=V3_ABI)
         self.info     = Info(constants.MAINNET_API_URL, skip_ws=True)
@@ -227,7 +227,7 @@ class LiveHedgeBot:
             msg = MIMEMultipart()
             msg["From"]    = self.email_config["sender_email"]
             msg["To"]      = ", ".join(RECIPIENTS)
-            msg["Subject"] = f"🛡️ [Haragán v2.0] {subject}"
+            msg["Subject"] = f"🛡️ [VIZNAGO Defensor Bajista] {subject}"
             msg.attach(MIMEText(body, "plain"))
             s = smtplib.SMTP(self.email_config["smtp_server"], self.email_config["smtp_port"])
             s.starttls()
@@ -566,7 +566,7 @@ class LiveHedgeBot:
     # ── Main loop ──────────────────────────────────────────────────────────────
 
     def run(self):
-        print(f"🚀 Bot Haragán v2.0 starting | NFT #{NFT_ID}", flush=True)
+        print(f"🚀 VIZNAGO Defensor Bajista starting | NFT #{NFT_ID}", flush=True)
 
         self.fetch_position_bounds()
 
@@ -604,7 +604,7 @@ class LiveHedgeBot:
             "trail_pct":       TRAIL_PCT * 100,
         })
         self.send_email(
-            "Bot Haragán v2.0 Started 🚀",
+            "VIZNAGO Defensor Bajista Started 🚀",
             f"NFT #{NFT_ID}\n"
             f"Range:          ${self.lower_bound:.2f} — ${self.upper_bound:.2f}\n"
             f"Short triggers:\n"
