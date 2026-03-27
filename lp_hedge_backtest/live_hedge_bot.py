@@ -254,7 +254,24 @@ class LiveHedgeBot:
     def get_hl_margin_balance(self):
         try:
             state = self.info.user_state(HL_ADDRESS)
-            return float(state["marginSummary"]["accountValue"])
+            perp_balance = float(state["marginSummary"]["accountValue"])
+
+            # Unified accounts: spot USDC also backs perp positions.
+            # Query spot and add USDC so the margin check works correctly.
+            spot_usdc = 0.0
+            try:
+                spot_state = self.info.spot_user_state(HL_ADDRESS)
+                for bal in spot_state.get("balances", []):
+                    if bal["coin"] == "USDC":
+                        spot_usdc = float(bal["total"])
+                        break
+            except Exception:
+                pass
+
+            total = perp_balance + spot_usdc
+            if spot_usdc > 0:
+                print(f"💰 HL balance: ${perp_balance:.2f} perp + ${spot_usdc:.2f} spot (unified) = ${total:.2f}", flush=True)
+            return total
         except Exception as e:
             print(f"⚠️  Could not fetch HL margin: {e}", flush=True)
             return 0.0
@@ -273,7 +290,7 @@ class LiveHedgeBot:
 
         size     = round(x_max * HEDGE_RATIO / 100.0, 4)
         size     = max(size, MIN_HEDGE_ETH)
-        size     = min(size, x_max)
+        size     = round(min(size, x_max), 4)  # re-round after min to avoid float_to_wire error
         margin   = self.get_hl_margin_balance()
         notional = size * price
 
@@ -293,18 +310,18 @@ class LiveHedgeBot:
         if margin < required_margin * MARGIN_BUFFER:
             # Try to find a lower leverage that fits
             reduced = False
-            for lev in range(leverage - 1, 0, -1):
+            for lev in range(leverage + 1, MAX_LEVERAGE + 1):
                 req = notional / lev
                 if margin >= req * MARGIN_BUFFER:
                     log_event("error", details={
-                        "warning": f"Leverage auto-reduced from {target_lev}x to {lev}x — "
+                        "warning": f"Leverage auto-increased from {target_lev}x to {lev}x — "
                                    f"insufficient margin (have ${margin:.2f}, "
                                    f"need ${(notional/target_lev)*MARGIN_BUFFER:.2f})"
                     })
                     self.send_email(
-                        "⚠️ Leverage Auto-Reduced",
+                        "⚠️ Leverage Auto-Increased",
                         f"NFT #{NFT_ID}: Target leverage {target_lev}x exceeded available margin.\n"
-                        f"Auto-reduced to {lev}x.\n"
+                        f"Auto-increased to {lev}x to fit margin.\n"
                         f"Available: ${margin:.2f} | Notional: ${notional:.2f}"
                     )
                     leverage        = lev
@@ -313,12 +330,13 @@ class LiveHedgeBot:
                     break
 
             if not reduced:
-                print(f"❌ Insufficient margin even at 1x: have ${margin:.2f}, "
-                      f"need ${(notional/1)*MARGIN_BUFFER:.2f}", flush=True)
+                print(f"❌ Insufficient margin even at {MAX_LEVERAGE}x: have ${margin:.2f}, "
+                      f"need ${(notional/MAX_LEVERAGE)*MARGIN_BUFFER:.2f}", flush=True)
                 self.send_email("⚠️ Short SKIPPED — Low Margin",
-                    f"NFT #{NFT_ID}: Not enough USDC even at 1x leverage.\n"
+                    f"NFT #{NFT_ID}: Not enough USDC even at {MAX_LEVERAGE}x leverage.\n"
                     f"Available: ${margin:.2f}\n"
-                    f"Notional: ${notional:.2f}")
+                    f"Notional: ${notional:.2f}\n"
+                    f"Min required: ${(notional/MAX_LEVERAGE)*MARGIN_BUFFER:.2f}")
                 return None
 
         return size, leverage, notional, required_margin, x_max

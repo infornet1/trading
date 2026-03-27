@@ -106,6 +106,28 @@ Uniswap NFT from Arbitrum to pick up any LP range changes.
 
 ---
 
+## Changelog
+
+### 2026-03-27 — Three order-placement bugs fixed
+
+**1. Unified account balance (`get_hl_margin_balance`)**
+Hyperliquid's `clearinghouseState` API returns `accountValue: 0` for unified accounts
+where USDC sits in the spot wallet. The bot now also queries `spotClearinghouseState`
+and sums `perp + spot USDC` as the effective margin, so unified accounts work correctly.
+
+**2. Leverage auto-adjustment loop (wrong direction)**
+When `TARGET_LEVERAGE` didn't fit the available margin, the bot looped downward
+(`range(lev-1, 0, -1)`) — lower leverage requires *more* margin, so the loop always
+failed. Fixed to loop upward to `MAX_LEVERAGE` (15x) instead, reducing the margin
+requirement until it fits.
+
+**3. Float precision — `float_to_wire` rejection**
+`min(size, x_max)` could return the raw unrounded `x_max` float
+(e.g. `0.06939895769911981`) bypassing the earlier `round(..., 4)`. Hyperliquid's SDK
+rejects sizes with > 4 decimal places. Fixed with `round(min(size, x_max), 4)`.
+
+---
+
 ## Known Limitations
 
 ### SL is software-managed (no native HL stop order yet)
