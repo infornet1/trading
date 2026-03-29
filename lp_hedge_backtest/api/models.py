@@ -47,7 +47,7 @@ class BotConfig(Base):
     hedge_exchange  = Column(String(20), default="hyperliquid")
     hl_api_key      = Column(Text, nullable=True)         # AES-256 encrypted
     hl_wallet_addr  = Column(String(42), nullable=True)
-    mode            = Column(Enum("aragan", "avaro", "fury"), default="aragan")
+    mode            = Column(Enum("aragan", "avaro", "fury", "whale"), default="aragan")
     leverage        = Column(Integer, default=10)
     sl_pct          = Column(Numeric(5, 3), default=0.100)    # % above entry → close short
     tp_pct          = Column(Numeric(5, 3), nullable=True)    # optional fixed TP %
@@ -60,6 +60,13 @@ class BotConfig(Base):
     fury_rsi_short_th = Column(Numeric(5, 2), nullable=True, default=65.0)
     fury_leverage_max = Column(Integer,    nullable=True, default=12)
     fury_risk_pct   = Column(Numeric(5, 2), nullable=True, default=2.0)
+    # WHALE-specific config (nullable — only used when mode='whale')
+    whale_top_n              = Column(Integer,      nullable=True, default=50)
+    whale_min_notional       = Column(Numeric(12, 2), nullable=True, default=50000)
+    whale_poll_interval      = Column(Integer,      nullable=True, default=30)
+    whale_custom_addresses   = Column(Text,         nullable=True)  # comma-separated
+    whale_watch_assets       = Column(String(100),  nullable=True)  # comma-separated, e.g. "BTC,ETH"
+    paper_trade     = Column(Boolean, default=False)          # simulate trades, no real orders
     active          = Column(Boolean, default=False)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -79,6 +86,9 @@ class BotEvent(Base):
             "trailing_stop", "stopped", "error",
             # FURY events
             "fury_entry", "fury_sl", "fury_tp", "fury_circuit_breaker",
+            # WHALE events
+            "whale_new_position", "whale_closed", "whale_size_increase",
+            "whale_size_decrease", "whale_flip", "whale_snapshot", "whale_event",
         ),
         nullable=False,
     )

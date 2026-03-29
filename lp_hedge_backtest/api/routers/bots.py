@@ -47,12 +47,19 @@ class BotConfigCreate(BaseModel):
     fury_rsi_short_th: Optional[float] = 65.0
     fury_leverage_max: Optional[int]   = 12
     fury_risk_pct:     Optional[float] = 2.0
+    # WHALE-specific fields (only used when mode='whale')
+    whale_top_n:             Optional[int]   = 50
+    whale_min_notional:      Optional[float] = 50000.0
+    whale_poll_interval:     Optional[int]   = 30
+    whale_custom_addresses:  Optional[str]   = None  # comma-separated 0x addresses
+    whale_watch_assets:      Optional[str]   = None  # comma-separated, e.g. "BTC,ETH"
+    paper_trade:       bool            = False
 
     @field_validator("mode")
     @classmethod
     def validate_mode(cls, v: str) -> str:
-        if v not in ("aragan", "avaro", "fury"):
-            raise ValueError("mode must be 'aragan', 'avaro', or 'fury'")
+        if v not in ("aragan", "avaro", "fury", "whale"):
+            raise ValueError("mode must be 'aragan', 'avaro', 'fury', or 'whale'")
         return v
 
     @field_validator("pair")
@@ -82,12 +89,19 @@ class BotConfigUpdate(BaseModel):
     fury_rsi_short_th: Optional[float] = None
     fury_leverage_max: Optional[int]   = None
     fury_risk_pct:     Optional[float] = None
+    # WHALE-specific fields
+    whale_top_n:             Optional[int]   = None
+    whale_min_notional:      Optional[float] = None
+    whale_poll_interval:     Optional[int]   = None
+    whale_custom_addresses:  Optional[str]   = None
+    whale_watch_assets:      Optional[str]   = None
+    paper_trade:       Optional[bool]  = None
 
     @field_validator("mode")
     @classmethod
     def validate_mode(cls, v):
-        if v is not None and v not in ("aragan", "avaro", "fury"):
-            raise ValueError("mode must be 'aragan', 'avaro', or 'fury'")
+        if v is not None and v not in ("aragan", "avaro", "fury", "whale"):
+            raise ValueError("mode must be 'aragan', 'avaro', 'fury', or 'whale'")
         return v
 
 
@@ -114,6 +128,12 @@ class BotConfigOut(BaseModel):
     fury_rsi_short_th: Optional[float]
     fury_leverage_max: Optional[int]
     fury_risk_pct:     Optional[float]
+    whale_top_n:             Optional[int]
+    whale_min_notional:      Optional[float]
+    whale_poll_interval:     Optional[int]
+    whale_custom_addresses:  Optional[str]
+    whale_watch_assets:      Optional[str]
+    paper_trade:    bool
     active:         bool
     created_at:     datetime
     updated_at:     datetime
@@ -219,6 +239,12 @@ async def create_bot(
         fury_rsi_short_th = body.fury_rsi_short_th,
         fury_leverage_max = body.fury_leverage_max,
         fury_risk_pct     = body.fury_risk_pct,
+        whale_top_n              = body.whale_top_n,
+        whale_min_notional       = body.whale_min_notional,
+        whale_poll_interval      = body.whale_poll_interval,
+        whale_custom_addresses   = body.whale_custom_addresses,
+        whale_watch_assets       = body.whale_watch_assets,
+        paper_trade       = body.paper_trade,
     )
     db.add(cfg)
     await db.commit()
@@ -258,6 +284,12 @@ async def update_bot(
     if body.fury_rsi_short_th is not None: cfg.fury_rsi_short_th = body.fury_rsi_short_th
     if body.fury_leverage_max is not None: cfg.fury_leverage_max = body.fury_leverage_max
     if body.fury_risk_pct     is not None: cfg.fury_risk_pct     = body.fury_risk_pct
+    if body.whale_top_n              is not None: cfg.whale_top_n              = body.whale_top_n
+    if body.whale_min_notional       is not None: cfg.whale_min_notional       = body.whale_min_notional
+    if body.whale_poll_interval      is not None: cfg.whale_poll_interval      = body.whale_poll_interval
+    if body.whale_custom_addresses   is not None: cfg.whale_custom_addresses   = body.whale_custom_addresses
+    if body.whale_watch_assets       is not None: cfg.whale_watch_assets       = body.whale_watch_assets
+    if body.paper_trade       is not None: cfg.paper_trade       = body.paper_trade
 
     await db.commit()
     await db.refresh(cfg)
@@ -465,8 +497,10 @@ async def start_bot(
 ):
     cfg = await _get_own_config(config_id, address, db)
 
-    if not cfg.hl_api_key or not cfg.hl_wallet_addr:
-        raise HTTPException(status_code=400, detail="HL API key and wallet address are required")
+    is_paper = bool(cfg.paper_trade)
+    # Whale mode uses read-only HL Info API — no keys required
+    if cfg.mode != "whale" and not is_paper and (not cfg.hl_api_key or not cfg.hl_wallet_addr):
+        raise HTTPException(status_code=400, detail="HL API key and wallet address are required (or enable paper_trade mode)")
 
     from api.bot_manager import manager
     if manager.is_running(config_id):
@@ -478,8 +512,8 @@ async def start_bot(
         "upper_bound":    str(cfg.upper_bound),
         "trigger_pct":    str(cfg.trigger_pct),
         "hedge_ratio":    str(cfg.hedge_ratio),
-        "hl_api_key":     decrypt(cfg.hl_api_key),
-        "hl_wallet_addr": cfg.hl_wallet_addr,
+        "hl_api_key":     decrypt(cfg.hl_api_key) if cfg.hl_api_key else "",
+        "hl_wallet_addr": cfg.hl_wallet_addr or "",
         "mode":           cfg.mode,
         "pair":           cfg.pair,
         "leverage":       str(cfg.leverage   or 10),
@@ -494,11 +528,63 @@ async def start_bot(
         "fury_rsi_short_th": str(cfg.fury_rsi_short_th or 65),
         "fury_leverage_max": str(cfg.fury_leverage_max or 12),
         "fury_risk_pct":     str(cfg.fury_risk_pct     or 2.0),
+        # WHALE config (only used when mode='whale')
+        "whale_top_n":            str(cfg.whale_top_n            or 50),
+        "whale_min_notional":     str(cfg.whale_min_notional     or 50000),
+        "whale_poll_interval":    str(cfg.whale_poll_interval    or 30),
+        "whale_custom_addresses": cfg.whale_custom_addresses     or "",
+        "whale_watch_assets":     cfg.whale_watch_assets         or "",
+        "paper_trade":       is_paper,
     }
     await manager.start(config_id, config_dict)
     cfg.active = True
     await db.commit()
     return {"status": "started"}
+
+
+@router.get("/{config_id}/whale-signals")
+async def whale_signals(
+    config_id: int,
+    limit: int = Query(50, le=200),
+    event_type: Optional[str] = Query(None, description="Filter: new_position|closed|flip|size_increase|size_decrease"),
+    asset: Optional[str] = Query(None, description="Filter by asset, e.g. BTC"),
+    address: str = Depends(get_current_address),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return recent whale signal events for a whale-mode bot config."""
+    cfg = await _get_own_config(config_id, address, db)
+    if cfg.mode != "whale":
+        raise HTTPException(status_code=400, detail="This endpoint is only available for whale-mode bots")
+
+    whale_event_types = [
+        "whale_new_position", "whale_closed", "whale_size_increase",
+        "whale_size_decrease", "whale_flip",
+    ]
+    if event_type:
+        full_type = f"whale_{event_type}" if not event_type.startswith("whale_") else event_type
+        whale_event_types = [full_type]
+
+    from sqlalchemy import and_, or_
+    type_filter = or_(*[BotEvent.event_type == t for t in whale_event_types])
+    q = select(BotEvent).where(and_(BotEvent.config_id == config_id, type_filter))
+
+    result = await db.execute(q.order_by(desc(BotEvent.ts)).limit(limit))
+    events = result.scalars().all()
+
+    signals = []
+    for ev in events:
+        d = ev.details or {}
+        if asset and d.get("asset", "").upper() != asset.upper():
+            continue
+        signals.append({
+            "event_type": ev.event_type,
+            "ts":         ev.ts.isoformat(),
+            "price":      float(ev.price_at_event) if ev.price_at_event else None,
+            "pnl":        float(ev.pnl) if ev.pnl else None,
+            **d,
+        })
+
+    return signals
 
 
 @router.post("/{config_id}/stop", status_code=status.HTTP_200_OK)

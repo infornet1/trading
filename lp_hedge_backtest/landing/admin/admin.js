@@ -240,6 +240,13 @@ function renderStats(s) {
   document.getElementById('stat-bots').textContent       = s.active_bots;
   document.getElementById('stat-shorts').textContent     = s.active_shorts;
   document.getElementById('stat-volume').textContent     = '$' + fmtNum(s.total_volume_usd);
+
+  // Whale bots stat (graceful — element may not exist in older HTML)
+  const whaleEl = document.getElementById('stat-whale-bots');
+  if (whaleEl) {
+    const whaleBots = s.whale_bots ?? '—';
+    whaleEl.textContent = whaleBots;
+  }
 }
 
 function renderPools(pools) {
@@ -438,7 +445,13 @@ function poolCard(p, ethPrice, isHistorical = false) {
   <div class="pool-footer">
     <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
       ${botStatus}${heartbeatBadge}${shortBadge}
-      <span class="badge badge--muted">${p.mode === 'aragan' ? 'Defensor Bajista' : p.mode === 'avaro' ? 'Defensor Alcista' : p.mode.toUpperCase()}</span>
+      <span class="badge badge--muted">${
+        p.mode === 'aragan' ? 'Defensor Bajista' :
+        p.mode === 'avaro'  ? 'Defensor Alcista' :
+        p.mode === 'fury'   ? '⚡ FURY RSI' :
+        p.mode === 'whale'  ? '🐋 WHALE' :
+        p.mode.toUpperCase()
+      }</span>
       <span class="badge badge--muted">${chainName(p.chain_id)}</span>
     </div>
     <span style="color:var(--muted);font-size:.7rem">${p.user_plan.toUpperCase()}</span>

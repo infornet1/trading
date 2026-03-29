@@ -1520,6 +1520,93 @@
 }
 .deviation-advisory-actions button:hover { background: rgba(255,255,255,0.05); }
 
+/* ── Whale Tracker Panel ─────────────────────────────────────── */
+.whale-signals-panel {
+  margin-top: 14px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.whale-signals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.whale-signal-row {
+  display: grid;
+  grid-template-columns: 100px 60px 90px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid rgba(0, 212, 255, 0.08);
+  font-size: 0.72rem;
+  transition: background 0.3s;
+}
+
+.whale-signal-row--new {
+  background: rgba(0, 212, 255, 0.12);
+  border-color: rgba(0, 212, 255, 0.3);
+}
+
+.whale-sig-evt {
+  font-weight: 700;
+  color: var(--color-neon-cyan);
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.whale-sig-asset {
+  font-family: 'Orbitron', monospace;
+  color: var(--color-text-primary);
+  font-size: 0.72rem;
+}
+
+.whale-sig-size {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Whale Section form ──────────────────────────────────────── */
+#whale-section .prot-form {
+  background: rgba(0, 212, 255, 0.02);
+  border: 1px solid rgba(0, 212, 255, 0.1);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+#whale-section .prot-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#whale-section .prot-input:focus {
+  border-color: rgba(0, 212, 255, 0.5);
+}
+
+#whale-section .prot-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 5px;
+}
+
 /* ── Utility ─────────────────────────────────────────────────── */
 .hidden { display: none !important; }
 

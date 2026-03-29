@@ -22,6 +22,7 @@ from api.models import BotConfig, BotEvent
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOT_SCRIPT       = os.path.join(_BASE, "live_hedge_bot.py")
 FURY_BOT_SCRIPT  = os.path.join(_BASE, "live_fury_bot.py")
+WHALE_BOT_SCRIPT = os.path.join(_BASE, "live_whale_bot.py")
 VENV_PYTHON      = os.path.join(_BASE, "venv", "bin", "python3")
 
 # Map event label from bot stdout → DB enum value
@@ -39,6 +40,14 @@ _EVENT_MAP = {
     "fury_sl":              "fury_sl",
     "fury_tp":              "fury_tp",
     "fury_circuit_breaker": "fury_circuit_breaker",
+    # WHALE events
+    "whale_new_position":   "whale_new_position",
+    "whale_closed":         "whale_closed",
+    "whale_size_increase":  "whale_size_increase",
+    "whale_size_decrease":  "whale_size_decrease",
+    "whale_flip":           "whale_flip",
+    "whale_snapshot":       "whale_snapshot",
+    "whale_event":          "whale_event",
 }
 
 
@@ -86,7 +95,7 @@ class BotManager:
             "AUTO_REARM":                  str(config.get("auto_rearm",    "1")),
         }
 
-        # Select bot script based on mode; inject fury-specific vars if needed
+        # Select bot script based on mode; inject mode-specific vars if needed
         bot_mode = config.get("mode", "aragan")
         if bot_mode == "fury":
             script = FURY_BOT_SCRIPT
@@ -96,6 +105,19 @@ class BotManager:
             env["FURY_RSI_SHORT_TH"] = str(config.get("fury_rsi_short_th", "65"))
             env["FURY_LEVERAGE_MAX"] = str(config.get("fury_leverage_max", "12"))
             env["FURY_RISK_PCT"]     = str(config.get("fury_risk_pct", "2.0"))
+            if config.get("paper_trade"):
+                env["PAPER_TRADE"] = "1"
+        elif bot_mode == "whale":
+            script = WHALE_BOT_SCRIPT
+            env["LEADERBOARD_TOP_N"]   = str(config.get("whale_top_n",          "50"))
+            env["MIN_NOTIONAL_USD"]    = str(config.get("whale_min_notional",    "50000"))
+            env["POLL_INTERVAL"]       = str(config.get("whale_poll_interval",   "30"))
+            env["CUSTOM_ADDRESSES"]    = str(config.get("whale_custom_addresses",""))
+            env["WATCH_ASSETS"]        = str(config.get("whale_watch_assets",    ""))
+            env["USE_WEBSOCKET"]       = "1" if config.get("whale_use_websocket") else "0"
+            env["OI_SPIKE_THRESHOLD"]  = str(config.get("whale_oi_spike_threshold", "0.03"))
+            if config.get("paper_trade"):
+                env["PAPER_TRADE"] = "1"
         else:
             script = BOT_SCRIPT
 

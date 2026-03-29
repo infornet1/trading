@@ -143,6 +143,7 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
         pools = []
         total_volume = 0.0
         active_shorts = 0
+        whale_bots = 0
 
         for cfg in configs:
             # Last event
@@ -184,6 +185,8 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
             last_event_type = last_evt.event_type if last_evt else None
             if last_event_type == "hedge_opened" and running:
                 active_shorts += 1
+            if cfg.mode == "whale" and running:
+                whale_bots += 1
 
             pools.append({
                 "config_id":    cfg.id,
@@ -255,6 +258,7 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                 "total_pools":       len(pools),
                 "active_bots":       running_count,
                 "active_shorts":     active_shorts,
+                "whale_bots":        whale_bots,
                 "total_volume_usd":  round(total_volume, 2),
             },
             "pools": pools,

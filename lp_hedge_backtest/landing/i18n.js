@@ -251,6 +251,15 @@ const TRANSLATIONS = {
     'dash.admin.modal.desc':      'Esto detendrá TODOS los bots activos para TODOS los usuarios y los marcará inactivos. Esta acción no puede deshacerse automáticamente.',
     'dash.admin.modal.confirm':   '☢ Confirmar Parada Total',
     'dash.admin.modal.cancel':    'Cancelar',
+    // Whale Tracker
+    'whale.leaderboard.label':    'Leaderboard',
+    'whale.notional.label':       'Notional Mín.',
+    'whale.notional.sub':         'Por señal',
+    'whale.assets.label':         'Activos',
+    'whale.mode.label':           'Modo',
+    'whale.last.signal':          'Última señal',
+    'whale.no.signals':           'Sin señales aún — esperando ballenas…',
+    // ---
     'prot.status.active':         '🟢 ACTIVO',
     'prot.status.inactive':       '⭕ INACTIVO',
     'prot.status.checking':       'Verificando…',
@@ -503,6 +512,15 @@ const TRANSLATIONS = {
     'dash.admin.modal.desc':      'This will terminate ALL active bots for ALL users and mark them inactive. This action cannot be automatically undone.',
     'dash.admin.modal.confirm':   '☢ Confirm Full Stop',
     'dash.admin.modal.cancel':    'Cancel',
+    // Whale Tracker
+    'whale.leaderboard.label':    'Leaderboard',
+    'whale.notional.label':       'Min. Notional',
+    'whale.notional.sub':         'Per signal',
+    'whale.assets.label':         'Assets',
+    'whale.mode.label':           'Mode',
+    'whale.last.signal':          'Last signal',
+    'whale.no.signals':           'No signals yet — waiting for whales…',
+    // ---
     'prot.status.active':         '🟢 ACTIVE',
     'prot.status.inactive':       '⭕ INACTIVE',
     'prot.status.checking':       'Checking…',
