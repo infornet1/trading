@@ -37,6 +37,75 @@ class PriceFetcher:
             f"{self.symbol}_{self.interval}_{start_date}_{end_date}.csv"
         )
 
+    def fetch_ohlcv(self, symbol: str, interval: str = "15m", limit: int = 100):
+        """Fetch the most recent N closed candles for live-bot use (no cache).
+
+        Uses Hyperliquid as primary (freshest, same exchange as trading).
+        Falls back to OKX if HL returns empty.
+
+        Args:
+            symbol:   e.g. 'BTCUSDT' or 'ETHUSDT'
+            interval: '1m', '5m', '15m', '1h', etc.
+            limit:    number of candles to return (newest last)
+
+        Returns:
+            DataFrame with columns [timestamp, open, high, low, close, volume, quote_volume]
+            or None on total failure.
+        """
+        coin = symbol.upper().replace("USDT", "").replace("USDC", "")
+
+        # ── Primary: Hyperliquid (same exchange, freshest data) ──
+        try:
+            payload = {"type": "candleSnapshot", "req": {"coin": coin, "interval": interval}}
+            resp = requests.post("https://api.hyperliquid.xyz/info", json=payload, timeout=10)
+            data = resp.json()
+            if isinstance(data, list) and data:
+                data = data[-limit:]  # keep most recent `limit` candles
+                import pandas as _pd
+                df = _pd.DataFrame(data)
+                df["timestamp"]    = _pd.to_datetime(df["t"].astype(int), unit="ms")
+                df["open"]         = df["o"].astype(float)
+                df["high"]         = df["h"].astype(float)
+                df["low"]          = df["l"].astype(float)
+                df["close"]        = df["c"].astype(float)
+                df["volume"]       = df["v"].astype(float)
+                df["quote_volume"] = df["volume"] * df["close"]
+                return df[["timestamp", "open", "high", "low", "close",
+                            "volume", "quote_volume"]].reset_index(drop=True)
+        except Exception as e:
+            logger.warning(f"HL fetch_ohlcv failed for {symbol} {interval}: {e}")
+
+        # ── Fallback: OKX (live endpoint, no cache, newest-first reversed) ──
+        try:
+            okx_bars = {
+                "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
+                "1h": "1H", "4h": "4H", "1d": "1D",
+            }
+            bar = okx_bars.get(interval, interval)
+            resp = requests.get(
+                "https://www.okx.com/api/v5/market/candles",
+                params={"instId": f"{coin}-USDT", "bar": bar, "limit": str(limit)},
+                timeout=10,
+            )
+            d = resp.json()
+            if d.get("code") == "0" and d.get("data"):
+                candles = list(reversed(d["data"]))  # OKX newest-first → oldest-first
+                import pandas as _pd
+                df = _pd.DataFrame(candles, columns=[
+                    "timestamp", "open", "high", "low", "close",
+                    "volume", "vol_ccy", "quote_volume", "confirm",
+                ])
+                df["timestamp"]    = _pd.to_datetime(df["timestamp"].astype(int), unit="ms")
+                for col in ["open", "high", "low", "close", "volume", "quote_volume"]:
+                    df[col] = df[col].astype(float)
+                return df[["timestamp", "open", "high", "low", "close",
+                            "volume", "quote_volume"]].reset_index(drop=True)
+        except Exception as e:
+            logger.warning(f"OKX fetch_ohlcv fallback failed for {symbol} {interval}: {e}")
+
+        logger.error(f"fetch_ohlcv: all sources failed for {symbol} {interval}")
+        return None
+
     def fetch(self, start_date, end_date, use_cache=True):
         cache_path = self._get_cache_path(start_date, end_date)
 
@@ -48,8 +117,9 @@ class PriceFetcher:
         # Try sources in order
         df = None
         for source_name, source_fn in [
-            ("bingx", self._fetch_bingx),
-            ("bybit", self._fetch_bybit),
+            ("okx", self._fetch_okx),       # Primary: deep history (2021+), 300/req, no auth
+            ("bingx", self._fetch_bingx),   # Fallback: 15m from mid-2025 only
+            ("bybit", self._fetch_bybit),   # Fallback: geo-blocked on some servers
             ("binance", self._fetch_binance),
         ]:
             try:
@@ -70,6 +140,89 @@ class PriceFetcher:
             logger.info(f"Cached {len(df)} candles to {cache_path}")
 
         logger.info(f"Fetched {len(df)} candles | {df['timestamp'].iloc[0]} to {df['timestamp'].iloc[-1]}")
+        return df
+
+    def _fetch_okx(self, start_date, end_date):
+        """Fetch from OKX public API (no auth, deep history: 2021+, 300 candles/request).
+
+        OKX pagination: 'after=<ts_ms>' returns candles OLDER than that timestamp.
+        We paginate backwards from end_date to start_date, then reverse.
+        """
+        OKX_URL = "https://www.okx.com/api/v5/market/history-candles"
+
+        # OKX bar (interval) mapping
+        okx_bars = {
+            "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
+            "1h": "1H", "4h": "4H", "1d": "1D", "1w": "1W",
+        }
+        bar = okx_bars.get(self.interval)
+        if bar is None:
+            raise ValueError(f"OKX: unsupported interval '{self.interval}'")
+
+        # OKX symbol format: BTC-USDT (from BTCUSDT)
+        base = self.symbol.replace("USDT", "")
+        inst_id = f"{base}-USDT"
+
+        start_ms = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp() * 1000)
+        end_ms   = int(datetime.strptime(end_date,   "%Y-%m-%d").timestamp() * 1000)
+
+        all_candles = []  # will be in newest-first order, reversed at end
+        # Start pagination at end_date and walk backwards
+        after_ts = end_ms
+
+        while after_ts > start_ms:
+            params = {
+                "instId": inst_id,
+                "bar":    bar,
+                "after":  str(after_ts),
+                "limit":  "300",
+            }
+
+            resp = requests.get(OKX_URL, params=params, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+
+            if data.get("code") != "0":
+                raise ValueError(f"OKX API error: {data.get('msg')}")
+
+            candles = data.get("data", [])
+            if not candles:
+                break  # no more historical data available
+
+            # OKX returns newest-first; candles[-1] is the oldest in this batch
+            all_candles.extend(candles)
+            oldest_ts = int(candles[-1][0])
+
+            if oldest_ts <= start_ms:
+                break  # reached or passed the start of the desired range
+
+            after_ts = oldest_ts  # next batch: get candles older than this
+            time.sleep(0.2)
+
+        if not all_candles:
+            return None
+
+        # Build DataFrame — OKX columns: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
+        df = pd.DataFrame(all_candles, columns=[
+            "timestamp", "open", "high", "low", "close",
+            "volume", "vol_ccy", "quote_volume", "confirm"
+        ])
+        df["timestamp"]    = pd.to_datetime(df["timestamp"].astype(int), unit="ms")
+        df["open"]         = df["open"].astype(float)
+        df["high"]         = df["high"].astype(float)
+        df["low"]          = df["low"].astype(float)
+        df["close"]        = df["close"].astype(float)
+        df["volume"]       = df["volume"].astype(float)
+        df["quote_volume"] = df["quote_volume"].astype(float)
+
+        df = df[["timestamp", "open", "high", "low", "close", "volume", "quote_volume"]]
+        df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+
+        # Filter to requested range
+        start_dt = pd.Timestamp(start_date)
+        end_dt   = pd.Timestamp(end_date)
+        df = df[(df["timestamp"] >= start_dt) & (df["timestamp"] <= end_dt)].reset_index(drop=True)
+
         return df
 
     def _fetch_bingx(self, start_date, end_date):
@@ -99,12 +252,16 @@ class PriceFetcher:
         }
         interval_ms = interval_ms_map.get(self.interval, 3600000)
 
+        batch_window_ms = 1440 * interval_ms  # time span covered by one full batch
+        empty_skip_count = 0
+
         while current_start < end_ms:
+            batch_end = min(current_start + batch_window_ms, end_ms)
             params = {
                 "symbol": bingx_symbol,
                 "interval": bingx_interval,
                 "startTime": current_start,
-                "endTime": min(current_start + 1440 * interval_ms, end_ms),
+                "endTime": batch_end,
                 "limit": 1440,
             }
 
@@ -117,16 +274,22 @@ class PriceFetcher:
 
             candles = data.get("data", [])
             if not candles:
-                break
+                # No data in this window — skip forward rather than aborting.
+                # Handles gaps at the start of the asset's history (e.g. BingX
+                # only has 15m data from mid-2025; Jan-Apr windows return empty).
+                empty_skip_count += 1
+                if empty_skip_count > 10:
+                    # 10 consecutive empty windows = genuine end of data
+                    break
+                current_start += batch_window_ms
+                continue
 
+            empty_skip_count = 0  # reset on any successful batch
             all_candles.extend(candles)
 
-            # Move to next batch
+            # Advance past the last returned candle
             latest_ts = max(int(c["time"]) for c in candles)
             current_start = latest_ts + interval_ms
-
-            if len(candles) < 1440:
-                break
 
             time.sleep(0.3)
 

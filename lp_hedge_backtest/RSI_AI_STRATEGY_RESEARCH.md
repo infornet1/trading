@@ -521,4 +521,165 @@ Step 10 → Live deploy — gate behind Pro+ membership tier
 
 ---
 
+## 13. Backtest Results & Tuning Notes (March 27, 2026)
+
+### 13.1 ETH/USDT Baseline (RSI 25/75)
+- **Result:** +3.97% (90 days) vs HODL -29.30%
+- **Win Rate:** 29.4% (Profitable due to ~3:1 R:R)
+- **Total Trades:** 68
+- **Sharpe Ratio:** 0.53
+- **Observation:** ETH is structurally profitable with the current RSI setup. The 3:1 R:R breakeven is 25%, and ETH is consistently holding at 29-32%, even in downtrends.
+
+### 13.2 BTC/USDT — The "Golden Rule" & Bidirectional Test
+- **Long-Only (Golden Rule):** -58.75% return, 30.2% WR, 129 trades.
+- **Bidirectional (Shorts Allowed):** -85.54% return, 28.6% WR, 241 trades.
+- **Critical Finding — Fee Drag:**
+  - BTC executed **241 trades** in 90 days, losing **$4,467 in fees** (45% of capital).
+  - The ATR stop floor ($150) is too tight for BTC at $60k-$70k prices (~0.2% stop). 
+  - Friction (0.1% fees + 0.15% slippage round-trip) consumes the entire stop distance, making the strategy a "fee farm" for the exchange.
+- **Action:** BTC requires **wider stops** (increase ATR floor to $300-$500) or **higher gate confluence** (min-gates 5) to reduce overtrading in noise.
+
+### 13.3 Summary Decision
+- **ETH:** Proceed to paper trade.
+- **BTC:** DO NOT deploy. Current RSI thresholds and stops are too sensitive for BTC price action, leading to terminal fee decay.
+
+---
+
+## 14. BTC Tuning Study — ATR Floor + Gate Confluence (March 28, 2026)
+
+**Goal:** Reproduce baseline with golden rule enforced, then systematically test two fixes from Section 13.2.
+
+**Bug fixed:** BTC golden rule (long-only) was documented but not implemented in `standalone_perps_simulator.py`. Shorts were being taken freely. Fixed in this session — `long_only=True` now enforced by default for BTC.
+
+### 14.1 Corrected Baseline (min-gates 4, floor $150, long-only)
+
+| Metric | Value |
+|--------|-------|
+| Return | **-52.91%** |
+| HODL | -21.25% (BTC bear period Dec25-Mar26) |
+| Alpha | -31.66% |
+| Win Rate | 31.5% |
+| Total Trades | 130 (all longs) |
+| Fees | **$3,902** |
+| Sharpe | -2.44 |
+| Max Drawdown | 57.8% |
+
+Root cause confirmed: fee drag. 130 trades × ~$30 avg fee = structural loss at this frequency.
+
+### 14.2 Full Tuning Matrix (Dec 2025 – Mar 2026)
+
+| Config | Return | WR | Trades | Fees | Alpha vs HODL | Sharpe | MaxDD |
+|--------|--------|----|--------|------|---------------|--------|-------|
+| Baseline (min4, $150) | -52.91% | 31.5% | 130 | $3,902 | -31.66% | -2.44 | 57.8% |
+| A: min5, floor $150 | -9.00% | 30.8% | 13 | $544 | +12.25% | -2.80 | 16.1% |
+| B: min4, floor $300 | -55.23% | 29.3% | 123 | $3,489 | -33.97% | -2.67 | 58.5% |
+| C: min5, floor $300 | -7.49% | 30.8% | 13 | $491 | +13.77% | -2.21 | 15.5% |
+| **D: min5, floor $500** | **+3.27%** | **38.5%** | **13** | **$404** | **+24.52%** | **1.31** | **11.0%** |
+
+**Key insight — ATR floor alone does nothing:** Test B shows that raising the floor to $300 with min-gates 4 barely changes trade count (130→123). The wider stop reduces position size but the signal fires just as often. Fee drag persists.
+
+**Key insight — min-gates 5 is the essential lever:** Drops 130 trades → 13, fees from $3,902 → $544. The circuit breaker now fires far less, and the small number of ultra-high-conviction signals shows positive expectancy.
+
+**Key insight — floor $500 flips BTC to profitable:** Test D is the first positive BTC config: +3.27%, Sharpe 1.31, MaxDD 11%. The $500 floor gives the position enough room to reach 3R TP without being stopped by micro-volatility.
+
+### 14.3 OOS Validation — Test D on Summer 2025 (Jun–Sep 2025)
+
+| Metric | Value |
+|--------|-------|
+| Return | +7.51% |
+| HODL | +2.62% |
+| Alpha | +4.89% |
+| Win Rate | 46.2% |
+| Total Trades | 13 |
+| Sharpe | 2.54 |
+| Max Drawdown | 8.9% |
+
+### 14.4 Full 10-Month Validation (BingX) — Test D on May 2025 → Mar 2026
+
+**Data fetched:** 30,089 × 15m candles via BingX (also fixed a BingX pagination bug in `price_fetcher.py` — see Section 14.5).
+
+| Metric | Value |
+|--------|-------|
+| Return | **-33.32%** |
+| HODL | **-33.26%** |
+| **Alpha vs HODL** | **-0.06%** (zero alpha) |
+| Win Rate | 28.6% |
+| Total Trades | 56 |
+| Fees | $1,708 |
+| Sharpe | -2.89 |
+| Max Drawdown | 37.5% |
+| Circuit breaker fires | **10× in 10 months** (~once per month) |
+
+### 14.4b Definitive 2-Year Validation (OKX) — Jan 2024 → Mar 2026
+
+**Data source:** OKX history-candles API (added as primary source — see Section 14.6). 78,337 × 15m candles.
+
+| Metric | Value |
+|--------|-------|
+| Return | **-83.46%** |
+| HODL | **+61.25%** (2024 bull run) |
+| **Alpha vs HODL** | **-144.70%** |
+| Win Rate | 22.9% |
+| Total Trades | 175 |
+| Fees | $2,296 |
+| Sharpe | -4.59 |
+| Max Drawdown | 84.6% |
+| Circuit breaker fires | **30× in 2 years** (~every 2.4 weeks) |
+
+### 14.5 Honest Assessment & Final BTC Decision
+
+**Full cross-period picture (all validated with OKX data):**
+- Jun-Sep 2025 (bear → sideways): +7.51% vs HODL +2.62% → alpha +4.89% ← cherry-picked best
+- Dec 2025-Mar 2026 (bearish): +3.27% vs HODL -21.25% → alpha +24.52% ← cherry-picked best
+- May 2025-Mar 2026 (10 months): -33.32% vs HODL -33.26% → **alpha -0.06%**
+- **Jan 2024-Mar 2026 (2 years): -83.46% vs HODL +61.25% → alpha -144.70%** ← definitive
+
+**Root cause — fundamental incompatibility:**
+- Circuit breaker fires every 2.4 weeks over 2 years = recurrent, systematic, not recoverable by tuning
+- In a 2024-2025 bull market, long-only "buy the oversold dip" on 15m BTC is a losing proposition — BTC trends hard, pullbacks on 15m are noise, not reversion opportunities
+- WR 22.9% over 175 trades — no amount of ATR/gate tuning fixes a structural 22% WR
+
+**Final BTC Decision: DO NOT DEPLOY — Strategy incompatible with BTC microstructure ❌**
+
+This is not a tuning problem. It is a fundamental incompatibility: **15m RSI mean-reversion long-only does not match BTC's behavior across any 2024-2026 market regime** (bull, bear, or sideways).
+
+**What would actually work for BTC (future research):**
+1. **Longer timeframe** — 4h or daily RSI signals, not 15m. BTC trends on short timeframes.
+2. **Bidirectional** — allow shorts in downtrends (violates golden rule, but that rule may be too restrictive for a dedicated perps strategy)
+3. **XGBoost regime filter** — classify bull vs bear market first; only take longs during confirmed bull phases
+4. **Focus on ETH instead** — ETH has demonstrably stronger mean-reversion on 15m due to its higher beta and more predictable oscillations
+
+### 14.6 Data Infrastructure Notes & Source Comparison
+
+**Data source research conducted 2026-03-28.** All sources tested for connectivity from the server.
+
+| Source | 15m History | Max/Request | Auth | Geo-Block | Verdict |
+|--------|------------|-------------|------|-----------|---------|
+| **OKX** | **2021+** | **300** | ❌ None | ❌ None | **✅ Primary (added)** |
+| BingX | May 2025+ | 1,440 | ❌ None | ❌ None | ✅ Fallback |
+| Hyperliquid | ~52 days | 5,000 | ❌ None | ❌ None | Live signals only |
+| Gate.io | ~104 days | 2,000 | ❌ None | ❌ None | Recent only |
+| Kraken REST | ~7 days | 720 | ❌ None | ❌ None | Useless for backtest |
+| Bybit | Unknown | 1,000 | ❌ None | ✅ Blocked | Unavailable |
+| Binance | Unknown | 1,000 | ❌ None | ✅ Blocked | Unavailable |
+
+**OKX pagination:** `after=<ts_ms>` walks backwards; 300 candles/request; 2 years = ~234 calls (~47s).
+
+**Hyperliquid API** (tested 2026-03-28): Max 5,000 candles per request, ~52 days of 15m. Correct for **live trading signals only** — not for backtesting.
+
+**Available cached data (data_cache/):**
+- `BTCUSDT_15m_2024-01-01_2026-03-27.csv` — 78,337 candles (OKX, 2 years) ← definitive
+- `BTCUSDT_1h_2024-01-01_2026-03-27.csv` — 19,585 candles (OKX, 2 years)
+- `BTCUSDT/ETHUSDT` 15m/1h May 2025 → Mar 2026 (BingX)
+- Older 90-day windows
+
+### 14.7 Code Changes Made (March 28, 2026)
+
+- `src/data/price_fetcher.py`: **Added OKX as primary source** (2021+ history, 300/req, backward pagination); fixed BingX pagination bug (`empty_skip_count` replaces premature `< 1440` break); source order: OKX → BingX → Bybit → Binance
+- `src/hedge/standalone_perps_simulator.py`: Added `long_only`, `atr_floor`, `atr_ceiling` params; implemented BTC golden rule (was documented but not enforced)
+- `src/engine/backtest_engine.py`: `FuryBacktestEngine` passes `atr_floor`, `atr_ceiling`, `long_only` from config to simulator
+- `run_fury_backtest.py`: Added `--atr-floor-btc`, `--atr-floor-eth`, `--atr-ceil-btc`, `--bidirectional` CLI flags
+
+---
+
 *Research based on papers published 2024-2026 and X practitioner discussions March 2025-2026. Strategy parameters require validation against current market conditions before deployment. Not investment advice.*

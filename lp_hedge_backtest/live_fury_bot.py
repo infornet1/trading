@@ -16,12 +16,14 @@ Strategy overview:
   - BTC golden rule: LONG-only always enforced
   - Circuit breaker: pause on 5% daily drawdown OR 3 consecutive losses
 
-Required env vars:
+Required env vars (live mode):
     HYPERLIQUID_SECRET_KEY       — HL API-wallet private key
     HYPERLIQUID_ACCOUNT_ADDRESS  — HL main wallet address
     FURY_SYMBOL                  — 'BTC' | 'ETH'
 
 Optional env vars (defaults shown):
+    PAPER_TRADE        — Set to '1' for paper trading (no real orders)  (default: 0)
+    PAPER_BALANCE      — Starting paper balance in USDC                 (default: 1000)
     CHECK_INTERVAL     — Seconds between price loops       (default: 60)
     CONFIG_ID          — SaaS bot_config row ID            (optional)
     EMAIL_RECIPIENTS   — Comma-separated email list        (optional)
@@ -61,13 +63,17 @@ from src.data.price_fetcher import PriceFetcher
 from src.indicators.technical import add_fury_indicators
 from src.hedge.standalone_perps_simulator import _ATR_FLOORS, _ATR_CEILINGS, _GATE_LEVERAGE
 
+# ── Paper trade mode ──────────────────────────────────────────────────────────
+PAPER_TRADE   = os.getenv("PAPER_TRADE", "0") == "1"
+PAPER_BALANCE = float(os.getenv("PAPER_BALANCE", "1000.0"))
+
 # ── Required ──────────────────────────────────────────────────────────────────
 HL_SECRET_KEY = os.getenv("HYPERLIQUID_SECRET_KEY")
 HL_ADDRESS    = os.getenv("HYPERLIQUID_ACCOUNT_ADDRESS")
 FURY_SYMBOL   = os.getenv("FURY_SYMBOL", "ETH").upper()
 
-if not HL_SECRET_KEY or not HL_ADDRESS:
-    print("❌ HYPERLIQUID_SECRET_KEY and HYPERLIQUID_ACCOUNT_ADDRESS are required.", flush=True)
+if not PAPER_TRADE and (not HL_SECRET_KEY or not HL_ADDRESS):
+    print("❌ HYPERLIQUID_SECRET_KEY and HYPERLIQUID_ACCOUNT_ADDRESS are required (or set PAPER_TRADE=1).", flush=True)
     sys.exit(1)
 
 if FURY_SYMBOL not in ("BTC", "ETH"):
@@ -93,9 +99,12 @@ CANDLE_LIMIT_1H = int(os.getenv("CANDLE_LIMIT_1H",   "50"))
 MIN_AVG_GAIN_PCT = 0.004  # 0.4%
 
 # ── Hyperliquid init ───────────────────────────────────────────────────────────
-_account  = Account.from_key(HL_SECRET_KEY)
-info      = Info(constants.MAINNET_API_URL, skip_ws=True)
-exchange  = Exchange(_account, constants.MAINNET_API_URL, account_address=HL_ADDRESS)
+info = Info(constants.MAINNET_API_URL, skip_ws=True)
+if PAPER_TRADE:
+    exchange = None
+else:
+    _account  = Account.from_key(HL_SECRET_KEY)
+    exchange  = Exchange(_account, constants.MAINNET_API_URL, account_address=HL_ADDRESS)
 
 fetcher = PriceFetcher()
 
@@ -125,10 +134,15 @@ daily_start_balance = None
 
 last_candle_ts_15m = None   # track last CLOSED 15m candle timestamp
 
+# Paper trade state
+_paper_balance = PAPER_BALANCE   # mutated by simulated closes
+
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def get_balance() -> float:
+    if PAPER_TRADE:
+        return _paper_balance
     state = info.user_state(HL_ADDRESS)
     return float(state["marginSummary"]["accountValue"])
 
@@ -246,14 +260,15 @@ def open_position(side: str, price: float, atr: float, gate_score: int, balance:
     size_contracts = size_usd / price
 
     try:
-        exchange.update_leverage(leverage, FURY_SYMBOL)
-        is_buy = (side == "LONG")
-        order = exchange.market_open(FURY_SYMBOL, is_buy, size_contracts, slippage=0.01)
+        if not PAPER_TRADE:
+            exchange.update_leverage(leverage, FURY_SYMBOL)
+            is_buy = (side == "LONG")
+            order = exchange.market_open(FURY_SYMBOL, is_buy, size_contracts, slippage=0.01)
 
-        if order.get("status") != "ok":
-            log(f"⚠️  Order failed: {order}")
-            emit("error", price=price, details={"msg": f"open failed: {order}"})
-            return
+            if order.get("status") != "ok":
+                log(f"⚠️  Order failed: {order}")
+                emit("error", price=price, details={"msg": f"open failed: {order}"})
+                return
 
         position = {
             "side": side,
@@ -266,11 +281,13 @@ def open_position(side: str, price: float, atr: float, gate_score: int, balance:
             "gate_score": gate_score,
             "opened_at": datetime.now(timezone.utc).isoformat(),
         }
-        log(f"📈 Opened {side} {FURY_SYMBOL} @ {price:.2f} | SL {sl:.2f} | TP {tp:.2f} | {leverage}x | Gates {gate_score}")
+        paper_tag = " [PAPER]" if PAPER_TRADE else ""
+        log(f"📈{paper_tag} Opened {side} {FURY_SYMBOL} @ {price:.2f} | SL {sl:.2f} | TP {tp:.2f} | {leverage}x | Gates {gate_score}")
         emit("fury_entry", price=price, details={
             "side": side, "sl": sl, "tp": tp,
             "size_usd": round(size_usd, 2),
             "leverage": leverage, "gate_score": gate_score,
+            "paper_trade": PAPER_TRADE,
         })
 
     except Exception as e:
@@ -279,38 +296,54 @@ def open_position(side: str, price: float, atr: float, gate_score: int, balance:
 
 
 def close_position(price: float, reason: str):
-    global position, consecutive_losses, circuit_breaker, daily_start_balance
+    global position, consecutive_losses, circuit_breaker, daily_start_balance, _paper_balance
 
     if not position:
         return
 
-    try:
-        order = exchange.market_close(FURY_SYMBOL, position["size_contracts"])
-        if order.get("status") != "ok":
-            log(f"⚠️  Close order failed: {order}")
-            emit("error", price=price, details={"msg": f"close failed: {order}"})
-            return
-    except Exception as e:
-        log(f"❌ close_position error: {e}")
-        emit("error", price=price, details={"msg": str(e)})
-        return
-
     side = position["side"]
     entry = position["entry"]
-    if side == "LONG":
-        pnl_pct = (price - entry) / entry
-    else:
-        pnl_pct = (entry - price) / entry
 
-    pnl_usd = pnl_pct * position["size_usd"]
+    if PAPER_TRADE:
+        # Simulate close — no real order, just compute P&L
+        fee_pct = 0.001  # 0.1% per side (round-trip covered across open+close)
+        if side == "LONG":
+            pnl_pct = (price - entry) / entry - fee_pct
+        else:
+            pnl_pct = (entry - price) / entry - fee_pct
+        pnl_usd = pnl_pct * position["size_usd"]
+        _paper_balance += pnl_usd
+    else:
+        try:
+            order = exchange.market_close(FURY_SYMBOL, position["size_contracts"])
+            if order.get("status") != "ok":
+                log(f"⚠️  Close order failed: {order}")
+                emit("error", price=price, details={"msg": f"close failed: {order}"})
+                return
+        except Exception as e:
+            log(f"❌ close_position error: {e}")
+            emit("error", price=price, details={"msg": str(e)})
+            return
+
+        if side == "LONG":
+            pnl_pct = (price - entry) / entry
+        else:
+            pnl_pct = (entry - price) / entry
+        pnl_usd = pnl_pct * position["size_usd"]
 
     event_type = "fury_tp" if reason == "TAKE_PROFIT" else "fury_sl"
     emoji = "✅" if pnl_usd > 0 else "❌"
-    log(f"{emoji} Closed {side} @ {price:.2f} ({reason}) | PnL ${pnl_usd:+.2f}")
-    emit(event_type, price=price, pnl=round(pnl_usd, 4), details={
+    paper_tag = " [PAPER]" if PAPER_TRADE else ""
+    log(f"{emoji}{paper_tag} Closed {side} @ {price:.2f} ({reason}) | PnL ${pnl_usd:+.2f}"
+        + (f" | Paper balance: ${_paper_balance:.2f}" if PAPER_TRADE else ""))
+    close_details = {
         "side": side, "entry": entry, "reason": reason,
         "gate_score": position["gate_score"],
-    })
+        "paper_trade": PAPER_TRADE,
+    }
+    if PAPER_TRADE:
+        close_details["paper_balance"] = round(_paper_balance, 2)
+    emit(event_type, price=price, pnl=round(pnl_usd, 4), details=close_details)
 
     # Circuit breaker tracking
     if pnl_usd <= 0:
@@ -347,7 +380,8 @@ def maybe_reset_circuit_breaker():
 def main():
     global last_candle_ts_15m, daily_start_balance, daily_reset_date
 
-    log(f"Starting FURY RSI Trader | Symbol: {FURY_SYMBOL} | Min gates: {MIN_GATES}")
+    mode_tag = " [PAPER TRADE]" if PAPER_TRADE else ""
+    log(f"Starting FURY RSI Trader{mode_tag} | Symbol: {FURY_SYMBOL} | Min gates: {MIN_GATES}")
     emit("started", price=get_price(), details={
         "symbol": FURY_SYMBOL,
         "rsi_period": RSI_PERIOD,
@@ -355,6 +389,7 @@ def main():
         "rsi_short_th": RSI_SHORT_TH,
         "leverage_max": LEVERAGE_MAX,
         "risk_pct": RISK_PCT * 100,
+        "paper_trade": PAPER_TRADE,
     })
 
     daily_reset_date = date.today()

@@ -88,6 +88,9 @@ class StandalonePerpsSimulator:
         commission: float = 0.0005,    # 0.05% taker each side
         slippage: float = 0.00075,     # 0.075% each side
         atr_multiplier: float = 1.5,
+        atr_floor: Optional[float] = None,   # override default floor for tuning
+        atr_ceiling: Optional[float] = None, # override default ceiling for tuning
+        long_only: Optional[bool] = None,    # None = auto (True for BTC, False for ETH)
     ):
         if symbol not in _ATR_FLOORS:
             raise ValueError(f"symbol must be one of {list(_ATR_FLOORS)}")
@@ -96,6 +99,10 @@ class StandalonePerpsSimulator:
         self.commission = commission
         self.slippage = slippage
         self.atr_multiplier = atr_multiplier
+        self._atr_floor = atr_floor if atr_floor is not None else _ATR_FLOORS[symbol]
+        self._atr_ceiling = atr_ceiling if atr_ceiling is not None else _ATR_CEILINGS[symbol]
+        # Golden rule: BTC is long-only by default
+        self.long_only = long_only if long_only is not None else (symbol == "BTC")
 
         self.capital = initial_capital
         self._initial_capital = initial_capital
@@ -133,9 +140,8 @@ class StandalonePerpsSimulator:
             logger.debug("open_position: circuit breaker active, skipped")
             return False
 
-        # BTC golden rule — long only
-        if self.symbol == "BTC" and side == "SHORT":
-            logger.warning("BTC golden rule: SHORT blocked")
+        if self.long_only and side == "SHORT":
+            logger.debug("open_position: golden rule — BTC long-only, SHORT blocked")
             return False
 
         ts = ts or datetime.now(timezone.utc)
@@ -235,9 +241,7 @@ class StandalonePerpsSimulator:
     def atr_stop_distance(self, atr: float) -> float:
         """Return capped/floored ATR stop distance in price units."""
         raw = atr * self.atr_multiplier
-        floor = _ATR_FLOORS[self.symbol]
-        ceiling = _ATR_CEILINGS[self.symbol]
-        return max(floor, min(raw, ceiling))
+        return max(self._atr_floor, min(raw, self._atr_ceiling))
 
     # ── Properties ────────────────────────────────────────────────────────────
 

@@ -745,8 +745,11 @@ class FuryBacktestEngine:
         self.rsi_period = config.get("rsi_period", 9)
         self.rsi_long_th = config.get("rsi_long_th", 35.0)    # oversold threshold
         self.rsi_short_th = config.get("rsi_short_th", 65.0)  # overbought threshold
-        self.min_gates = config.get("min_gates", 3)           # minimum gates to enter
+        self.min_gates = config.get("min_gates", 4)           # minimum gates to enter
         self.atr_multiplier = config.get("atr_multiplier", 1.5)
+        self.atr_floor = config.get("atr_floor", None)        # None = use asset default
+        self.atr_ceiling = config.get("atr_ceiling", None)    # None = use asset default
+        self.long_only = config.get("long_only", None)        # None = auto (BTC=True, ETH=False)
         self.funding_short_bias_th = config.get("funding_short_bias_th", 0.0005)
 
     def run(self, df_15m: pd.DataFrame, df_1h: pd.DataFrame) -> dict:
@@ -774,6 +777,9 @@ class FuryBacktestEngine:
             initial_capital=self.initial_capital,
             symbol=self.symbol,
             atr_multiplier=self.atr_multiplier,
+            atr_floor=self.atr_floor,
+            atr_ceiling=self.atr_ceiling,
+            long_only=self.long_only,
         )
 
         equity_curve = []
@@ -839,10 +845,6 @@ class FuryBacktestEngine:
 
         side = "LONG" if ema_signal > 0 else "SHORT"
 
-        # BTC golden rule — silently block shorts
-        if self.symbol == "BTC" and side == "SHORT":
-            return {}, 0, None
-
         rsi_15m = row_15m.get("rsi")
         if rsi_15m is None or np.isnan(rsi_15m):
             return {}, 0, None
@@ -853,12 +855,22 @@ class FuryBacktestEngine:
         # Gate 2: RSI level on 15m
         g2 = (rsi_15m < self.rsi_long_th) if side == "LONG" else (rsi_15m > self.rsi_short_th)
 
-        # Gate 3: 1h RSI MTF confirmation
-        rsi_1h = row_1h.get("rsi") if row_1h is not None else None
-        if rsi_1h is not None and not np.isnan(rsi_1h):
-            g3 = (rsi_1h < 50) if side == "LONG" else (rsi_1h > 50)
-        else:
-            g3 = False
+        # Gate 3: 1h MTF confirmation — HARD REQUIREMENT (not just scored).
+        # 1h EMA-8/21 direction must match the intended trade direction.
+        # This prevents longs in sustained downtrends where 15m EMA whipsaws.
+        # If this gate fails the trade is blocked regardless of other gate scores.
+        ema_1h = row_1h.get("ema_signal") if row_1h is not None else None
+        rsi_1h = row_1h.get("rsi")        if row_1h is not None else None
+        ema_1h_ok = False
+        if ema_1h is not None and not np.isnan(float(ema_1h)):
+            ema_1h_ok = (ema_1h > 0) if side == "LONG" else (ema_1h < 0)
+        if not ema_1h_ok:
+            # 1h macro trend opposes our direction — hard block
+            return {}, 0, None
+        rsi_1h_ok = False
+        if rsi_1h is not None and not np.isnan(float(rsi_1h)):
+            rsi_1h_ok = (rsi_1h < 55) if side == "LONG" else (rsi_1h > 45)
+        g3 = rsi_1h_ok  # EMA already enforced above; g3 scores the RSI half
 
         # Gate 4: Volume above 20-bar SMA
         vol = row_15m.get("volume", 0)
