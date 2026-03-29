@@ -332,8 +332,95 @@ function poolHealth(p, currentPrice) {
   return { level: 'green', reason: 'En rango — fees activos' };
 }
 
+// ── Whale card HTML ────────────────────────────────────────────────────────
+function whaleCard(p, isHistorical = false) {
+  const isExpanded  = state.expanded.has(p.config_id);
+  const lastEvt     = p.last_event;
+  const lastEvtStr  = lastEvt ? evtLabel(lastEvt.type) : 'Sin eventos';
+  const lastTimeStr = lastEvt?.ts ? relTime(lastEvt.ts) : '';
+
+  const botStatus = p.running
+    ? `<span class="badge badge--green">RUNNING</span>`
+    : p.active
+      ? `<span class="badge badge--red">CAÍDO</span>`
+      : `<span class="badge badge--muted">DETENIDO</span>`;
+
+  let heartbeatBadge = '';
+  if (p.running && p.last_heartbeat) {
+    const ageSec = Math.floor((Date.now() - new Date(
+      p.last_heartbeat.endsWith('Z') ? p.last_heartbeat : p.last_heartbeat + 'Z'
+    ).getTime()) / 1000);
+    const cls   = ageSec < 120 ? 'green' : ageSec < 300 ? 'yellow' : 'red';
+    const label = ageSec < 60 ? `${ageSec}s` : `${Math.floor(ageSec/60)}min`;
+    heartbeatBadge = `<span class="badge badge--${cls}" title="Último output">⏱ ${label}</span>`;
+  }
+
+  const recentEventsHtml = (p.recent_events || []).slice(0, 3).map(e => `
+    <div class="mini-evt mini-evt--muted">
+      <span>${evtLabel(e.type)}</span>
+      <span class="muted">${e.ts ? relTime(e.ts) : ''}</span>
+    </div>`).join('');
+
+  const wsMode    = p.whale_use_websocket;
+  const modeTag   = wsMode ? 'WebSocket' : 'Poll';
+  const topN      = p.whale_top_n || 50;
+  const minNot    = p.whale_min_notional ? '$' + fmtNum(p.whale_min_notional) : '—';
+  const assets    = p.whale_watch_assets || 'All';
+  const pollInt   = p.whale_poll_interval || 30;
+  const isPaper   = p.paper_trade;
+
+  return `
+<div class="pool-card pool-card--muted${isHistorical ? ' pool-card--historical' : ''}" id="card-${p.config_id}">
+  <div class="pool-card-header">
+    <div class="health-dot health-dot--${p.running ? 'green' : 'muted'}"></div>
+    <span class="pool-pair">🐋 WHALE</span>
+    <span class="pool-nft">ID #${p.config_id}</span>
+  </div>
+
+  <div class="pool-row">
+    <span class="pool-label">Modo</span>
+    <span class="pool-val">${modeTag} · ${pollInt}s poll</span>
+  </div>
+  <div class="pool-row">
+    <span class="pool-label">Top-N / Min. notional</span>
+    <span class="pool-val">Top ${topN} · ${minNot}</span>
+  </div>
+  <div class="pool-row">
+    <span class="pool-label">Assets vigilados</span>
+    <span class="pool-val">${assets}</span>
+  </div>
+  <div class="pool-row">
+    <span class="pool-label">Último evento</span>
+    <span class="pool-val">${lastEvtStr} <span style="color:var(--muted)">${lastTimeStr}</span></span>
+  </div>
+
+  ${recentEventsHtml ? `<div class="mini-events">${recentEventsHtml}</div>` : ''}
+
+  <div class="pool-footer">
+    <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+      ${botStatus}${heartbeatBadge}
+      <span class="badge badge--muted">🐋 WHALE</span>
+      ${isPaper ? `<span class="badge badge--yellow">PAPER</span>` : ''}
+      <span class="badge badge--muted">${p.user_plan.toUpperCase()}</span>
+    </div>
+  </div>
+  <div class="pool-wallet">${p.user_address}</div>
+
+  <button class="detail-toggle" onclick="toggleDetail(${p.config_id})">
+    ${isExpanded ? '▲ Ocultar historial' : '▼ Ver historial de señales'}
+  </button>
+
+  <div class="detail-drawer ${isExpanded ? '' : 'hidden'}" id="drawer-${p.config_id}">
+    <div class="detail-loading" id="hl-loading-${p.config_id}">Cargando señales…</div>
+    <div class="detail-content hidden" id="hl-content-${p.config_id}"></div>
+  </div>
+</div>`;
+}
+
 // ── Pool card HTML ─────────────────────────────────────────────────────────
 function poolCard(p, ethPrice, isHistorical = false) {
+  if (p.mode === 'whale') return whaleCard(p, isHistorical);
+
   const h = poolHealth(p, ethPrice);
   const isExpanded = state.expanded.has(p.config_id);
 
@@ -888,7 +975,13 @@ function evtColor(type) {
 }
 
 function relTime(isoStr) {
-  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  // Ensure UTC interpretation — DB timestamps have no 'Z' suffix so browsers
+  // would otherwise parse them as local time, producing negative diffs.
+  const normalized = isoStr && !isoStr.endsWith('Z') && !isoStr.includes('+')
+    ? isoStr.replace(' ', 'T') + 'Z'
+    : isoStr;
+  const diff = Math.floor((Date.now() - new Date(normalized).getTime()) / 1000);
+  if (diff < 0)     return 'ahora';
   if (diff < 60)    return `hace ${diff}s`;
   if (diff < 3600)  return `hace ${Math.floor(diff/60)}min`;
   if (diff < 86400) return `hace ${Math.floor(diff/3600)}h`;
