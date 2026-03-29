@@ -56,6 +56,9 @@ async def _auto_restart_bots():
         bots = result.scalars().all()
         for bot in bots:
             try:
+                if not bot.hl_api_key or not bot.hl_wallet_addr:
+                    print(f"[Startup] Skipping bot {bot.id} — missing credentials (hl_api_key or hl_wallet_addr is NULL)", flush=True)
+                    continue
                 config = {
                     "nft_token_id":   bot.nft_token_id,
                     "lower_bound":    str(bot.lower_bound),
