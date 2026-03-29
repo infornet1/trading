@@ -53,6 +53,8 @@ class BotConfigCreate(BaseModel):
     whale_poll_interval:     Optional[int]   = 30
     whale_custom_addresses:  Optional[str]   = None  # comma-separated 0x addresses
     whale_watch_assets:      Optional[str]   = None  # comma-separated, e.g. "BTC,ETH"
+    whale_use_websocket:     Optional[bool]  = False
+    whale_oi_spike_threshold: Optional[float] = 0.03
     paper_trade:       bool            = False
 
     @field_validator("mode")
@@ -95,6 +97,8 @@ class BotConfigUpdate(BaseModel):
     whale_poll_interval:     Optional[int]   = None
     whale_custom_addresses:  Optional[str]   = None
     whale_watch_assets:      Optional[str]   = None
+    whale_use_websocket:     Optional[bool]  = None
+    whale_oi_spike_threshold: Optional[float] = None
     paper_trade:       Optional[bool]  = None
 
     @field_validator("mode")
@@ -133,6 +137,8 @@ class BotConfigOut(BaseModel):
     whale_poll_interval:     Optional[int]
     whale_custom_addresses:  Optional[str]
     whale_watch_assets:      Optional[str]
+    whale_use_websocket:     Optional[bool]
+    whale_oi_spike_threshold: Optional[float]
     paper_trade:    bool
     active:         bool
     created_at:     datetime
@@ -244,6 +250,8 @@ async def create_bot(
         whale_poll_interval      = body.whale_poll_interval,
         whale_custom_addresses   = body.whale_custom_addresses,
         whale_watch_assets       = body.whale_watch_assets,
+        whale_use_websocket      = body.whale_use_websocket,
+        whale_oi_spike_threshold = body.whale_oi_spike_threshold,
         paper_trade       = body.paper_trade,
     )
     db.add(cfg)
@@ -289,6 +297,8 @@ async def update_bot(
     if body.whale_poll_interval      is not None: cfg.whale_poll_interval      = body.whale_poll_interval
     if body.whale_custom_addresses   is not None: cfg.whale_custom_addresses   = body.whale_custom_addresses
     if body.whale_watch_assets       is not None: cfg.whale_watch_assets       = body.whale_watch_assets
+    if body.whale_use_websocket      is not None: cfg.whale_use_websocket      = body.whale_use_websocket
+    if body.whale_oi_spike_threshold is not None: cfg.whale_oi_spike_threshold = body.whale_oi_spike_threshold
     if body.paper_trade       is not None: cfg.paper_trade       = body.paper_trade
 
     await db.commit()

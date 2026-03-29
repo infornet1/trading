@@ -1212,7 +1212,7 @@ function renderLiveBots() {
     // ── WHALE mode panel ──────────────────────────────────────────────────
     if (bot.mode === 'whale') {
       const isPaper   = bot.paper_trade === true;
-      const wsMode    = bot.whale_use_websocket;
+      const wsMode    = bot.whale_use_websocket || false;
       const topN      = bot.whale_top_n || 50;
       const minNotional = (bot.whale_min_notional || 50000).toLocaleString();
       const assets    = bot.whale_watch_assets || 'All assets';
@@ -1240,6 +1240,9 @@ function renderLiveBots() {
             const margin   = Number(d.margin_used    || 0);
             const roe      = Number(d.roe_pct        || 0);
             const funding  = Number(d.funding_since_open || 0);
+            const rank     = d.rank;
+            const addr     = d.address || '';
+            const deltaUsd = Number(d.delta_usd || 0);
             const levHtml  = lev !== '—'
               ? `<span class="whale-sig-lev">${lev}x${levType ? ' <span class="whale-sig-levtype">'+levType+'</span>' : ''}</span>`
               : '';
@@ -1255,17 +1258,28 @@ function renderLiveBots() {
             const fundingHtml = funding
               ? `<span class="whale-sig-funding" title="Funding since open" style="color:${funding>=0?'#00ffb3':'#ff6b6b'};font-size:0.6rem">Δf ${funding>=0?'+':''}$${Math.abs(funding).toFixed(0)}</span>`
               : '';
+            const rankHtml = rank != null
+              ? `<span class="whale-sig-rank" title="Leaderboard rank">#${rank}</span>`
+              : '';
+            const addrHtml = addr
+              ? `<span class="whale-sig-addr" title="${addr}" onclick="navigator.clipboard.writeText('${addr}')" style="cursor:pointer">${addr.slice(0,6)}…${addr.slice(-4)}</span>`
+              : '';
+            const deltaHtml = deltaUsd && Math.abs(deltaUsd) > 0
+              ? `<span class="whale-sig-delta" title="Position size change" style="color:${deltaUsd>=0?'#00ffb3':'#ff6b6b'};font-size:0.6rem">${deltaUsd>=0?'▲':'▼'}$${Math.abs(deltaUsd).toLocaleString(undefined,{maximumFractionDigits:0})}</span>`
+              : '';
             return `<div class="whale-signal-row">
               <div class="whale-sig-top">
+                ${rankHtml}
                 <span class="whale-sig-evt">${evt}</span>
                 <span class="whale-sig-asset">${d.asset || s.asset || '—'}</span>
                 ${dir}
                 <span class="whale-sig-size">$${sizeUsd.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                ${deltaHtml}
                 ${entryPx ? `<span class="whale-sig-entry" title="Entry">@ $${entryPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>` : ''}
                 <span class="whale-sig-time">${s.ts ? new Date(s.ts).toLocaleTimeString() : ''}</span>
               </div>
               <div class="whale-sig-meta">
-                ${levHtml}${liqHtml}${marginHtml}${roeHtml}${fundingHtml}
+                ${levHtml}${liqHtml}${marginHtml}${roeHtml}${fundingHtml}${addrHtml}
               </div>
             </div>`;
           }).join('')
@@ -2348,6 +2362,8 @@ window.launchWhaleBot = async function () {
       whale_poll_interval:     pollInt,
       whale_watch_assets:      watchAssets,
       whale_custom_addresses:  customAddrs,
+      whale_use_websocket:     useWs,
+      whale_oi_spike_threshold: 0.03,
       paper_trade:             paperTrade,
     });
 

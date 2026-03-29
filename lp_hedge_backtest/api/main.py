@@ -37,6 +37,9 @@ async def _run_column_migrations():
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS fury_rsi_short_th DECIMAL(5,2) NULL DEFAULT 65.00",
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS fury_leverage_max INT NULL DEFAULT 12",
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS fury_risk_pct DECIMAL(5,2) NULL DEFAULT 2.00",
+        # WHALE mode missing columns
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS whale_use_websocket TINYINT(1) NULL DEFAULT 0",
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS whale_oi_spike_threshold DECIMAL(5,3) NULL DEFAULT 0.030",
     ]
     async with engine.begin() as conn:
         for sql in migrations:
@@ -81,6 +84,14 @@ async def _auto_restart_bots():
                     "fury_rsi_short_th": str(bot.fury_rsi_short_th or 65),
                     "fury_leverage_max": str(bot.fury_leverage_max or 12),
                     "fury_risk_pct":     str(bot.fury_risk_pct     or 2.0),
+                    # WHALE config (only used when mode='whale')
+                    "whale_top_n":              str(bot.whale_top_n          or 50),
+                    "whale_min_notional":       str(bot.whale_min_notional   or 50000),
+                    "whale_poll_interval":      str(bot.whale_poll_interval  or 30),
+                    "whale_custom_addresses":   bot.whale_custom_addresses   or "",
+                    "whale_watch_assets":       bot.whale_watch_assets       or "",
+                    "whale_use_websocket":      bot.whale_use_websocket      or False,
+                    "whale_oi_spike_threshold": str(bot.whale_oi_spike_threshold or 0.03),
                 }
                 await manager.start(bot.id, config)
                 print(f"[Startup] Auto-restarted bot {bot.id} (NFT #{bot.nft_token_id})", flush=True)

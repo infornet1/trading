@@ -66,6 +66,8 @@ class BotConfig(Base):
     whale_poll_interval      = Column(Integer,      nullable=True, default=30)
     whale_custom_addresses   = Column(Text,         nullable=True)  # comma-separated
     whale_watch_assets       = Column(String(100),  nullable=True)  # comma-separated, e.g. "BTC,ETH"
+    whale_use_websocket      = Column(Boolean,      nullable=True, default=False)
+    whale_oi_spike_threshold = Column(Numeric(5, 3), nullable=True, default=0.030)
     paper_trade     = Column(Boolean, default=False)          # simulate trades, no real orders
     active          = Column(Boolean, default=False)
     created_at      = Column(DateTime, default=datetime.utcnow)
