@@ -1537,11 +1537,10 @@
 }
 
 .whale-signal-row {
-  display: grid;
-  grid-template-columns: 100px 60px 90px 1fr auto;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 10px;
   border-radius: 6px;
   background: rgba(0, 212, 255, 0.04);
   border: 1px solid rgba(0, 212, 255, 0.08);
@@ -1552,6 +1551,21 @@
 .whale-signal-row--new {
   background: rgba(0, 212, 255, 0.12);
   border-color: rgba(0, 212, 255, 0.3);
+}
+
+.whale-sig-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.whale-sig-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-left: 2px;
 }
 
 .whale-sig-evt {
@@ -1570,6 +1584,59 @@
 
 .whale-sig-size {
   color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.whale-sig-entry {
+  color: #7aaccc;
+  font-size: 0.65rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.whale-sig-time {
+  color: #3d6b8c;
+  font-size: 0.62rem;
+  margin-left: auto;
+}
+
+.whale-sig-lev {
+  background: rgba(0, 212, 255, 0.12);
+  color: var(--color-neon-cyan);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.whale-sig-levtype {
+  color: #7aaccc;
+  font-weight: 400;
+}
+
+.whale-sig-liq {
+  color: #ff6b6b;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.whale-sig-margin {
+  color: #f59e0b;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.whale-sig-roe {
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.whale-sig-roe--pos { color: #00ffb3; }
+.whale-sig-roe--neg { color: #ff6b6b; }
+
+.whale-sig-funding {
+  font-size: 0.6rem;
   font-variant-numeric: tabular-nums;
 }
 

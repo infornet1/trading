@@ -1225,18 +1225,48 @@ function renderLiveBots() {
       const lastSignals = (saas.whaleSignals[bot.id] || []).slice(0, 5);
       const signalRows  = lastSignals.length
         ? lastSignals.map(s => {
-            const dir = s.side === 'LONG'
+            const d   = s.details || s;
+            const dir = (d.side || s.side) === 'LONG'
               ? `<span style="color:#00ffb3">▲ LONG</span>`
-              : s.side === 'SHORT'
+              : (d.side || s.side) === 'SHORT'
                 ? `<span style="color:#ff6b6b">▼ SHORT</span>`
-                : `<span style="color:#7aaccc">— ${s.side}</span>`;
-            const evt = s.event_type.replace('whale_','').replace(/_/g,' ').toUpperCase();
+                : `<span style="color:#7aaccc">—</span>`;
+            const evt      = (s.event_type || '').replace('whale_','').replace(/_/g,' ').toUpperCase();
+            const sizeUsd  = Number(d.size_usd  || s.size_usd  || 0);
+            const entryPx  = Number(d.entry_px  || 0);
+            const liqPx    = Number(d.liq_px    || 0);
+            const lev      = d.leverage    || '—';
+            const levType  = d.leverage_type ? d.leverage_type.toUpperCase() : '';
+            const margin   = Number(d.margin_used    || 0);
+            const roe      = Number(d.roe_pct        || 0);
+            const funding  = Number(d.funding_since_open || 0);
+            const levHtml  = lev !== '—'
+              ? `<span class="whale-sig-lev">${lev}x${levType ? ' <span class="whale-sig-levtype">'+levType+'</span>' : ''}</span>`
+              : '';
+            const liqHtml  = liqPx
+              ? `<span class="whale-sig-liq" title="Liq price">Liq $${liqPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>`
+              : '';
+            const marginHtml = margin
+              ? `<span class="whale-sig-margin" title="Margin used">Mrg $${margin.toLocaleString(undefined,{maximumFractionDigits:0})}</span>`
+              : '';
+            const roeHtml  = roe
+              ? `<span class="whale-sig-roe ${roe>=0?'whale-sig-roe--pos':'whale-sig-roe--neg'}" title="ROE">ROE ${roe>=0?'+':''}${roe.toFixed(1)}%</span>`
+              : '';
+            const fundingHtml = funding
+              ? `<span class="whale-sig-funding" title="Funding since open" style="color:${funding>=0?'#00ffb3':'#ff6b6b'};font-size:0.6rem">Δf ${funding>=0?'+':''}$${Math.abs(funding).toFixed(0)}</span>`
+              : '';
             return `<div class="whale-signal-row">
-              <span class="whale-sig-evt">${evt}</span>
-              <span class="whale-sig-asset">${s.asset || s.details?.asset || '—'}</span>
-              ${dir}
-              <span class="whale-sig-size">$${Number(s.details?.size_usd || s.size_usd || 0).toLocaleString(undefined,{maximumFractionDigits:0})}</span>
-              <span class="whale-sig-time" style="color:#3d6b8c;font-size:0.65rem">${s.ts ? new Date(s.ts).toLocaleTimeString() : ''}</span>
+              <div class="whale-sig-top">
+                <span class="whale-sig-evt">${evt}</span>
+                <span class="whale-sig-asset">${d.asset || s.asset || '—'}</span>
+                ${dir}
+                <span class="whale-sig-size">$${sizeUsd.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                ${entryPx ? `<span class="whale-sig-entry" title="Entry">@ $${entryPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>` : ''}
+                <span class="whale-sig-time">${s.ts ? new Date(s.ts).toLocaleTimeString() : ''}</span>
+              </div>
+              <div class="whale-sig-meta">
+                ${levHtml}${liqHtml}${marginHtml}${roeHtml}${fundingHtml}
+              </div>
             </div>`;
           }).join('')
         : `<div style="color:#3d6b8c;font-size:0.75rem;padding:8px 0">${t('whale.no.signals')}</div>`;
@@ -1448,32 +1478,47 @@ function updateWhaleSignalDisplay(configId, data) {
   const list = document.getElementById(`whale-signals-${configId}`);
   if (!list) return;
 
-  const evt   = (data.event || data.event_type || '').replace('whale_','').replace(/_/g,' ').toUpperCase();
-  const d     = data.details || {};
-  const side  = d.side || data.side || '—';
-  const asset = d.asset || data.asset || '—';
-  const sizeUsd = Number(d.size_usd || data.size_usd || 0);
-  const ts    = data.ts ? new Date(data.ts).toLocaleTimeString() : '';
+  const evt     = (data.event || data.event_type || '').replace('whale_','').replace(/_/g,' ').toUpperCase();
+  const d       = data.details || {};
+  const side    = d.side    || data.side    || '—';
+  const asset   = d.asset   || data.asset   || '—';
+  const sizeUsd = Number(d.size_usd         || data.size_usd || 0);
+  const entryPx = Number(d.entry_px         || 0);
+  const liqPx   = Number(d.liq_px           || 0);
+  const lev     = d.leverage                || null;
+  const levType = d.leverage_type           || '';
+  const margin  = Number(d.margin_used      || 0);
+  const roe     = Number(d.roe_pct          || 0);
+  const funding = Number(d.funding_since_open || 0);
+  const ts      = data.ts ? new Date(data.ts).toLocaleTimeString() : '';
 
   const dirHtml = side === 'LONG'
     ? `<span style="color:#00ffb3">▲ LONG</span>`
     : side === 'SHORT'
       ? `<span style="color:#ff6b6b">▼ SHORT</span>`
-      : `<span style="color:#7aaccc">— ${side}</span>`;
+      : `<span style="color:#7aaccc">—</span>`;
+
+  const levHtml    = lev ? `<span class="whale-sig-lev">${lev}x${levType ? ' <span class="whale-sig-levtype">'+levType.toUpperCase()+'</span>' : ''}</span>` : '';
+  const liqHtml    = liqPx ? `<span class="whale-sig-liq" title="Liq price">Liq $${liqPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>` : '';
+  const marginHtml = margin ? `<span class="whale-sig-margin" title="Margin used">Mrg $${margin.toLocaleString(undefined,{maximumFractionDigits:0})}</span>` : '';
+  const roeHtml    = roe ? `<span class="whale-sig-roe ${roe>=0?'whale-sig-roe--pos':'whale-sig-roe--neg'}" title="ROE">ROE ${roe>=0?'+':''}${roe.toFixed(1)}%</span>` : '';
+  const fundingHtml = funding ? `<span class="whale-sig-funding" title="Funding since open" style="color:${funding>=0?'#00ffb3':'#ff6b6b'};font-size:0.6rem">Δf ${funding>=0?'+':''}$${Math.abs(funding).toFixed(0)}</span>` : '';
 
   const row = document.createElement('div');
   row.className = 'whale-signal-row whale-signal-row--new';
   row.innerHTML = `
-    <span class="whale-sig-evt">${evt}</span>
-    <span class="whale-sig-asset">${asset}</span>
-    ${dirHtml}
-    <span class="whale-sig-size">$${sizeUsd.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
-    <span class="whale-sig-time" style="color:#3d6b8c;font-size:0.65rem">${ts}</span>`;
+    <div class="whale-sig-top">
+      <span class="whale-sig-evt">${evt}</span>
+      <span class="whale-sig-asset">${asset}</span>
+      ${dirHtml}
+      <span class="whale-sig-size">$${sizeUsd.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+      ${entryPx ? `<span class="whale-sig-entry" title="Entry">@ $${entryPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>` : ''}
+      <span class="whale-sig-time">${ts}</span>
+    </div>
+    <div class="whale-sig-meta">${levHtml}${liqHtml}${marginHtml}${roeHtml}${fundingHtml}</div>`;
 
   list.insertBefore(row, list.firstChild);
-  // Remove animation class after transition
   setTimeout(() => row.classList.remove('whale-signal-row--new'), 800);
-  // Keep max WHALE_SIGNAL_MAX rows in DOM
   while (list.children.length > WHALE_SIGNAL_MAX) list.removeChild(list.lastChild);
 }
 
