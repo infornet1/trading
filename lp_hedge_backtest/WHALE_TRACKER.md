@@ -1,6 +1,7 @@
 # VIZNAGO WHALE — Hyperliquid Whale Tracker
-> Feature documentation — v1.0 (2026-03-29)
+> Feature documentation — v1.1 (2026-03-29)
 > Status: **Complete · Live in Dashboard + Admin Panel**
+> Next layer: see [WHALE_INTELLIGENCE_AGENT.md](WHALE_INTELLIGENCE_AGENT.md)
 
 ---
 
@@ -234,3 +235,15 @@ Signals are printed as `[EVENT] {...}` JSON lines and as human-readable log line
 - **Hedged books:** Some top leaderboard wallets run market-neutral strategies (long + short on different sub-accounts). Their directional fills are not true alpha — filter out wallets where `accountValue` >> `totalNtlPos`.
 - **WS subscription limit:** Subscribing to too many addresses simultaneously may cause silent drops. Keep `LEADERBOARD_TOP_N` ≤ 50 in WS mode; use poll mode for larger watchlists.
 - **Rate limits:** HL REST API throttles at ~1200 req/min per IP. With top_n=50 and poll_interval=30, each cycle makes ~52 requests (1 leaderboard + 1 all_mids + 50 user_state). This is well within limits.
+
+---
+
+## 11. Intelligence Layer (Planned)
+
+The Whale Intelligence Agent extends this tracker with:
+- 90-day per-wallet fill history and behavioral fingerprints
+- Pattern detection (accumulation burst, leverage spike, wallet convergence, repeat winners)
+- Scored intelligence brief (`score 0–100`, `confidence`, `classification`, `historical_match`) attached to every signal
+- Convergence alerts when ≥3 top-100 wallets pile into the same asset within 30 minutes
+
+Full specification: **[WHALE_INTELLIGENCE_AGENT.md](WHALE_INTELLIGENCE_AGENT.md)**

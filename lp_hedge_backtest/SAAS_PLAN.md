@@ -672,12 +672,28 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 | **8** | Subscriptions via Unlock Protocol NFT Keys + grace period state machine | 🔲 Pending |
 | **9** | Telegram Bot alerts (anonymous, NFT Key linked, two-way commands) | 🔲 Pending |
 | **10** | Alpha test with 3–5 real users | 🔲 Pending |
+| **W1** | VIZNAGO WHALE — leaderboard tracker, position diffing, copy-trade signals, dashboard panel | ✅ Complete |
+| **W2** | Whale signal enrichment — leverage, liq price, margin, ROE%, funding delta in every signal row | ✅ Complete |
+| **W3** | Whale Intelligence Agent Phase 1 — HistoryStore, PatternEngine, SignalEnricher, convergence panel | 🔲 Planned |
+| **W4** | Whale Intelligence Agent Phase 2 — backtest framework, Telegram CRITICAL alerts, pinned watchlist | 🔲 Planned |
 
 **Estimated remaining to MVP: 1–2 weeks.**
 
 ---
 
-## 13. Post-Alpha Upgrade Path
+## 13. Feature Modules
+
+In addition to the core SaaS steps above, VIZNAGO ships three intelligence modules:
+
+| Module | Doc | Status |
+|--------|-----|--------|
+| VIZNAGO WHALE — Tracker | [WHALE_TRACKER.md](WHALE_TRACKER.md) | ✅ Live |
+| VIZNAGO WHALE — Intelligence Agent | [WHALE_INTELLIGENCE_AGENT.md](WHALE_INTELLIGENCE_AGENT.md) | 🔲 Planned |
+| FURY RSI Bot + Backtest | [RSI_AI_STRATEGY_RESEARCH.md](RSI_AI_STRATEGY_RESEARCH.md) | ✅ Live (ETH) |
+
+---
+
+## 14. Post-Alpha Upgrade Path
 
 When alpha is validated and revenue justifies it:
 
@@ -698,7 +714,7 @@ Migration is low-friction:
 
 ---
 
-## 14. Open Decisions (For Review)
+## 15. Open Decisions (For Review)
 
 **Blocking Step 8 (Subscriptions):**
 - [x] Network confirmed: **Arbitrum One** (same network as users' LP pools)
