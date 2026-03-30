@@ -1276,7 +1276,7 @@ function renderLiveBots() {
                 <span class="whale-sig-size">$${sizeUsd.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
                 ${deltaHtml}
                 ${entryPx ? `<span class="whale-sig-entry" title="Entry">@ $${entryPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>` : ''}
-                <span class="whale-sig-time">${s.ts ? new Date(s.ts.endsWith('Z') ? s.ts : s.ts + 'Z').toLocaleTimeString() : ''}</span>
+                <span class="whale-sig-time">${s.ts ? new Date(s.ts.replace('+00:00','Z').replace(/\+\d{2}:\d{2}$/,'Z')).toLocaleTimeString() : ''}</span>
               </div>
               <div class="whale-sig-meta">
                 ${levHtml}${liqHtml}${marginHtml}${roeHtml}${fundingHtml}${addrHtml}

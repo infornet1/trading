@@ -167,7 +167,7 @@ class WhaleSignal:
             # Signal metadata
             "delta_usd":     round(self.delta_usd, 2) if self.delta_usd is not None else None,
             "fill_dir":      self.fill_dir,
-            "ts":            self.ts.isoformat(),
+            "ts":            self.ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
 
 

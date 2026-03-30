@@ -587,11 +587,11 @@ async def whale_signals(
         if asset and d.get("asset", "").upper() != asset.upper():
             continue
         signals.append({
+            **d,
             "event_type": ev.event_type,
-            "ts":         ev.ts.isoformat(),
+            "ts":         ev.ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "price":      float(ev.price_at_event) if ev.price_at_event else None,
             "pnl":        float(ev.pnl) if ev.pnl else None,
-            **d,
         })
 
     return signals
