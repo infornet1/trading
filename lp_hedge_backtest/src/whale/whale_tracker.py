@@ -33,7 +33,9 @@ DEFAULT_POLL_INTERVAL      = 30
 DEFAULT_OI_SPIKE_THRESHOLD = 0.03
 
 
-# ── HTTP helper (bypasses SDK dex= bug) ───────────────────────────────────────
+# ── HTTP helpers ──────────────────────────────────────────────────────────────
+
+HL_STATS_URL = "https://stats-data.hyperliquid.xyz/Mainnet"
 
 def _hl_post(payload: dict, timeout: int = 12) -> dict | list:
     """Direct POST to HL Info API — no SDK, no dex= param."""
@@ -43,6 +45,17 @@ def _hl_post(payload: dict, timeout: int = 12) -> dict | list:
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read())
+
+
+def _hl_get(path: str, timeout: int = 20) -> dict | list:
+    """GET request to HL stats API."""
+    req = urllib.request.Request(
+        f"{HL_STATS_URL}{path}",
+        headers={"Accept": "application/json"},
+        method="GET",
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read())
@@ -221,21 +234,30 @@ class WhaleTracker:
     # ── Leaderboard ────────────────────────────────────────────────────────
 
     def refresh_leaderboard(self) -> list[str]:
-        """Fetch HL leaderboard. Returns list of top-N addresses."""
-        # Try week window first, fall back to allTime
+        """Fetch HL leaderboard. Returns list of top-N addresses sorted by week PnL."""
+        # Leaderboard moved to stats-data GET endpoint (info POST endpoint removed ~2026-Q1)
         for window in ("week", "allTime", "day"):
             try:
-                data = _hl_post({"type": "leaderboard", "req": {"timeWindow": window}})
-                rows = data.get("leaderboardRows", []) if isinstance(data, dict) else data
-                if rows:
-                    top = []
-                    for i, row in enumerate(rows[:self.top_n]):
-                        addr = (row.get("ethAddress") or row.get("user") or "").lower()
-                        if addr:
-                            self._address_ranks[addr] = i + 1
-                            top.append(addr)
-                    if top:
-                        return top
+                data = _hl_get("/leaderboard")
+                rows = data.get("leaderboardRows", []) if isinstance(data, dict) else []
+                if not rows:
+                    continue
+                # Sort by chosen window PnL descending
+                def _pnl(row):
+                    for w, perf in row.get("windowPerformances", []):
+                        if w == window:
+                            return float(perf.get("pnl", 0))
+                    return 0.0
+                rows_sorted = sorted(rows, key=_pnl, reverse=True)
+                top = []
+                for i, row in enumerate(rows_sorted[:self.top_n]):
+                    addr = (row.get("ethAddress") or row.get("user") or "").lower()
+                    if addr:
+                        self._address_ranks[addr] = i + 1
+                        top.append(addr)
+                if top:
+                    print(f"[WhaleTracker] Leaderboard loaded — {len(top)} addresses (sorted by {window} PnL)", flush=True)
+                    return top
             except Exception as e:
                 print(f"[WhaleTracker] Leaderboard ({window}) error: {e}", flush=True)
         return []
