@@ -164,6 +164,17 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
             )
             recent_evts = recent_result.scalars().all()
 
+            # x_max_eth from last started event (used for pool value estimate)
+            started_result = await db.execute(
+                select(BotEvent)
+                .where(BotEvent.config_id == cfg.id)
+                .where(BotEvent.event_type == "started")
+                .order_by(BotEvent.id.desc())
+                .limit(1)
+            )
+            started_evt = started_result.scalar_one_or_none()
+            x_max_eth = float(started_evt.details.get("x_max_eth", 0)) if started_evt and started_evt.details else None
+
             # Volume: sum notionals from hedge_opened events
             vol_result = await db.execute(
                 select(BotEvent)
@@ -226,7 +237,9 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                     }
                     for e in recent_evts
                 ],
-                "volume_usd": round(config_volume, 2),
+                "volume_usd":  round(config_volume, 2),
+                "hedge_ratio": float(cfg.hedge_ratio) if cfg.hedge_ratio is not None else 50.0,
+                "x_max_eth":   x_max_eth,
             })
 
         # ── User acquisition stats ──────────────────────────────────────

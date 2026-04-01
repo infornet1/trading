@@ -490,6 +490,17 @@ function poolCard(p, ethPrice, isHistorical = false) {
     <span class="pool-label">Precio actual</span>
     <span class="pool-val pool-val--${h.level}">${priceStr}</span>
   </div>
+  ${(() => {
+    const poolVal = estimatePoolValue(p, ethPrice);
+    if (!poolVal) return '';
+    const hedgeNotional = poolVal * (p.hedge_ratio / 100);
+    return `<div class="pool-row">
+      <span class="pool-label">Pool Value ~</span>
+      <span class="pool-val" style="font-weight:600;color:#e2e8f0">$${fmtNum(poolVal)}
+        <span style="font-size:.68rem;color:var(--muted);margin-left:4px">hedge $${fmtNum(hedgeNotional)}</span>
+      </span>
+    </div>`;
+  })()}
 
   <div class="range-bar-wrap">
     <div class="range-bar-bg">
@@ -986,4 +997,30 @@ function relTime(isoStr) {
   if (diff < 3600)  return `hace ${Math.floor(diff/60)}min`;
   if (diff < 86400) return `hace ${Math.floor(diff/3600)}h`;
   return `hace ${Math.floor(diff/86400)}d`;
+}
+
+// ── Pool value estimate (no blockchain — uses x_max_eth from started event) ─
+// x_max_eth is the max ETH the position holds at lower_bound (from bot startup).
+// We use this to estimate current value based on price position within range.
+function estimatePoolValue(p, ethPrice) {
+  const xMax = p.x_max_eth;
+  if (!xMax || !ethPrice || !p.lower_bound || !p.upper_bound) return null;
+  const lower = p.lower_bound;
+  const upper = p.upper_bound;
+
+  if (ethPrice >= upper) {
+    // Out of range high — all USDC. Value ≈ x_max * upper_bound
+    return xMax * upper;
+  }
+  if (ethPrice <= lower) {
+    // Out of range low — all ETH. Value ≈ x_max * current_price
+    return xMax * ethPrice;
+  }
+  // In range — approximate using geometric mean of ETH and USDC components
+  const sqrtP = Math.sqrt(ethPrice);
+  const sqrtA = Math.sqrt(lower);
+  const sqrtB = Math.sqrt(upper);
+  const ethAmt  = xMax * (sqrtB - sqrtP) / (sqrtP * sqrtB) * sqrtP * sqrtP; // simplified
+  const usdcAmt = xMax * (sqrtP - sqrtA) * sqrtP;
+  return ethAmt * ethPrice + usdcAmt;
 }
