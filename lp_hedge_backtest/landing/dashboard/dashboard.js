@@ -536,10 +536,10 @@ async function fetchPositions() {
       }
 
       return {
-        tokenId:     raw.tokenId.toString(),
-        token0:      raw.token0,
-        token1:      raw.token1,
-        fee:         Number(raw.fee),
+        tokenId:      raw.tokenId.toString(),
+        token0:       raw.token0,
+        token1:       raw.token1,
+        fee:          Number(raw.fee),
         token0Info,
         token1Info,
         tickLower,
@@ -547,11 +547,12 @@ async function fetchPositions() {
         liquidity,
         tokensOwed0,
         tokensOwed1,
+        sqrtPriceX96: pool?.slot0?.sqrtPriceX96 ?? null,
         priceLower,
         priceUpper,
         priceCurrent,
-        priceBase:   priceLowerObj.base,
-        priceQuote:  priceLowerObj.quote,
+        priceBase:    priceLowerObj.base,
+        priceQuote:   priceLowerObj.quote,
         rangeStatus,
         rangePercent,
       };
@@ -822,6 +823,22 @@ function buildPositionCard(pos) {
   const fee1Display = formatTokenAmount(tokensOwed1, token1Info.decimals);
   const hasFees     = tokensOwed0 > 0n || tokensOwed1 > 0n;
 
+  // Pool value in USD
+  const { amount0, amount1 } = computePositionAmounts(
+    pos.sqrtPriceX96, tickLower, tickUpper, liquidity,
+    token0Info.decimals, token1Info.decimals
+  );
+  const usd0 = tokenToUsd(token0Info.symbol, amount0);
+  const usd1 = tokenToUsd(token1Info.symbol, amount1);
+  const poolValueUsd = (usd0 !== null && usd1 !== null) ? usd0 + usd1 : null;
+
+  // Uncollected fees USD value
+  const fees0Human = Number(tokensOwed0) / Math.pow(10, token0Info.decimals);
+  const fees1Human = Number(tokensOwed1) / Math.pow(10, token1Info.decimals);
+  const feeUsd0 = tokenToUsd(token0Info.symbol, fees0Human);
+  const feeUsd1 = tokenToUsd(token1Info.symbol, fees1Human);
+  const feesValueUsd = (feeUsd0 !== null && feeUsd1 !== null) ? feeUsd0 + feeUsd1 : null;
+
   card.innerHTML = `
     <div class="pc-header">
       <div>
@@ -872,8 +889,19 @@ function buildPositionCard(pos) {
       ? `<div class="pc-range-pct">${rangePctText}</div>`
       : ''}
 
+    ${poolValueUsd !== null ? `
+    <div class="pc-pool-value">
+      <div class="pc-fees-label">Pool Value</div>
+      <div class="pc-fees-values" style="font-size:1.05rem;font-weight:700;color:#e2e8f0">
+        $${poolValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <span style="font-size:0.72rem;font-weight:400;color:var(--color-text-secondary);margin-left:6px">
+          ${amount0.toFixed(4)} ${token0Info.symbol} + ${amount1.toFixed(2)} ${token1Info.symbol}
+        </span>
+      </div>
+    </div>` : ''}
+
     <div class="pc-fees">
-      <div class="pc-fees-label">${t('pos.fees.label')}</div>
+      <div class="pc-fees-label">${t('pos.fees.label')}${feesValueUsd !== null && feesValueUsd > 0 ? ` <span style="color:#34d399;font-size:0.72rem">≈ $${feesValueUsd.toFixed(2)}</span>` : ''}</div>
       <div class="pc-fees-values">
         ${hasFees
           ? `${fee0Display}<span>${token0Info.symbol}</span>&nbsp;+&nbsp;${fee1Display}<span>${token1Info.symbol}</span>`
@@ -885,6 +913,50 @@ function buildPositionCard(pos) {
   `;
 
   return card;
+}
+
+// ── Uniswap v3 Pool Value Math ────────────────────────────────────────────
+
+/**
+ * Compute token0 and token1 amounts from a v3 position.
+ * Returns { amount0, amount1 } as human-readable floats (post-decimal).
+ */
+function computePositionAmounts(sqrtPriceX96, tickLower, tickUpper, liquidity, decimals0, decimals1) {
+  if (!sqrtPriceX96 || liquidity === 0n) return { amount0: 0, amount1: 0 };
+
+  const Q96 = 2 ** 96;
+  const sqrtP  = Number(sqrtPriceX96) / Q96;
+  const sqrtA  = Math.sqrt(Math.pow(1.0001, tickLower));
+  const sqrtB  = Math.sqrt(Math.pow(1.0001, tickUpper));
+  const liq    = Number(liquidity);
+
+  let raw0 = 0, raw1 = 0;
+  if (sqrtP <= sqrtA) {
+    // All token0
+    raw0 = liq * (sqrtB - sqrtA) / (sqrtA * sqrtB);
+  } else if (sqrtP >= sqrtB) {
+    // All token1
+    raw1 = liq * (sqrtB - sqrtA);
+  } else {
+    raw0 = liq * (sqrtB - sqrtP) / (sqrtP * sqrtB);
+    raw1 = liq * (sqrtP - sqrtA);
+  }
+
+  return {
+    amount0: raw0 / Math.pow(10, decimals0),
+    amount1: raw1 / Math.pow(10, decimals1),
+  };
+}
+
+/**
+ * Convert token symbol + amount to USD using live prices.
+ * Returns null if price unavailable.
+ */
+function tokenToUsd(symbol, amount) {
+  if (STABLES.has(symbol))       return amount;
+  if (symbol === 'WETH')         return state.prices.eth  ? amount * state.prices.eth  : null;
+  if (symbol === 'WBTC')         return state.prices.btc  ? amount * state.prices.btc  : null;
+  return null;
 }
 
 // ── UI Helpers ────────────────────────────────────────────────────────────
