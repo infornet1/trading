@@ -948,6 +948,9 @@ function init() {
   // Start price ticker even before wallet connects
   fetchLivePrices();
 
+  // Load public whale signals — no wallet required
+  loadPublicWhaleSignals();
+
   // Check if wallet already authorized (no popup)
   if (window.ethereum) {
     window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {
@@ -1144,6 +1147,19 @@ async function saasLoadBots() {
     // Silently ignore — JWT may be expired (apiCall handles 401)
     console.warn('[SaaS] loadBots:', err.message);
   }
+}
+
+// ── Public whale signal loader (no auth required) ────────────────────────
+
+async function loadPublicWhaleSignals() {
+  try {
+    const signals = await fetch(API_BASE + '/bots/public-whale-signals?limit=50')
+      .then(r => r.ok ? r.json() : []);
+    if (!Array.isArray(signals) || !signals.length) return;
+    // Store under a reserved key so renderWhaleSection can pick them up
+    saas.whaleSignals['__public__'] = signals;
+    renderWhaleSection();
+  } catch (_) {}
 }
 
 // ── Live Bots Panel ───────────────────────────────────────────────────────
@@ -2175,7 +2191,7 @@ async function checkMaintenanceStatus() {
 
 function renderWhaleSection() {
   const section = document.getElementById('whale-section');
-  if (!section || !saas.jwt) return;
+  if (!section) return;
   const t = window.t || (k => k);
 
   const whaleBots = Object.values(saas.bots).filter(b => b.mode === 'whale');
@@ -2216,10 +2232,72 @@ function renderWhaleSection() {
         whale bot is running.
       </p>
 
-      ${stoppedCards}
+      ${(() => {
+        // Aggregate signals: prefer live websocket data, fall back to public endpoint
+        const allSignals = [
+          ...Object.entries(saas.whaleSignals)
+            .filter(([k]) => k !== '__public__')
+            .flatMap(([, s]) => s),
+          ...(saas.whaleSignals['__public__'] || []),
+        ].filter((s, i, arr) => {
+          // deduplicate by ts+asset+event_type
+          const key = `${s.ts}|${s.asset}|${s.event_type}`;
+          return arr.findIndex(x => `${x.ts}|${x.asset}|${x.event_type}` === key) === i;
+        }).sort((a, b) => (b.ts > a.ts ? 1 : -1)).slice(0, 20);
 
-      <!-- Launch form -->
-      <div id="whale-launch-form" class="prot-form" style="margin-top:${stoppedBots.length ? '20px' : '0'}">
+        if (!allSignals.length) return `
+          <p style="font-size:0.75rem;color:var(--color-text-secondary);margin:0 0 16px;text-align:center;opacity:0.6">
+            No signals yet — whale tracker is polling…
+          </p>`;
+
+        const evColor = t => ({ whale_new_position:'#00d4ff', whale_closed:'#9ca3af',
+          whale_flip:'#f59e0b', whale_size_increase:'#34d399', whale_size_decrease:'#f87171' }[t] || '#9ca3af');
+        const evLabel = t => t.replace('whale_','').replace(/_/g,' ').toUpperCase();
+
+        const rows = allSignals.map(s => {
+          const side  = (s.side||'').toUpperCase();
+          const sideColor = side === 'LONG' ? '#34d399' : side === 'SHORT' ? '#f87171' : '#9ca3af';
+          const sz    = s.size_usd ? `$${Number(s.size_usd).toLocaleString('en-US',{maximumFractionDigits:0})}` : '—';
+          const delta = s.delta_usd != null
+            ? `<span style="color:${s.delta_usd>=0?'#34d399':'#f87171'}">${s.delta_usd>=0?'▲':'▼'}$${Math.abs(Number(s.delta_usd)).toLocaleString('en-US',{maximumFractionDigits:0})}</span>` : '';
+          const addr  = s.address ? `<span title="${s.address}" style="cursor:pointer;font-size:0.68rem;color:#6b7280" onclick="navigator.clipboard?.writeText('${s.address}')">${s.address.slice(0,6)}…${s.address.slice(-4)}</span>` : '';
+          const ts    = (() => { try { return new Date(s.ts.replace(/[+-]\d{2}:\d{2}$/,'')).toLocaleTimeString(); } catch(_){return s.ts||'';} })();
+          return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+            <td style="padding:5px 6px;font-size:0.7rem;color:#6b7280;white-space:nowrap">${ts}</td>
+            <td style="padding:5px 6px;font-size:0.72rem;font-weight:600;color:${evColor(s.event_type)}">${evLabel(s.event_type)}</td>
+            <td style="padding:5px 6px;font-size:0.72rem;font-weight:600">${s.asset||'—'}</td>
+            <td style="padding:5px 6px;font-size:0.72rem;color:${sideColor}">${side||'—'}</td>
+            <td style="padding:5px 6px;font-size:0.72rem;text-align:right">${sz}</td>
+            <td style="padding:5px 6px;font-size:0.72rem;text-align:right">${delta}</td>
+            <td style="padding:5px 6px">${addr}</td>
+          </tr>`;
+        }).join('');
+
+        return `<div style="overflow-x:auto;margin-bottom:16px">
+          <table style="width:100%;border-collapse:collapse;font-size:0.72rem">
+            <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+              <th style="padding:4px 6px;text-align:left;color:#6b7280;font-weight:500;font-size:0.68rem">TIME</th>
+              <th style="padding:4px 6px;text-align:left;color:#6b7280;font-weight:500;font-size:0.68rem">EVENT</th>
+              <th style="padding:4px 6px;text-align:left;color:#6b7280;font-weight:500;font-size:0.68rem">ASSET</th>
+              <th style="padding:4px 6px;text-align:left;color:#6b7280;font-weight:500;font-size:0.68rem">SIDE</th>
+              <th style="padding:4px 6px;text-align:right;color:#6b7280;font-weight:500;font-size:0.68rem">SIZE</th>
+              <th style="padding:4px 6px;text-align:right;color:#6b7280;font-weight:500;font-size:0.68rem">DELTA</th>
+              <th style="padding:4px 6px;color:#6b7280;font-weight:500;font-size:0.68rem">WHALE</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+      })()}
+
+      ${saas.jwt ? stoppedCards : ''}
+
+      <!-- Launch form — requires wallet auth -->
+      ${saas.jwt ? `<div id="whale-launch-form" class="prot-form" style="margin-top:${stoppedBots.length ? '20px' : '0'}">` : `
+      <div id="whale-launch-form" class="prot-form" style="margin-top:0;opacity:0.5;pointer-events:none;position:relative">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;background:rgba(10,15,26,0.7);border-radius:8px">
+          <span style="font-size:0.8rem;color:var(--color-text-secondary)">🔒 Connect wallet to launch a tracker</span>
+        </div>
+      <div>`}
         <div class="tp-header" style="margin-bottom:14px">
           <div class="tp-pair">New Whale Tracker</div>
           <div class="tp-range">Hyperliquid · Public API</div>

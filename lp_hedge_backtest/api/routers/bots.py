@@ -437,6 +437,57 @@ async def hl_position(
     return await loop.run_in_executor(None, _sync)
 
 
+@router.get("/public-whale-signals")
+async def public_whale_signals(
+    limit: int = Query(50, le=200),
+    event_type: Optional[str] = Query(None),
+    asset: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Public read-only endpoint — returns recent whale signals from all active whale bots.
+    No authentication required. Suitable for unauthenticated dashboard views."""
+    from sqlalchemy import and_, or_
+
+    whale_event_types = [
+        "whale_new_position", "whale_closed", "whale_size_increase",
+        "whale_size_decrease", "whale_flip",
+    ]
+    if event_type:
+        full_type = f"whale_{event_type}" if not event_type.startswith("whale_") else event_type
+        whale_event_types = [full_type]
+
+    # Only pull from active whale bots
+    active_whale_ids_q = select(BotConfig.id).where(
+        and_(BotConfig.mode == "whale", BotConfig.active == True)
+    )
+    active_ids_result = await db.execute(active_whale_ids_q)
+    active_ids = [row[0] for row in active_ids_result.fetchall()]
+
+    if not active_ids:
+        return []
+
+    type_filter = or_(*[BotEvent.event_type == t for t in whale_event_types])
+    id_filter   = or_(*[BotEvent.config_id == cid for cid in active_ids])
+    q = select(BotEvent).where(and_(id_filter, type_filter))
+
+    result = await db.execute(q.order_by(desc(BotEvent.ts)).limit(limit))
+    events = result.scalars().all()
+
+    signals = []
+    for ev in events:
+        d = ev.details or {}
+        if asset and d.get("asset", "").upper() != asset.upper():
+            continue
+        signals.append({
+            **d,
+            "event_type": ev.event_type,
+            "ts":         ev.ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "price":      float(ev.price_at_event) if ev.price_at_event else None,
+            "pnl":        float(ev.pnl) if ev.pnl else None,
+        })
+    return signals
+
+
 @router.get("/{config_id}", response_model=BotConfigOut)
 async def get_bot(
     config_id: int,
