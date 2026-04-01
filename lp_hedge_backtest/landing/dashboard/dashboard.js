@@ -770,7 +770,8 @@ function renderPositions() {
 
 function buildPositionCard(pos) {
   const { tokenId, token0Info, token1Info, fee, priceLower, priceUpper, priceCurrent,
-          priceBase, rangeStatus, rangePercent, liquidity, tokensOwed0, tokensOwed1 } = pos;
+          priceBase, rangeStatus, rangePercent, liquidity, tokensOwed0, tokensOwed1,
+          tickLower, tickUpper, sqrtPriceX96 } = pos;
 
   const card = document.createElement('div');
   card.className = 'pos-card ' + (rangeStatus === 'in-range' ? 'in-range'
@@ -825,7 +826,7 @@ function buildPositionCard(pos) {
 
   // Pool value in USD
   const { amount0, amount1 } = computePositionAmounts(
-    pos.sqrtPriceX96, tickLower, tickUpper, liquidity,
+    sqrtPriceX96, tickLower, tickUpper, liquidity,
     token0Info.decimals, token1Info.decimals
   );
   const usd0 = tokenToUsd(token0Info.symbol, amount0);
