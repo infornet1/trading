@@ -2097,12 +2097,17 @@ async function fetchHLBalance() {
 
 // Called once after the trading panel is injected into DOM
 async function initTradingPanel(tokenId, pos) {
-  // Compute capital estimate
-  const xMax    = calcXMaxEth(pos.liquidity, pos.tickLower, pos.tickUpper);
+  // Compute capital estimate from current pool value (not theoretical xMax)
+  const { amount0, amount1 } = computePositionAmounts(
+    pos.sqrtPriceX96, pos.tickLower, pos.tickUpper, pos.liquidity,
+    pos.token0Info.decimals, pos.token1Info.decimals
+  );
+  const usd0 = tokenToUsd(pos.token0Info.symbol, amount0);
+  const usd1 = tokenToUsd(pos.token1Info.symbol, amount1);
+  const poolValueUsd = (usd0 !== null && usd1 !== null) ? usd0 + usd1 : 0;
   const hedgeEl = document.getElementById(`prot-hedge-${tokenId}`);
   const hedgeRatio = hedgeEl ? parseFloat(hedgeEl.value) / 100 : 0.5;
-  const price   = pos.priceCurrent || 0;
-  const capital = xMax * hedgeRatio * price;
+  const capital = poolValueUsd * hedgeRatio;
 
   const capEl = document.getElementById(`tp-capital-${tokenId}`);
   if (capEl) capEl.textContent = capital > 0 ? `$${capital.toFixed(2)}` : '—';
@@ -2120,8 +2125,14 @@ function _updateMarginBox(tokenId, pos) {
   const leverage   = parseInt(levEl.value, 10);
   const hedgeRatio = parseFloat(hedgeEl.value) / 100;
   const price      = pos.priceCurrent || 0;
-  const xMax       = calcXMaxEth(pos.liquidity, pos.tickLower, pos.tickUpper);
-  const notional   = xMax * hedgeRatio * price;
+  const { amount0: a0, amount1: a1 } = computePositionAmounts(
+    pos.sqrtPriceX96, pos.tickLower, pos.tickUpper, pos.liquidity,
+    pos.token0Info.decimals, pos.token1Info.decimals
+  );
+  const u0 = tokenToUsd(pos.token0Info.symbol, a0);
+  const u1 = tokenToUsd(pos.token1Info.symbol, a1);
+  const poolUsd  = (u0 !== null && u1 !== null) ? u0 + u1 : 0;
+  const notional = poolUsd * hedgeRatio;
   const reqMargin  = notional > 0 && leverage > 0 ? notional / leverage : 0;
 
   const reqEl   = document.getElementById(`tp-mb-req-${tokenId}`);
@@ -2136,9 +2147,9 @@ function _updateMarginBox(tokenId, pos) {
 
   // Live hedge sub-label: show actual ETH and USD amounts
   if (subEl) {
-    const hedgeEth = xMax * hedgeRatio;
+    const hedgeEth = price > 0 ? (notional / price) : 0;
     if (hedgeEth > 0 && price > 0) {
-      subEl.textContent = `≈ ${hedgeEth.toFixed(4)} ETH  ≈  $${(hedgeEth * price).toFixed(2)} al precio actual`;
+      subEl.textContent = `≈ ${hedgeEth.toFixed(4)} ETH  ≈  $${notional.toFixed(2)} al precio actual`;
       subEl.classList.remove('tp-hedge-sublabel--empty');
     } else {
       subEl.textContent = 'calculando…';
