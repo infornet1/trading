@@ -305,7 +305,7 @@ function poolHealth(p, currentPrice) {
     return { level: 'yellow', reason: 'Short activo — cobertura en curso' };
   }
 
-  if (currentPrice && p.pair.startsWith('ETH')) {
+  if (currentPrice && (p.pair.startsWith('ETH') || p.pair.startsWith('WETH'))) {
     const pct_to_lower = (currentPrice - p.lower_bound) / currentPrice;
     const pct_to_upper = (p.upper_bound - currentPrice) / currentPrice;
 
@@ -425,7 +425,7 @@ function poolCard(p, ethPrice, isHistorical = false) {
   const isExpanded = state.expanded.has(p.config_id);
 
   let barPct = 50, cursorPct = 50, priceStr = '—';
-  if (ethPrice && p.pair.startsWith('ETH')) {
+  if (ethPrice && (p.pair.startsWith('ETH') || p.pair.startsWith('WETH'))) {
     const range  = p.upper_bound - p.lower_bound;
     cursorPct = Math.max(0, Math.min(100,
       ((ethPrice - p.lower_bound) / range) * 100
