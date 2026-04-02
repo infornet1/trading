@@ -91,14 +91,32 @@ async def telegram_webhook(request: Request):
     return {"ok": True}
 
 
+_WELCOME_TEXT = (
+    "VIZNAGO Bot 🛡 — Alertas DeFi en tiempo real\n\n"
+    "Monitorea tus bots LP de cobertura desde Telegram.\n"
+    "Soporta múltiples wallets. Sin datos personales.\n\n"
+    "Comandos:\n"
+    "/start `0xWallet` — vincular wallet\n"
+    "/status         — ver bots activos\n"
+    "/unlink         — desactivar alertas\n"
+    "/help           — ayuda"
+)
+
+
 async def _handle_start(chat_id: int, wallet: str):
     wallet = wallet.lower().strip()
+
+    # /start with no argument → show welcome + onboarding prompt
+    if not wallet:
+        await send_message(chat_id, _WELCOME_TEXT)
+        return
+
     if not wallet.startswith("0x") or len(wallet) != 42:
         await send_message(
             chat_id,
-            "❌ *Invalid wallet address.*\n\n"
-            "Usage: `/start 0xYourWalletAddress`\n\n"
-            "You can link multiple wallets — each fires alerts independently.",
+            "❌ *Dirección inválida.*\n\n"
+            "Uso: `/start 0xTuWallet`\n\n"
+            "Puedes vincular múltiples wallets.",
         )
         return
 
