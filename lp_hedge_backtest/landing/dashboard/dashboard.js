@@ -323,6 +323,7 @@ async function onWalletConnected() {
   // state on first paint — avoids the "activate bot" flash on tab return.
   updateNuclearBtn();
   await saasLoadBots();
+  updateWalletDropdown();
 
   // Check maintenance flag and show banner if active
   checkMaintenanceStatus();
@@ -627,10 +628,10 @@ function updateWalletBar() {
       : t('dash.ws.disconnect');
   }
 
-  // Navbar wallet button → shows address (eye prefix in watch mode)
+  // Navbar wallet button → shows address + dropdown toggle (eye prefix in watch mode)
   const btn = document.getElementById('wallet-btn');
-  btn.textContent = (state.watchMode ? '👁 ' : '● ') + truncateAddr(state.address);
-  btn.onclick = disconnectWallet;
+  btn.textContent = (state.watchMode ? '👁 ' : '● ') + truncateAddr(state.address) + ' ▾';
+  btn.onclick = toggleWalletDropdown;
 
   // Chain badge in navbar
   const badge = document.getElementById('chain-badge');
@@ -653,6 +654,145 @@ function updateChainPills() {
     if (!el) return;
     el.classList.toggle('chain-pill--active', Number(id) === state.chainId);
   });
+}
+
+// ── Wallet Dropdown ───────────────────────────────────────────────────────
+
+function toggleWalletDropdown() {
+  const menu = document.getElementById('wallet-dropdown-menu');
+  if (!menu) return;
+  menu.classList.contains('hidden') ? openWalletDropdown() : closeWalletDropdown();
+}
+
+function openWalletDropdown() {
+  const menu = document.getElementById('wallet-dropdown-menu');
+  if (!menu) return;
+  menu.innerHTML = buildWalletDropdownContent();
+  menu.classList.remove('hidden');
+  // Fetch HL balance async if not yet cached, then refresh dropdown content
+  if (!_hlBalanceCache && saas.jwt) {
+    fetchHLBalance().then(() => {
+      if (!menu.classList.contains('hidden')) {
+        menu.innerHTML = buildWalletDropdownContent();
+      }
+    });
+  }
+}
+
+function closeWalletDropdown() {
+  const menu = document.getElementById('wallet-dropdown-menu');
+  if (menu) menu.classList.add('hidden');
+}
+
+// Call this after bot status updates to keep dropdown fresh if open
+function updateWalletDropdown() {
+  const menu = document.getElementById('wallet-dropdown-menu');
+  if (menu && !menu.classList.contains('hidden')) {
+    menu.innerHTML = buildWalletDropdownContent();
+  }
+}
+
+function buildWalletDropdownContent() {
+  const chain  = CHAINS[state.chainId];
+  const bots   = Object.values(saas.bots);
+  const hl     = _hlBalanceCache;
+  const lpActiveCount   = document.getElementById('tab-count-active')?.textContent  || '—';
+  const lpHistoryCount  = document.getElementById('tab-count-history')?.textContent || '—';
+
+  // ── Header ─────────────────────────────────────────────────────────────
+  let html = `
+    <div class="wd-header">
+      <div class="wd-address-row">
+        <span class="wd-address">${truncateAddr(state.address)}</span>
+        <button class="wd-copy-btn" onclick="navigator.clipboard.writeText('${state.address}');this.textContent='✓';setTimeout(()=>this.textContent='⎘',1500)" title="Copy full address">⎘</button>
+      </div>
+      <div class="wd-chain-label">${chain ? chain.name : 'Unknown Network'}</div>
+    </div>`;
+
+  // ── Hyperliquid Balance ─────────────────────────────────────────────────
+  html += `<div class="wd-section">
+    <div class="wd-section-title">HYPERLIQUID</div>`;
+  if (hl) {
+    const av  = Number(hl.account_value  || 0).toFixed(2);
+    const wd  = Number(hl.withdrawable   || 0).toFixed(2);
+    const pos = Number(hl.total_notional_position || 0).toFixed(2);
+    html += `
+      <div class="wd-kv-row"><span class="wd-kv-label">Account Value</span><span class="wd-kv-value">$${av}</span></div>
+      <div class="wd-kv-row"><span class="wd-kv-label">Withdrawable</span><span class="wd-kv-value">$${wd}</span></div>
+      <div class="wd-kv-row"><span class="wd-kv-label">Open Notional</span><span class="wd-kv-value">$${pos}</span></div>`;
+  } else if (saas.jwt) {
+    html += `<div class="wd-loading-row">Fetching balance…</div>`;
+  } else {
+    html += `<div class="wd-loading-row">Sign in to view</div>`;
+  }
+  html += `</div>`;
+
+  // ── Bot Protection ──────────────────────────────────────────────────────
+  html += `<div class="wd-section">
+    <div class="wd-section-title">BOT PROTECTION${bots.length ? ` <span class="wd-count-badge">${bots.length}</span>` : ''}</div>`;
+
+  if (!saas.jwt) {
+    html += `<div class="wd-loading-row">Sign in with wallet to manage bots</div>`;
+  } else if (!bots.length) {
+    html += `<div class="wd-loading-row">No bots configured</div>`;
+  } else {
+    const modeLabel = m => m === 'aragan' ? 'Defensor Bajista'
+                         : m === 'avaro'  ? 'Defensor Alcista'
+                         : m === 'fury'   ? 'FURY RSI'
+                         : m === 'whale'  ? 'WHALE Tracker'
+                         : m;
+    bots.forEach(bot => {
+      const lastEvt  = saas.statuses[bot.id];
+      const isActive = bot.active;
+      const isPaper  = bot.paper_trade;
+      const statusLabel = isActive ? (isPaper ? 'PAPER' : 'LIVE') : 'INACTIVE';
+      const statusClass = isActive ? (isPaper ? 'wd-status-paper' : 'wd-status-live') : 'wd-status-off';
+
+      let evtHtml = '';
+      if (lastEvt && isActive) {
+        const raw   = (lastEvt.event || lastEvt.event_type || '').replace(/_/g, ' ').toUpperCase();
+        const price = lastEvt.price != null ? ` @ $${Number(lastEvt.price).toFixed(2)}` : '';
+        const pnlN  = lastEvt.pnl  != null ? Number(lastEvt.pnl) : null;
+        const pnlStr = pnlN != null
+          ? `<span class="${pnlN >= 0 ? 'wd-pnl-pos' : 'wd-pnl-neg'}">${pnlN >= 0 ? '+' : ''}$${Math.abs(pnlN).toFixed(2)}</span>`
+          : '';
+        evtHtml = `<div class="wd-bot-evt">${raw}${price}${pnlStr ? ' · ' + pnlStr : ''}</div>`;
+      }
+
+      html += `
+        <div class="wd-bot-row">
+          <div class="wd-bot-top">
+            <span class="wd-bot-nft">NFT #${bot.nft_token_id}</span>
+            <span class="wd-bot-status ${statusClass}">${statusLabel}</span>
+          </div>
+          <div class="wd-bot-mode">${modeLabel(bot.mode)}${bot.target_leverage ? ' · ' + bot.target_leverage + 'x' : ''}</div>
+          ${evtHtml}
+        </div>`;
+    });
+  }
+  html += `</div>`;
+
+  // ── LP Positions summary ────────────────────────────────────────────────
+  html += `
+    <div class="wd-section">
+      <div class="wd-section-title">LP POSITIONS</div>
+      <div class="wd-kv-row">
+        <span class="wd-kv-label">Active</span><span class="wd-kv-value">${lpActiveCount}</span>
+      </div>
+      <div class="wd-kv-row">
+        <span class="wd-kv-label">History</span><span class="wd-kv-value">${lpHistoryCount}</span>
+      </div>
+    </div>`;
+
+  // ── Footer ──────────────────────────────────────────────────────────────
+  html += `
+    <div class="wd-footer">
+      <button class="wd-disconnect-btn" onclick="closeWalletDropdown();disconnectWallet();">
+        ${state.watchMode ? 'Stop Watching' : 'Disconnect'}
+      </button>
+    </div>`;
+
+  return html;
 }
 
 // ── Auto-refresh control ──────────────────────────────────────────────────
@@ -1009,6 +1149,12 @@ function init() {
     const hint = document.querySelector('.connect-hint');
     if (hint) hint.textContent = window.t ? window.t('dash.rabby.detected') : 'Rabby Wallet detected ✓';
   }
+
+  // Close wallet dropdown when clicking outside it
+  document.addEventListener('click', e => {
+    const wrapper = document.getElementById('wallet-dropdown-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) closeWalletDropdown();
+  });
 
   // Enter key on watch address input
   const watchInput = document.getElementById('watch-addr-input');
@@ -1542,6 +1688,7 @@ function connectBotWS(configId) {
           updateWhaleSignalDisplay(configId, data);
         }
         updateBotStatusDisplay(configId, data);
+        updateWalletDropdown();
       }
     } catch (_) {}
   };

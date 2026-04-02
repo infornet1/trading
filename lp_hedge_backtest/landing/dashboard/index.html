@@ -37,10 +37,13 @@
       </button>
       <!-- Chain badge (hidden until connected) -->
       <span id="chain-badge" class="navbar-chain-badge hidden"></span>
-      <!-- Connect / address button -->
-      <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()">
-        &#128994;&nbsp; <span data-i18n="dash.btn.connect">Conectar Billetera</span>
-      </button>
+      <!-- Connect / address button + dropdown -->
+      <div class="wallet-dropdown-wrapper" id="wallet-dropdown-wrapper">
+        <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()">
+          &#128994;&nbsp; <span data-i18n="dash.btn.connect">Conectar Billetera</span>
+        </button>
+        <div id="wallet-dropdown-menu" class="wallet-dropdown-menu hidden"></div>
+      </div>
     </div>
   </nav>
 

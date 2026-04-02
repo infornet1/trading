@@ -222,6 +222,166 @@
   background: rgba(248, 113, 113, 0.1);
 }
 
+/* ── Wallet Dropdown ─────────────────────────────────────────── */
+.wallet-dropdown-wrapper {
+  position: relative;
+}
+.wallet-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 270px;
+  background: #0a1628;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,212,255,0.08);
+  z-index: 999;
+  overflow: hidden;
+  font-size: 0.78rem;
+}
+.wd-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(0,212,255,0.04);
+}
+.wd-address-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.wd-address {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.72rem;
+  color: var(--color-neon-cyan);
+  letter-spacing: 0.04em;
+}
+.wd-copy-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+.wd-copy-btn:hover { color: var(--color-neon-cyan); }
+.wd-chain-label {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.wd-section {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.wd-section:last-of-type { border-bottom: none; }
+.wd-section-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wd-count-badge {
+  background: rgba(0,212,255,0.15);
+  color: var(--color-neon-cyan);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 0.6rem;
+  font-family: monospace;
+}
+.wd-kv-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+.wd-kv-label { color: var(--color-text-muted); font-size: 0.72rem; }
+.wd-kv-value { color: var(--color-text-primary); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+.wd-loading-row {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-style: italic;
+  padding: 4px 0;
+}
+/* Bot rows */
+.wd-bot-row {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  padding: 7px 10px;
+  margin-bottom: 6px;
+}
+.wd-bot-row:last-child { margin-bottom: 0; }
+.wd-bot-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+.wd-bot-nft {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+}
+.wd-bot-status {
+  font-size: 0.6rem;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.1em;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+.wd-status-live  { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+.wd-status-paper { background: rgba(251,191,36,0.15);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+.wd-status-off   { background: rgba(100,116,139,0.15); color: #64748b; border: 1px solid rgba(100,116,139,0.2); }
+.wd-bot-mode {
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+.wd-bot-evt {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wd-pnl-pos { color: #10b981; font-weight: 600; }
+.wd-pnl-neg { color: #f87171; font-weight: 600; }
+/* LP row */
+.wd-lp-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  padding: 2px 0;
+}
+.wd-lp-hist { color: var(--color-text-muted); }
+/* Footer */
+.wd-footer {
+  padding: 10px 16px 12px;
+}
+.wd-disconnect-btn {
+  width: 100%;
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.25);
+  color: #f87171;
+  border-radius: 7px;
+  padding: 7px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+.wd-disconnect-btn:hover { background: rgba(248,113,113,0.18); }
+
 /* ── Price Ticker ────────────────────────────────────────────── */
 .price-ticker {
   position: sticky;

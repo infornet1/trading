@@ -734,4 +734,232 @@ Migration is low-friction:
 
 ---
 
+## 16. Treasury & Invoicing Architecture
+
+> Added 2026-04-02. Wallets confirmed this session.
+
+### 16.1 Wallet Map
+
+| Role | Address | Connects to browser? | Purpose |
+|---|---|---|---|
+| **Bot** | `0xe84f181541072c14a6a28224a33b078a44cc343c` | No — API key only | LP positions + HL hedges |
+| **Admin** | `0xeF0DDF18382538F31dcfa0AF40B47eE8c5A2cf2f` | Yes — frequent | Dashboard JWT auth, nuclear stop |
+| **Treasury** | `0xc73aE673A740b195D50c38B294708468e99eF191` | **Never** | Receives all subscription USDC — cold wallet |
+| **Operator** | `0x1c536E45CbdbeDC500738070a812b53A98645d89` | Occasionally | Deploys + manages Unlock Protocol lock contracts only |
+
+**Treasury** is set as `beneficiary` on both Unlock Protocol lock contracts — receives revenue, never signs.
+**Operator** is the Lock Manager — deploys contracts, can update lock settings, never holds revenue.
+Never connect Treasury to MetaMask or any dApp.
+
+```
+Responsibility split:
+  OPERATOR  → who manages the contracts (Lock Manager role)
+  TREASURY  → who receives the money (beneficiary)
+  ADMIN     → who logs into the dashboard
+  BOT       → who executes trades
+```
+
+---
+
+### 16.2 Money Flow
+
+```
+User Wallet (Arbitrum USDC)
+        │
+        │  approve + purchase Key NFT ($29 or $79 USDC)
+        ▼
+Unlock Protocol Lock Contract (Arbitrum One)
+        │
+        ├── 1%  → Unlock DAO (protocol fee, automatic)
+        └── 99% → sits in Lock until withdrawn
+                        │
+                        ▼
+        Treasury  0xc73aE673A740b195D50c38B294708468e99eF191
+                        │
+                        ├──→ Infra costs (DO droplets, RPC, domain)
+                        └──→ Operator wallet / reinvestment
+```
+
+No intermediary, no Stripe, no bank. USDC lands directly on Arbitrum.
+
+---
+
+### 16.3 Admin Wallet — Billing Bypass
+
+Admin wallets listed in `ADMIN_WALLETS` env var are **fully bypassed from billing**.
+
+Logic in `api/auth.py` at JWT issuance:
+```
+if wallet in ADMIN_WALLETS:
+    plan = "enterprise"   ← full access, no Key NFT check
+else:
+    check getHasValidKey(wallet) on Unlock lock contracts
+    plan = "starter" | "pro" | "free"
+```
+
+**Why:** Platform operators must never be locked out by their own billing system.
+Admin wallets get implicit `enterprise`-level plan — no subscription purchase required.
+This is enforced server-side in the JWT claim, not just in the UI.
+
+Current admin wallets bypassed:
+- `0xeF0DDF18382538F31dcfa0AF40B47eE8c5A2cf2f` (operator admin)
+
+---
+
+### 16.4 Unlock Protocol Lock Contracts (to deploy)
+
+Network: **Arbitrum One** — same network as users' LP pools, zero bridging friction.
+
+| Lock | Price | Duration | Beneficiary |
+|---|---|---|---|
+| Starter Lock | $29 USDC / 30 days | 30 days | `0xc73aE673A740b195D50c38B294708468e99eF191` |
+| Pro Lock | $79 USDC / 30 days | 30 days | `0xc73aE673A740b195D50c38B294708468e99eF191` |
+
+Deploy from: **Operator wallet** `0x1c536E45CbdbeDC500738070a812b53A98645d89` (Lock Manager)
+Beneficiary: **Treasury wallet** `0xc73aE673A740b195D50c38B294708468e99eF191` (revenue recipient)
+Deploy via: `app.unlock-protocol.com` → Create Lock → Arbitrum One → USDC token
+One-time cost: ~$0.20 total gas. After that fully autonomous.
+Operator wallet needs: ~0.001 ETH (~$2) kept as gas reserve on Arbitrum.
+
+After deploying, add to `api/.env`:
+```
+STARTER_LOCK_ADDRESS=0x...
+PRO_LOCK_ADDRESS=0x...
+TREASURY_WALLET=0xc73aE673A740b195D50c38B294708468e99eF191
+OPERATOR_WALLET=0x1c536E45CbdbeDC500738070a812b53A98645d89
+```
+
+---
+
+### 16.5 Invoicing & Receipts
+
+DeFi-native receipt = the blockchain tx hash. Every subscription is a public,
+immutable, timestamped on-chain transaction. No PDF needed for most users.
+
+**Receipt format (no KYC required):**
+```
+VIZNAGO — Subscription Receipt
+Plan:        Starter ($29 USDC/mo)
+Period:      Apr 2 – May 2, 2026
+NFT Key ID:  #42
+Wallet:      0xe84f...343c
+Tx Hash:     0xabcd...1234
+Network:     Arbitrum One
+Amount:      $29.00 USDC
+Protocol fee: $0.29 (Unlock DAO — 1%)
+```
+
+| User type | Receipt format | How |
+|---|---|---|
+| Retail DeFi user | Tx hash + Arbiscan link | Auto-generated in dashboard |
+| Business / tax | PDF invoice | Generated on demand |
+| Enterprise | Monthly PDF report | Included in tier (MEMBERSHIP_PLANS.md) |
+
+---
+
+### 16.6 Revenue Sustainability
+
+| Stage | Infra cost/mo | Break-even |
+|---|---|---|
+| Beta | ~$90 | 4 Starter or 2 Pro subscribers |
+| Zero-downtime | ~$145 | 6 Starter or 2 Pro |
+| Full production | ~$175 | 7 Starter or 3 Pro |
+
+**Y1 MRR target:**
+```
+100 Starter × $29  = $2,900/mo
+ 40 Pro     × $79  = $3,160/mo
+  5 Enterprise × $199 = $995/mo
+─────────────────────────────
+Total MRR          = $7,055/mo
+Infra cost         =   $175/mo
+Net margin         = $6,880/mo (97.5%)
+```
+
+---
+
+### 16.6.1 Admin Subscription Management Panel
+
+Full back-office for customer support — visible only to admin wallets.
+
+**Six core actions:**
+
+| Action | Use case |
+|---|---|
+| **Override Plan** | Grant free Pro/Enterprise to beta testers, investors, supporters |
+| **Extend Subscription** | Compensate downtime — add days without payment |
+| **Suspend** | Block abusive wallets regardless of valid NFT |
+| **Reimburse** | Log refund decision + track manual USDC transfer from treasury |
+| **Add Note** | Internal audit trail per wallet (date, reason, admin who acted) |
+| **Full Timeline** | Bot events + billing events merged into one view per wallet |
+
+**Reimbursement flow (no refund button exists in DeFi):**
+```
+Option A — Credit: extend subscription days in DB (no USDC movement)
+Option B — Manual transfer: admin sends USDC from treasury wallet manually,
+           pastes tx hash into admin panel → logged as "Reimbursed 0xabcd..."
+```
+
+**Auth priority order in api/auth.py:**
+```
+1. ADMIN_WALLETS     → plan = "enterprise" (bypass all checks)
+2. suspended = true  → plan = "suspended"  (block all)
+3. plan_override set → use override plan
+4. credit_days set   → extend expiry accordingly
+5. valid NFT Key     → plan = "starter" or "pro"
+6. none of above     → plan = "free"
+```
+
+**New DB columns needed:** `plan_override`, `suspended`, `credit_days`, `internal_notes`
+**New API routes:** `GET /admin/user/{wallet}`, `POST /admin/user/{wallet}/override-plan`,
+`/extend`, `/suspend`, `/reimburse`, `/note`
+
+---
+
+### 16.7 Unlock Protocol — Subgraph Monitoring API
+
+Working endpoint for real-time lock monitoring on Arbitrum One:
+```
+POST https://subgraph.unlock-protocol.com/api/42161
+Body: {"query": "{ locks(where: {deployer: \"0x1c536e45cbdbedc500738070a812b53a98645d89\"}) { id name address price expirationDuration tokenAddress totalKeys maxNumberOfKeys createdAtBlock creationTransactionHash lockManagers } }"}
+```
+Returns all locks deployed by operator wallet. Use to verify deployments on-chain.
+Dead endpoints (do not use): `api.thegraph.com/subgraphs/name/unlock-protocol/arbitrum-one` (shut down).
+
+---
+
+### 16.9 Wallet Dropdown — Status at a Glance (implemented 2026-04-02)
+
+Clickable wallet corner button (navbar top-right) opens a dropdown showing full account status without scrolling. Motivation: first user (`0xe84f...`) was confused because LP side (Uniswap) and hedge side (Hyperliquid) are on different platforms — the dropdown makes both visible in one click.
+
+**What it shows:**
+- Wallet address (truncated) + one-click copy
+- Chain name
+- Hyperliquid: account value, withdrawable, open notional (async fetched, cached)
+- Bot Protection: each configured bot with NFT ID, mode, leverage, status (LIVE/PAPER/INACTIVE), last event + PnL
+- LP Positions: active count + history count
+- Disconnect button
+
+**Plan/subscription section:** placeholder shown now — will populate with real tier + Key NFT expiry once Step 8 billing is built.
+
+**Files changed:** `landing/dashboard/index.html`, `landing/dashboard/dashboard.js`, `landing/dashboard/dashboard.css`
+**Backend changes:** none — all data already in `saas.bots`, `saas.statuses`, `_hlBalanceCache`
+**Dropdown auto-refreshes** when: bot WS events arrive, `saasLoadBots()` resolves
+
+---
+
+### 16.8 Build Checklist (Step 8 detail)
+
+- [ ] Deploy Starter Lock on Arbitrum → `STARTER_LOCK_ADDRESS` in `.env`
+- [ ] Deploy Pro Lock on Arbitrum → `PRO_LOCK_ADDRESS` in `.env`
+- [ ] `TREASURY_WALLET` added to `.env`
+- [ ] `api/auth.py`: admin bypass (enterprise plan if in `ADMIN_WALLETS`)
+- [ ] `api/auth.py`: `getHasValidKey()` call for non-admin wallets → plan in JWT
+- [ ] `GET /subscription` endpoint: plan, Key NFT ID, expiry, days remaining
+- [ ] Subscription watchdog async task (hourly, checks expired keys with open positions)
+- [ ] Grace period state machine (see §8.3)
+- [ ] Receipt page in dashboard: tx hash + Arbiscan link + PDF export button
+
+---
+
 *VIZNAGO FURY — Bootcamp Cripto 2026 · LP + Perps Hedge Strategy*
