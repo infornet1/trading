@@ -118,8 +118,16 @@ async def lifespan(app: FastAPI):
     await _run_column_migrations()
     # Re-launch bots that were active before last restart
     await _auto_restart_bots()
+    # Start Telegram long-poller (fallback when webhook DNS fails)
+    from api.telegram_poller import run_poller
+    tg_task = asyncio.create_task(run_poller())
     yield
-    # Graceful shutdown — bots stay active=True in DB so they restart next time
+    # Graceful shutdown
+    tg_task.cancel()
+    try:
+        await tg_task
+    except asyncio.CancelledError:
+        pass
     from api.bot_manager import manager
     await manager.shutdown()
     await engine.dispose()
