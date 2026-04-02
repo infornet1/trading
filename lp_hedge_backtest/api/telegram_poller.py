@@ -12,7 +12,7 @@ import os
 
 import httpx
 
-from api.routers.telegram import _handle_start, _handle_status, _HELP_TEXT
+from api.routers.telegram import _handle_start, _handle_status, _handle_unlink, _HELP_TEXT
 from api.telegram_alerts import send_message
 
 _TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -39,6 +39,8 @@ async def _process_update(update: dict):
         await _handle_start(chat_id, arg)
     elif command == "/status":
         await _handle_status(chat_id)
+    elif command == "/unlink":
+        await _handle_unlink(chat_id)
     elif command == "/help":
         await send_message(chat_id, _HELP_TEXT)
     else:

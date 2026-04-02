@@ -4,6 +4,7 @@ Telegram webhook router — handles incoming updates from @vizniago_bot.
 Commands:
   /start <wallet_address>   Link wallet to receive bot alerts
   /status                   Show all bots for the linked wallet
+  /unlink                   Remove wallet link and stop all alerts
   /help                     List available commands
 
 Auth model: wallet address (trust-based for alpha).
@@ -13,7 +14,7 @@ Step 8 will add NFT key on-chain verification.
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from api.auth import get_current_address
 from api.database import AsyncSessionLocal
@@ -33,6 +34,7 @@ _HELP_TEXT = (
     "*VIZNAGO Bot Commands*\n\n"
     "/start `0xYourWallet` — Link wallet to receive alerts\n"
     "/status — Show your active bots\n"
+    "/unlink — Remove wallet link & stop all alerts\n"
     "/help — Show this message\n\n"
     "_Visit the dashboard to manage your bots._"
 )
@@ -79,6 +81,8 @@ async def telegram_webhook(request: Request):
         await _handle_start(chat_id, arg)
     elif command == "/status":
         await _handle_status(chat_id)
+    elif command == "/unlink":
+        await _handle_unlink(chat_id)
     elif command == "/help":
         await send_message(chat_id, _HELP_TEXT)
     else:
@@ -130,6 +134,29 @@ async def _handle_start(chat_id: int, wallet: str):
         f"• Circuit breakers & errors\n"
         f"• LP events\n\n"
         f"Use /status to see your bots.",
+    )
+
+
+async def _handle_unlink(chat_id: int):
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
+        )
+        link = result.scalar_one_or_none()
+        if not link:
+            await send_message(chat_id, "⚠️ No wallet linked — nothing to unlink.")
+            return
+        wallet = link.user_address
+        await db.execute(
+            delete(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
+        )
+        await db.commit()
+    await send_message(
+        chat_id,
+        f"🔕 *Unlinked*\n\n"
+        f"`{wallet[:6]}...{wallet[-4:]}`\n\n"
+        f"You will no longer receive alerts from @vizniago_bot.\n"
+        f"Use /start to re-link at any time.",
     )
 
 
