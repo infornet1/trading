@@ -1,5 +1,5 @@
 /**
- * VIZNAGO FURY — i18n
+ * VIZNIAGO FURY — i18n
  * Bilingual support: Spanish (default) / English
  *
  * Usage in HTML:
@@ -139,10 +139,11 @@ const TRANSLATIONS = {
     'cta.btn':                'Notifícame',
 
     // ── Landing: footer ───────────────────────────────────────────
-    'footer.text':       'LP + Perps Hedge Backtester — VIZNAGO FURY © 2026',
+    'footer.text':       'LP + Perps Hedge Backtester — VIZNIAGO FURY © 2026',
     'footer.strategies': 'Estrategias',
     'footer.metrics':    'Métricas',
     'footer.docs':       'Docs',
+    'footer.telegram':   'Alertas en Telegram — @vizniago_bot',
 
     // ── Dashboard: navbar ─────────────────────────────────────────
     'dash.nav.title':          'Panel de Control LP',
@@ -223,7 +224,7 @@ const TRANSLATIONS = {
     'dash.watch.invalid':      'Dirección inválida. Debe empezar con 0x y tener 42 caracteres.',
     'dash.watch.network':      'Red:',
 
-    'dash.footer.text':        'Panel de Control LP — VIZNAGO FURY © 2026',
+    'dash.footer.text':        'Panel de Control LP — VIZNIAGO FURY © 2026',
     'dash.footer.backtest':    'Backtester',
 
     // ── Dashboard: protection drawer ──────────────────────────────
@@ -400,10 +401,11 @@ const TRANSLATIONS = {
     'cta.btn':                'Notify Me',
 
     // ── Landing: footer ───────────────────────────────────────────
-    'footer.text':       'LP + Perps Hedge Backtester — VIZNAGO FURY © 2026',
+    'footer.text':       'LP + Perps Hedge Backtester — VIZNIAGO FURY © 2026',
     'footer.strategies': 'Strategies',
     'footer.metrics':    'Metrics',
     'footer.docs':       'Docs',
+    'footer.telegram':   'Real-time Alerts — @vizniago_bot',
 
     // ── Dashboard: navbar ─────────────────────────────────────────
     'dash.nav.title':          'LP Pool Dashboard',
@@ -484,7 +486,7 @@ const TRANSLATIONS = {
     'dash.watch.invalid':      'Invalid address. Must start with 0x and be 42 characters.',
     'dash.watch.network':      'Network:',
 
-    'dash.footer.text':        'LP Pool Dashboard — VIZNAGO FURY © 2026',
+    'dash.footer.text':        'LP Pool Dashboard — VIZNIAGO FURY © 2026',
     'dash.footer.backtest':    'Backtester',
 
     // ── Dashboard: protection drawer ──────────────────────────────

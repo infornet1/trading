@@ -17,9 +17,11 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import delete, select
 
+from sqlalchemy import desc
+
 from api.auth import get_current_address
 from api.database import AsyncSessionLocal
-from api.models import BotConfig, TelegramLink
+from api.models import BotConfig, BotEvent, TelegramLink
 from api.telegram_alerts import send_message
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
@@ -103,10 +105,93 @@ _WELCOME_TEXT = (
 )
 
 
+async def _active_bots_status(wallet: str) -> str:
+    """Build a rich status block for all active bots on a wallet. Returns '' if none."""
+    async with AsyncSessionLocal() as db:
+        bots_res = await db.execute(
+            select(BotConfig).where(
+                BotConfig.user_address == wallet,
+                BotConfig.active == True,
+            )
+        )
+        bots = bots_res.scalars().all()
+        if not bots:
+            return ""
+
+        blocks = []
+        for bot in bots:
+            st_res = await db.execute(
+                select(BotEvent)
+                .where(BotEvent.config_id == bot.id, BotEvent.event_type == "started")
+                .order_by(desc(BotEvent.ts)).limit(1)
+            )
+            started   = st_res.scalar_one_or_none()
+            x_max_eth = (started.details or {}).get("x_max_eth") if started else None
+
+            ev_res = await db.execute(
+                select(BotEvent).where(BotEvent.config_id == bot.id)
+                .order_by(desc(BotEvent.ts)).limit(1)
+            )
+            blocks.append((bot, x_max_eth, ev_res.scalar_one_or_none()))
+
+    short = f"{wallet[:6]}...{wallet[-4:]}"
+    n     = len(blocks)
+    lines = [
+        f"🛡 *VIZNAGO* — `{short}`",
+        f"_{n} bot{'s' if n > 1 else ''} activo{'s' if n > 1 else ''}_\n",
+    ]
+
+    for bot, x_max_eth, last_ev in blocks:
+        label     = _MODE_LABELS.get(bot.mode, bot.mode.upper())
+        paper_tag = " _(paper)_" if bot.paper_trade else ""
+        lines += [
+            "━━━━━━━━━━━━━━━━",
+            f"🟢 *{label}* — LIVE{paper_tag}",
+            "━━━━━━━━━━━━━━━━",
+        ]
+
+        if bot.mode in ("aragan", "avaro"):
+            lines.append(f"NFT:      `#{bot.nft_token_id}`")
+            lines.append(f"Par:      {bot.pair}")
+            lines.append(f"Rango:    ${float(bot.lower_bound):,.2f} – ${float(bot.upper_bound):,.2f}")
+            if x_max_eth:
+                lines.append(f"Pool:     ~{float(x_max_eth):.3f} ETH")
+            lines.append("")
+            lines.append("⚙️ *Parámetros:*")
+            lines.append(f"• Cobertura:   {float(bot.hedge_ratio):.0f}% del pool")
+            lines.append(f"• Leverage:    {bot.leverage}x")
+            lines.append(f"• Stop Loss:   {float(bot.sl_pct):.1f}%")
+            lines.append(f"• Trailing SL: {'✅' if bot.trailing_stop else '❌'}")
+            lines.append(f"• Auto-rearm:  {'✅' if bot.auto_rearm else '❌'}")
+            tp = f"{float(bot.tp_pct):.1f}%" if bot.tp_pct else "— (no fijo)"
+            lines.append(f"• Take Profit: {tp}")
+            lines.append(f"• Trigger:     {abs(float(bot.trigger_pct)):.1f}% bajo rango")
+
+        elif bot.mode == "fury":
+            lines.append(f"Símbolo:  {bot.fury_symbol or 'ETH'}")
+            lines.append(f"RSI Long:  < {float(bot.fury_rsi_long_th or 35):.0f}  |  RSI Short: > {float(bot.fury_rsi_short_th or 65):.0f}")
+            lines.append(f"Leverage:  {bot.fury_leverage_max or 12}x máx (dinámico por gates)")
+            lines.append(f"Riesgo:    {float(bot.fury_risk_pct or 2):.1f}% por trade")
+            lines.append(f"Stop Loss: ATR dinámico (1.5×ATR mín)")
+
+        elif bot.mode == "whale":
+            lines.append(f"Top-N:    {bot.whale_top_n or 50} traders HL")
+            lines.append(f"Min pos:  ${float(bot.whale_min_notional or 50000):,.0f}")
+            lines.append(f"Assets:   {bot.whale_watch_assets or 'BTC, ETH'}")
+
+        if last_ev:
+            evt   = last_ev.event_type.upper().replace("_", " ")
+            price = f" @ ${float(last_ev.price_at_event):,.2f}" if last_ev.price_at_event else ""
+            lines.append(f"\n📌 Último evento: {evt}{price}")
+
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
+
+
 async def _handle_start(chat_id: int, wallet: str):
     wallet = wallet.lower().strip()
 
-    # /start with no argument → show welcome + onboarding prompt
     if not wallet:
         await send_message(chat_id, _WELCOME_TEXT)
         return
@@ -127,26 +212,24 @@ async def _handle_start(chat_id: int, wallet: str):
                 TelegramLink.user_address == wallet,
             )
         )
-        if existing.scalar_one_or_none():
-            await send_message(chat_id, f"✅ Already linked: `{wallet[:6]}...{wallet[-4:]}`")
-            return
+        already_linked = existing.scalar_one_or_none() is not None
+        if not already_linked:
+            db.add(TelegramLink(user_address=wallet, telegram_chat_id=chat_id))
+            await db.commit()
 
-        db.add(TelegramLink(user_address=wallet, telegram_chat_id=chat_id))
-        await db.commit()
+    short  = f"{wallet[:6]}...{wallet[-4:]}"
+    prefix = "✅ *Wallet ya vinculada*" if already_linked else "✅ *Wallet vinculada!*"
+    status = await _active_bots_status(wallet)
 
-        # Count total wallets linked to this chat
-        count_res = await db.execute(
-            select(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
+    if status:
+        await send_message(chat_id, f"{prefix} — `{short}`\n\n{status}")
+    else:
+        await send_message(
+            chat_id,
+            f"{prefix} — `{short}`\n\n"
+            "⚠️ No hay bots activos en esta wallet.\n"
+            "Activa la protección desde el dashboard.",
         )
-        total = len(count_res.scalars().all())
-
-    await send_message(
-        chat_id,
-        f"✅ *Wallet added!*\n\n"
-        f"`{wallet[:6]}...{wallet[-4:]}`\n\n"
-        f"You now have *{total}* wallet(s) linked.\n"
-        f"Use /status to see all bots, /unlink `0xWallet` to remove one.",
-    )
 
 
 async def _handle_unlink(chat_id: int, arg: str = ""):

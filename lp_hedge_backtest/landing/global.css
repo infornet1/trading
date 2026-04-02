@@ -1,5 +1,5 @@
 /* ============================================================
-   VIZNAGO FURY — Global CSS
+   VIZNIAGO FURY — Global CSS
    LP + Perps Hedge Backtester Landing Page
    ============================================================ */
 
@@ -8,7 +8,7 @@
 
 /* ---------- CSS Variables ---------- */
 :root {
-  /* Brand colors from VIZNAGO FURY logo */
+  /* Brand colors from VIZNIAGO FURY logo */
   --color-bg-deep:      #040d1a;
   --color-bg-card:      #071428;
   --color-bg-card2:     #091c38;
@@ -532,6 +532,31 @@ section { padding: 80px 0; }
   transition: color 0.2s;
 }
 .footer-link:hover { color: var(--color-neon-cyan); }
+.footer-tg-cta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-decoration: none;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.08em;
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 20px;
+  padding: 5px 14px;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.footer-tg-cta:hover {
+  color: var(--color-neon-cyan);
+  border-color: rgba(0,212,255,0.5);
+  background: rgba(0,212,255,0.06);
+}
+.footer-tg-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: #29b6f6;
+}
 
 /* ---------- Language Toggle ---------- */
 .lang-toggle {

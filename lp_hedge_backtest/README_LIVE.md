@@ -130,9 +130,9 @@ size, entry price, mark price, and unrealized PnL. If no open position exists, t
 still requires confirmation but shows a "no open position" message. New API endpoint:
 `GET /bots/{config_id}/hl-position`.
 
-**7. Bot renamed to VIZNAGO Defensor Bajista**
+**7. Bot renamed to VIZNIAGO Defensor Bajista**
 All references in email subjects, email bodies, console output, and file docstrings
-updated from "Haragán v2.0" to "VIZNAGO Defensor Bajista".
+updated from "Haragán v2.0" to "VIZNIAGO Defensor Bajista".
 
 ---
 
@@ -183,3 +183,66 @@ ALTER TABLE bot_events
 ```
 
 This adds `trailing_stop` as a proper event type (previously fell back to `error`).
+
+---
+
+## Telegram Bot — @vizniago_bot
+
+VIZNAGO provides real-time alerts via Telegram. No email or personal data required — only your wallet address.
+
+### How to link your wallet
+
+1. Open Telegram and search for **@vizniago_bot**
+2. Tap **START** — the bot sends a welcome message in Spanish
+3. Send: `/start 0xYourWalletAddress`
+4. The bot replies with full status of all **active** bots on that wallet
+
+### Commands
+
+| Command | Description |
+|---|---|
+| `/start` | Show welcome message and instructions |
+| `/start 0xWallet` | Link wallet and display active bot status |
+| `/status` | Show bots across all linked wallets |
+| `/unlink 0xWallet` | Remove a specific wallet from alerts |
+| `/unlink all` | Remove all linked wallets |
+| `/help` | List all commands |
+
+### What the bot shows after /start 0xWallet
+
+For each **active** bot on the wallet:
+- NFT token ID, trading pair, LP price range
+- Estimated pool size (in ETH)
+- All active parameters: hedge ratio, leverage, stop loss %, trailing stop, auto-rearm, take profit, trigger offset
+- FURY mode: RSI thresholds, max leverage, risk % per trade, stop loss type
+- WHALE mode: top-N traders, min notional, watched assets
+- Most recent bot event (e.g. HEDGE OPENED @ $2,086.30)
+
+Stopped bots and historical positions are intentionally omitted — only live, active bots are shown.
+
+### Alert events (push notifications)
+
+The bot sends instant alerts for:
+- `HEDGE OPENED` — short hedge entry
+- `SL HIT` — stop loss executed
+- `TP HIT` — take profit executed
+- `TRAILING STOP` — trailing stop closed position
+- `FURY ENTRY` — FURY RSI bot opened a trade
+- `FURY SL / FURY TP` — FURY trade closed
+- `FURY CIRCUIT BREAKER` — FURY bot paused (daily drawdown or consecutive losses)
+- `ERROR` — bot error requiring attention
+- `LP REMOVED / LP BURNED` — LP position events
+
+### Multi-wallet support
+
+One Telegram account can link multiple wallets. Each wallet fires alerts independently. Example:
+```
+/start 0xWalletA   ← link first wallet
+/start 0xWalletB   ← link second wallet
+/status            ← shows bots from both wallets
+/unlink 0xWalletA  ← remove only wallet A
+```
+
+### Privacy
+
+VIZNAGO stores only: wallet address (public on-chain) + Telegram chat ID (a number). No name, email, phone number, or username is ever stored.
