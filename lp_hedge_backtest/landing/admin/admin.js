@@ -41,6 +41,10 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('btn-signin').addEventListener('click', signIn);
+
+  // Enter key on wallet search input
+  const wsInput = document.getElementById('wallet-search-input');
+  if (wsInput) wsInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchWallet(); });
 });
 
 // ── Auth helpers ───────────────────────────────────────────────────────────
@@ -288,6 +292,7 @@ function renderPools(pools) {
   }
 
   grid.innerHTML = html;
+  renderRiskStrip(pools);
 }
 
 function toggleHistorical() {
@@ -878,6 +883,179 @@ function renderUsersTable(users) {
 
 function planColor(plan) {
   return { pro: 'yellow', starter: 'green', free: 'muted' }[plan] || 'muted';
+}
+
+// ── Active Risk Strip ──────────────────────────────────────────────────────
+
+function renderRiskStrip(pools) {
+  const strip = document.getElementById('risk-strip');
+  if (!strip) return;
+
+  const activeShorts = pools.filter(p =>
+    p.running && p.last_event?.type === 'hedge_opened'
+  );
+
+  if (!activeShorts.length) {
+    strip.classList.add('hidden');
+    return;
+  }
+
+  const items = activeShorts.map(p => {
+    const health  = poolHealth(p, state.ethPrice);
+    const dotCls  = `risk-dot--${health.level}`;
+    const price   = p.last_event?.price != null ? `$${fmtNum(p.last_event.price)}` : '—';
+    const pnlVal  = p.last_event?.pnl;
+    const pnlHtml = pnlVal != null
+      ? `<span class="${pnlVal >= 0 ? 'risk-pnl-pos' : 'risk-pnl-neg'}">${pnlVal >= 0 ? '+' : ''}$${fmtNum(Math.abs(pnlVal))}</span>`
+      : '';
+    const hbHtml  = p.last_heartbeat ? heartbeatBadgeHtml(p.last_heartbeat) : '';
+    return `
+      <div class="risk-item" onclick="searchWalletDirect('${p.user_address}')" title="Click para ver detalle">
+        <span class="risk-dot ${dotCls}"></span>
+        <span class="risk-wallet">${shortAddr(p.user_address)}</span>
+        <span class="risk-sep">·</span>
+        <span class="risk-pair">${p.pair} NFT #${p.nft_token_id}</span>
+        <span class="risk-sep">·</span>
+        <span class="risk-entry">Entry ${price}</span>
+        ${pnlHtml ? `<span class="risk-sep">·</span>${pnlHtml}` : ''}
+        ${hbHtml}
+      </div>`;
+  }).join('');
+
+  strip.innerHTML = `
+    <div class="risk-strip-inner">
+      <span class="risk-strip-title">⚡ POSICIONES ABIERTAS</span>
+      <span class="risk-strip-count">${activeShorts.length}</span>
+      <div class="risk-items">${items}</div>
+    </div>`;
+  strip.classList.remove('hidden');
+}
+
+function heartbeatBadgeHtml(ts) {
+  if (!ts) return '';
+  const normalized = !ts.endsWith('Z') && !ts.includes('+') ? ts.replace(' ', 'T') + 'Z' : ts;
+  const ageSec = Math.floor((Date.now() - new Date(normalized).getTime()) / 1000);
+  const cls    = ageSec < 120 ? 'green' : ageSec < 300 ? 'yellow' : 'red';
+  const label  = ageSec < 60  ? `${ageSec}s` : `${Math.floor(ageSec / 60)}min`;
+  return `<span class="badge badge--${cls} risk-hb">⏱ ${label}</span>`;
+}
+
+// ── Wallet Search / User Lookup ────────────────────────────────────────────
+
+async function searchWallet() {
+  const input = document.getElementById('wallet-search-input');
+  const query = (input?.value || '').trim().toLowerCase();
+  if (query.length < 4) return;
+
+  const panel = document.getElementById('wallet-panel');
+  panel.innerHTML = '<div class="loading-msg">Buscando…</div>';
+  panel.classList.remove('hidden');
+  document.getElementById('wallet-search-clear').classList.remove('hidden');
+
+  // Match from already-loaded pools
+  const pools = (state.lastPools || []).filter(p =>
+    p.user_address?.toLowerCase().includes(query)
+  );
+
+  // Get user profile from users endpoint
+  let userProfile = null;
+  try {
+    const d = await apiGet('/admin/users');
+    userProfile = (d.users || []).find(u => u.address?.toLowerCase().includes(query));
+  } catch (_) {}
+
+  if (!pools.length && !userProfile) {
+    panel.innerHTML = `<div class="wp-not-found">Sin resultados para <strong>${query}</strong></div>`;
+    return;
+  }
+
+  panel.innerHTML = buildWalletPanel(userProfile, pools);
+}
+
+function searchWalletDirect(address) {
+  const input = document.getElementById('wallet-search-input');
+  if (input) input.value = address;
+  searchWallet();
+  setTimeout(() => {
+    document.getElementById('wallet-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 300);
+}
+
+function clearWalletSearch() {
+  const input = document.getElementById('wallet-search-input');
+  if (input) input.value = '';
+  document.getElementById('wallet-panel')?.classList.add('hidden');
+  document.getElementById('wallet-search-clear')?.classList.add('hidden');
+}
+
+function buildWalletPanel(user, pools) {
+  const address  = user?.address || pools[0]?.user_address || '—';
+  const plan     = user?.plan    || 'free';
+  const funnel   = user?.funnel  || '—';
+  const running  = user?.running_bots || 0;
+
+  const funnelMap = {
+    bot_running:    'Bot corriendo',
+    bot_configured: 'Bot configurado',
+    pool_added:     'Pool añadido',
+    signed_up:      'Registrado',
+  };
+
+  // ── Header ───────────────────────────────────────────────────────────
+  let html = `
+    <div class="wp-header">
+      <div class="wp-address-row">
+        <span class="wp-address">${address}</span>
+        <button class="btn-outline-sm" onclick="navigator.clipboard.writeText('${address}');this.textContent='✓ Copiado';setTimeout(()=>this.textContent='⎘ Copiar',1500)">⎘ Copiar</button>
+      </div>
+      <div class="wp-badges">
+        <span class="badge badge--${planColor(plan)}">${plan.toUpperCase()}</span>
+        <span class="badge badge--muted">${funnelMap[funnel] || funnel}</span>
+        ${running > 0 ? `<span class="badge badge--green">● ${running} bot(s) activos</span>` : ''}
+        ${user?.last_seen ? `<span class="wp-last-seen">Última actividad: ${relTime(user.last_seen)}</span>` : ''}
+      </div>
+      <div class="wp-actions">
+        <button class="btn-outline-sm wp-btn" onclick="alert('Disponible en Step 8 (billing)')">✏️ Override Plan</button>
+        <button class="btn-outline-sm wp-btn" onclick="alert('Disponible en Step 8 (billing)')">📅 Extender</button>
+        <button class="btn-outline-sm wp-btn wp-btn--danger" onclick="alert('Disponible en Step 8 (billing)')">⛔ Suspender</button>
+        <button class="btn-outline-sm wp-btn" onclick="alert('Disponible en Step 8 (billing)')">💰 Reembolsar</button>
+        <button class="btn-outline-sm wp-btn" onclick="alert('Disponible en Step 8 (billing)')">📝 Nota</button>
+      </div>
+      <div class="wp-step8-note">⚙️ Las acciones de gestión estarán activas en Step 8 — Subscriptions</div>
+    </div>`;
+
+  // ── Pools / Bots ─────────────────────────────────────────────────────
+  if (pools.length) {
+    html += `<div class="wp-section-title">POOLS / BOTS (${pools.length})</div>`;
+    html += pools.map(p => {
+      const health  = poolHealth(p, state.ethPrice);
+      const lastEvt = p.last_event;
+      const evtHtml = lastEvt
+        ? `<span class="wp-pool-evt">${evtLabel(lastEvt.type)}${lastEvt.price != null ? ` @ $${fmtNum(lastEvt.price)}` : ''}${lastEvt.pnl != null ? ` · PnL $${fmtNum(lastEvt.pnl)}` : ''} <span class="muted">${relTime(lastEvt.ts)}</span></span>`
+        : '';
+
+      return `
+        <div class="wp-pool-row">
+          <div class="health-dot health-dot--${health.level}" style="flex-shrink:0;margin-top:3px"></div>
+          <div class="wp-pool-body">
+            <div class="wp-pool-top">
+              <span class="pool-pair">${p.pair}</span>
+              <span class="pool-nft">NFT #${p.nft_token_id}</span>
+              ${p.running ? '<span class="badge badge--green">RUNNING</span>' : p.active ? '<span class="badge badge--red">CAÍDO</span>' : '<span class="badge badge--muted">STOPPED</span>'}
+              ${p.paper_trade ? '<span class="badge badge--yellow">PAPER</span>' : ''}
+            </div>
+            <div class="wp-pool-meta">Mode: ${p.mode} · ${p.leverage}x leverage · SL ${p.sl_pct}%${p.tp_pct ? ` · TP ${p.tp_pct}%` : ''}</div>
+            ${evtHtml}
+          </div>
+          <button class="btn-outline-sm" style="flex-shrink:0" onclick="toggleDetail(${p.config_id})">Ver HL ▾</button>
+        </div>
+        <div id="detail-${p.config_id}" class="pool-detail hidden"></div>`;
+    }).join('');
+  } else {
+    html += `<div class="wp-no-pools">Sin pools configurados para esta wallet.</div>`;
+  }
+
+  return html;
 }
 
 // ── Nuclear stop ───────────────────────────────────────────────────────────

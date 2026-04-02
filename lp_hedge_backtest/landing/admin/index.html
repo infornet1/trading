@@ -77,6 +77,9 @@
     </div>
   </section>
 
+  <!-- Active risk strip — live open positions -->
+  <div id="risk-strip" class="risk-strip hidden"></div>
+
   <!-- Status bar -->
   <div class="refresh-bar">
     <span id="refresh-status">Actualizando...</span>
@@ -84,6 +87,16 @@
     <button id="btn-maintenance" class="btn-maintenance hidden" onclick="toggleMaintenance()">🔧 Maintenance: OFF</button>
     <button id="btn-nuclear" class="btn-nuclear hidden" onclick="nuclearStop()">☢ Stop All</button>
   </div>
+
+  <!-- Wallet lookup panel -->
+  <div class="wallet-search-bar">
+    <span class="wallet-search-label">🔍 Wallet Lookup</span>
+    <input type="text" id="wallet-search-input" class="wallet-search-input"
+           placeholder="0x… dirección completa o parcial" />
+    <button class="btn-outline-sm" onclick="searchWallet()">Buscar</button>
+    <button class="btn-outline-sm wallet-search-clear hidden" id="wallet-search-clear" onclick="clearWalletSearch()">✕ Limpiar</button>
+  </div>
+  <div id="wallet-panel" class="wallet-panel hidden"></div>
 
   <!-- Pool health grid -->
   <section class="pools-grid" id="pools-grid">
