@@ -40,7 +40,7 @@ async def _process_update(update: dict):
     elif command == "/status":
         await _handle_status(chat_id)
     elif command == "/unlink":
-        await _handle_unlink(chat_id)
+        await _handle_unlink(chat_id, arg)
     elif command == "/help":
         await send_message(chat_id, _HELP_TEXT)
     else:

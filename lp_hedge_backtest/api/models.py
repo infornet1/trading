@@ -5,7 +5,7 @@ SQLAlchemy ORM models — mirrors the MariaDB schema in SAAS_PLAN.md.
 from datetime import datetime
 from sqlalchemy import (
     BigInteger, Boolean, Column, DateTime, Numeric,
-    Enum, ForeignKey, Integer, JSON, String, Text,
+    Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from api.database import Base
@@ -103,12 +103,19 @@ class BotEvent(Base):
 
 
 class TelegramLink(Base):
-    """Maps a VIZNAGO user wallet → Telegram chat_id for push alerts."""
+    """
+    Maps wallet ↔ Telegram chat_id for push alerts.
+    Multi-wallet: one chat_id can link many wallets; one wallet can notify many chats.
+    Composite unique prevents duplicate (chat, wallet) pairs.
+    """
     __tablename__ = "telegram_links"
+    __table_args__ = (
+        UniqueConstraint("telegram_chat_id", "user_address", name="uq_chat_wallet"),
+    )
 
     id               = Column(Integer,    primary_key=True, autoincrement=True)
-    user_address     = Column(String(42), nullable=False, unique=True)  # lowercase 0x…
-    telegram_chat_id = Column(BigInteger, nullable=False, unique=True)
+    user_address     = Column(String(42), nullable=False)
+    telegram_chat_id = Column(BigInteger, nullable=False)
     linked_at        = Column(DateTime,   default=datetime.utcnow)
 
 

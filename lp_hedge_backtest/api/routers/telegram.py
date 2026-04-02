@@ -2,11 +2,12 @@
 Telegram webhook router — handles incoming updates from @vizniago_bot.
 
 Commands:
-  /start <wallet_address>   Link wallet to receive bot alerts
-  /status                   Show all bots for the linked wallet
-  /unlink                   Remove wallet link and stop all alerts
-  /help                     List available commands
+  /start <wallet_address>      Add a wallet to your alert list
+  /status                      Show bots across all linked wallets
+  /unlink <0xWallet|all>       Remove one wallet or all links
+  /help                        List available commands
 
+Multi-wallet: one Telegram user can link many wallets.
 Auth model: wallet address (trust-based for alpha).
 Step 8 will add NFT key on-chain verification.
 """
@@ -32,27 +33,26 @@ _MODE_LABELS = {
 
 _HELP_TEXT = (
     "*VIZNAGO Bot Commands*\n\n"
-    "/start `0xYourWallet` — Link wallet to receive alerts\n"
-    "/status — Show your active bots\n"
-    "/unlink — Remove wallet link & stop all alerts\n"
+    "/start `0xWallet` — Add a wallet to your alert list\n"
+    "/status — Show bots across all linked wallets\n"
+    "/unlink `0xWallet` — Remove a specific wallet\n"
+    "/unlink all — Remove all linked wallets\n"
     "/help — Show this message\n\n"
-    "_Visit the dashboard to manage your bots._"
+    "_You can link multiple wallets. Each fires alerts independently._"
 )
 
 
 @router.get("/link-status")
 async def telegram_link_status(address: str = Depends(get_current_address)):
-    """Return whether the authenticated wallet has a Telegram link."""
+    """Return how many Telegram chats are linked to this wallet."""
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(TelegramLink).where(TelegramLink.user_address == address.lower())
         )
-        link = result.scalar_one_or_none()
-    if link:
-        # Return last 4 digits of chat_id as hint (never full ID)
-        hint = str(link.telegram_chat_id)[-4:]
-        return {"linked": True, "hint": f"...{hint}"}
-    return {"linked": False}
+        links = result.scalars().all()
+    if links:
+        return {"linked": True, "count": len(links)}
+    return {"linked": False, "count": 0}
 
 
 @router.post("/webhook")
@@ -82,7 +82,7 @@ async def telegram_webhook(request: Request):
     elif command == "/status":
         await _handle_status(chat_id)
     elif command == "/unlink":
-        await _handle_unlink(chat_id)
+        await _handle_unlink(chat_id, arg)
     elif command == "/help":
         await send_message(chat_id, _HELP_TEXT)
     else:
@@ -98,97 +98,141 @@ async def _handle_start(chat_id: int, wallet: str):
             chat_id,
             "❌ *Invalid wallet address.*\n\n"
             "Usage: `/start 0xYourWalletAddress`\n\n"
-            "Connect your wallet on the dashboard first, then copy the address here.",
+            "You can link multiple wallets — each fires alerts independently.",
         )
         return
 
     async with AsyncSessionLocal() as db:
         existing = await db.execute(
-            select(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
-        )
-        link = existing.scalar_one_or_none()
-
-        if link:
-            if link.user_address == wallet:
-                await send_message(chat_id, f"✅ Already linked to `{wallet[:6]}...{wallet[-4:]}`")
-                return
-            link.user_address = wallet
-            link.linked_at    = datetime.utcnow()
-            await db.commit()
-            await send_message(
-                chat_id,
-                f"🔄 *Wallet updated*\n`{wallet[:6]}...{wallet[-4:]}`\n\nAlerts will now follow this wallet's bots.",
+            select(TelegramLink).where(
+                TelegramLink.telegram_chat_id == chat_id,
+                TelegramLink.user_address == wallet,
             )
+        )
+        if existing.scalar_one_or_none():
+            await send_message(chat_id, f"✅ Already linked: `{wallet[:6]}...{wallet[-4:]}`")
             return
 
         db.add(TelegramLink(user_address=wallet, telegram_chat_id=chat_id))
         await db.commit()
 
-    await send_message(
-        chat_id,
-        f"✅ *Wallet linked!*\n\n"
-        f"`{wallet[:6]}...{wallet[-4:]}`\n\n"
-        f"You'll receive alerts for:\n"
-        f"• Hedge entries & exits\n"
-        f"• Stop losses & take profits\n"
-        f"• Circuit breakers & errors\n"
-        f"• LP events\n\n"
-        f"Use /status to see your bots.",
-    )
-
-
-async def _handle_unlink(chat_id: int):
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
+        # Count total wallets linked to this chat
+        count_res = await db.execute(
             select(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
         )
-        link = result.scalar_one_or_none()
-        if not link:
-            await send_message(chat_id, "⚠️ No wallet linked — nothing to unlink.")
-            return
-        wallet = link.user_address
-        await db.execute(
-            delete(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
-        )
-        await db.commit()
+        total = len(count_res.scalars().all())
+
     await send_message(
         chat_id,
-        f"🔕 *Unlinked*\n\n"
+        f"✅ *Wallet added!*\n\n"
         f"`{wallet[:6]}...{wallet[-4:]}`\n\n"
-        f"You will no longer receive alerts from @vizniago_bot.\n"
-        f"Use /start to re-link at any time.",
+        f"You now have *{total}* wallet(s) linked.\n"
+        f"Use /status to see all bots, /unlink `0xWallet` to remove one.",
     )
+
+
+async def _handle_unlink(chat_id: int, arg: str = ""):
+    arg = arg.lower().strip()
+
+    async with AsyncSessionLocal() as db:
+        all_res = await db.execute(
+            select(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
+        )
+        links = all_res.scalars().all()
+
+        if not links:
+            await send_message(chat_id, "⚠️ No wallets linked — nothing to unlink.")
+            return
+
+        # /unlink all
+        if arg == "all":
+            await db.execute(
+                delete(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
+            )
+            await db.commit()
+            await send_message(
+                chat_id,
+                f"🔕 *All wallets unlinked* ({len(links)} removed)\n\n"
+                f"Use /start `0xWallet` to re-link at any time.",
+            )
+            return
+
+        # /unlink 0xWallet
+        if arg.startswith("0x") and len(arg) == 42:
+            match = next((l for l in links if l.user_address == arg), None)
+            if not match:
+                await send_message(chat_id, f"⚠️ `{arg[:6]}...{arg[-4:]}` is not in your linked wallets.")
+                return
+            await db.execute(
+                delete(TelegramLink).where(
+                    TelegramLink.telegram_chat_id == chat_id,
+                    TelegramLink.user_address == arg,
+                )
+            )
+            await db.commit()
+            remaining = len(links) - 1
+            msg = (
+                f"🔕 *Unlinked* `{arg[:6]}...{arg[-4:]}`\n\n"
+                f"{remaining} wallet(s) still active."
+                if remaining else
+                f"🔕 *Unlinked* `{arg[:6]}...{arg[-4:]}`\n\nNo wallets remaining. Use /start to re-link."
+            )
+            await send_message(chat_id, msg)
+            return
+
+        # No arg — show list if multiple, unlink directly if only one
+        if len(links) == 1:
+            wallet = links[0].user_address
+            await db.execute(
+                delete(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
+            )
+            await db.commit()
+            await send_message(
+                chat_id,
+                f"🔕 *Unlinked* `{wallet[:6]}...{wallet[-4:]}`\n\nUse /start to re-link at any time.",
+            )
+            return
+
+        # Multiple wallets — ask user to specify
+        lines = ["⚠️ *You have multiple wallets linked. Specify which to remove:*\n"]
+        for l in links:
+            lines.append(f"• `/unlink {l.user_address}`")
+        lines.append("\nOr use `/unlink all` to remove everything.")
+        await send_message(chat_id, "\n".join(lines))
 
 
 async def _handle_status(chat_id: int):
     async with AsyncSessionLocal() as db:
-        link_res = await db.execute(
+        links_res = await db.execute(
             select(TelegramLink).where(TelegramLink.telegram_chat_id == chat_id)
         )
-        link = link_res.scalar_one_or_none()
+        links = links_res.scalars().all()
 
-        if not link:
+        if not links:
             await send_message(
                 chat_id,
-                "⚠️ No wallet linked yet.\n\nUse `/start 0xYourWallet` to link your wallet.",
+                "⚠️ No wallets linked yet.\n\nUse `/start 0xYourWallet` to add a wallet.",
             )
             return
 
+        wallets = [l.user_address for l in links]
         bots_res = await db.execute(
-            select(BotConfig).where(BotConfig.user_address == link.user_address)
+            select(BotConfig).where(BotConfig.user_address.in_(wallets))
         )
         bots = bots_res.scalars().all()
 
-    if not bots:
-        await send_message(chat_id, "No bots found for your wallet.")
-        return
+    lines = [f"*VIZNAGO Status* — {len(wallets)} wallet(s)\n"]
+    for wallet in wallets:
+        short = f"{wallet[:6]}...{wallet[-4:]}"
+        wallet_bots = [b for b in bots if b.user_address == wallet]
+        lines.append(f"👛 `{short}`")
+        if not wallet_bots:
+            lines.append("  _No bots configured_")
+        else:
+            for bot in wallet_bots:
+                status = "🟢" if bot.active else "⚫"
+                label  = _MODE_LABELS.get(bot.mode, bot.mode.upper())
+                lines.append(f"  {status} *{label}* — {bot.pair} #{bot.nft_token_id}")
+        lines.append("")
 
-    short_wallet = f"{link.user_address[:6]}...{link.user_address[-4:]}"
-    lines = [f"*VIZNAGO Bots* — `{short_wallet}`\n"]
-    for bot in bots:
-        status = "🟢 RUNNING" if bot.active else "⚫ STOPPED"
-        label  = _MODE_LABELS.get(bot.mode, bot.mode.upper())
-        nft    = str(bot.nft_token_id)
-        lines.append(f"{status} *{label}* — {bot.pair} #{nft}")
-
-    await send_message(chat_id, "\n".join(lines))
+    await send_message(chat_id, "\n".join(lines).rstrip())

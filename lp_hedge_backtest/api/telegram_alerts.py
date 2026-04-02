@@ -148,15 +148,16 @@ async def send_alert(config_id: int, event_type: str, price, pnl, details):
             if not bot:
                 return
 
-            link_res = await db.execute(
+            links_res = await db.execute(
                 select(TelegramLink).where(TelegramLink.user_address == bot.user_address)
             )
-            link = link_res.scalar_one_or_none()
-            if not link:
+            links = links_res.scalars().all()
+            if not links:
                 return
 
             msg = _build_message(event_type, bot.pair, bot.mode, price, pnl, details)
-            asyncio.create_task(send_message(link.telegram_chat_id, msg))
+            for link in links:
+                asyncio.create_task(send_message(link.telegram_chat_id, msg))
 
     except Exception as e:
         print(f"[Telegram] Alert error for config {config_id}: {e}", flush=True)

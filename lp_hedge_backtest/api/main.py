@@ -41,15 +41,21 @@ async def _run_column_migrations():
         # WHALE mode missing columns
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS whale_use_websocket TINYINT(1) NULL DEFAULT 0",
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS whale_oi_spike_threshold DECIMAL(5,3) NULL DEFAULT 0.030",
-        # Telegram alerts
+        # Telegram alerts — create table if not exists
         (
             "CREATE TABLE IF NOT EXISTS telegram_links ("
             "  id               INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,"
-            "  user_address     VARCHAR(42)  NOT NULL UNIQUE,"
-            "  telegram_chat_id BIGINT       NOT NULL UNIQUE,"
-            "  linked_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            "  user_address     VARCHAR(42)  NOT NULL,"
+            "  telegram_chat_id BIGINT       NOT NULL,"
+            "  linked_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "  UNIQUE KEY uq_chat_wallet (telegram_chat_id, user_address)"
             ")"
         ),
+        # Multi-wallet migration: drop old single-column unique indexes if they exist
+        "ALTER TABLE telegram_links DROP INDEX user_address",
+        "ALTER TABLE telegram_links DROP INDEX telegram_chat_id",
+        # Add composite unique if not already present
+        "ALTER TABLE telegram_links ADD UNIQUE KEY uq_chat_wallet (telegram_chat_id, user_address)",
     ]
     async with engine.begin() as conn:
         for sql in migrations:

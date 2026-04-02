@@ -778,10 +778,10 @@ function buildWalletDropdownContent() {
     <div class="wd-section-title">TELEGRAM ALERTS</div>`;
   if (!saas.jwt) {
     html += `<div class="wd-loading-row">Sign in to link Telegram</div>`;
-  } else if (saas.tgLinked && saas.tgLinked.hint) {
+  } else if (saas.tgLinked && saas.tgLinked.count) {
+    const n = saas.tgLinked.count;
     html += `<div class="wd-tg-linked">
-      <span class="wd-tg-check">✓</span> Connected to @vizniago_bot
-      <span class="wd-tg-hint">${saas.tgLinked.hint}</span>
+      <span class="wd-tg-check">✓</span> @vizniago_bot — ${n} wallet${n > 1 ? 's' : ''} linked
     </div>`;
   } else {
     const walletArg = state.address ? state.address.toLowerCase() : '0x…';
@@ -2426,7 +2426,7 @@ async function loadTgLinkStatus() {
   if (!saas.jwt) return;
   try {
     const data = await apiCall('GET', '/telegram/link-status');
-    saas.tgLinked = data.linked ? { hint: data.hint } : false;
+    saas.tgLinked = data.linked ? { count: data.count } : false;
     // Refresh wallet dropdown if it's open
     const menu = document.getElementById('wallet-dropdown-menu');
     if (menu && menu.style.display !== 'none') renderWalletDropdown();
