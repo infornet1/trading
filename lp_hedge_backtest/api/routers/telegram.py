@@ -12,9 +12,10 @@ Step 8 will add NFT key on-chain verification.
 
 from datetime import datetime
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 
+from api.auth import get_current_address
 from api.database import AsyncSessionLocal
 from api.models import BotConfig, TelegramLink
 from api.telegram_alerts import send_message
@@ -35,6 +36,21 @@ _HELP_TEXT = (
     "/help — Show this message\n\n"
     "_Visit the dashboard to manage your bots._"
 )
+
+
+@router.get("/link-status")
+async def telegram_link_status(address: str = Depends(get_current_address)):
+    """Return whether the authenticated wallet has a Telegram link."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(TelegramLink).where(TelegramLink.user_address == address.lower())
+        )
+        link = result.scalar_one_or_none()
+    if link:
+        # Return last 4 digits of chat_id as hint (never full ID)
+        hint = str(link.telegram_chat_id)[-4:]
+        return {"linked": True, "hint": f"...{hint}"}
+    return {"linked": False}
 
 
 @router.post("/webhook")

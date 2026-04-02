@@ -1,5 +1,5 @@
 /**
- * VIZNAGO FURY — LP Pool Dashboard
+ * VIZNIAGO FURY — LP Pool Dashboard
  * Phase 1: Wallet Connect + Chain Detection
  * Phase 2: Uniswap v3 On-Chain Position Fetching
  *
@@ -130,6 +130,7 @@ const saas = {
   statuses:       {},      // config_id → last event payload
   logs:           {},      // config_id → array of log line strings (max 50)
   whaleSignals:   {},      // config_id → array of last N whale signal events (mode='whale' bots)
+  tgLinked:       null,    // null=unknown, false=not linked, {hint:"...1234"}=linked
 };
 const WHALE_SIGNAL_MAX = 50; // max signals to keep in memory per whale bot
 const LOG_MAX = 50;
@@ -772,6 +773,27 @@ function buildWalletDropdownContent() {
   }
   html += `</div>`;
 
+  // ── Telegram Alerts ─────────────────────────────────────────────────────
+  html += `<div class="wd-section">
+    <div class="wd-section-title">TELEGRAM ALERTS</div>`;
+  if (!saas.jwt) {
+    html += `<div class="wd-loading-row">Sign in to link Telegram</div>`;
+  } else if (saas.tgLinked && saas.tgLinked.hint) {
+    html += `<div class="wd-tg-linked">
+      <span class="wd-tg-check">✓</span> Connected to @vizniago_bot
+      <span class="wd-tg-hint">${saas.tgLinked.hint}</span>
+    </div>`;
+  } else {
+    const walletArg = state.address ? state.address.toLowerCase() : '0x…';
+    const cmd = `/start ${walletArg}`;
+    html += `<div class="wd-tg-setup">
+      <div class="wd-tg-step">Open <a href="https://t.me/vizniago_bot" target="_blank" rel="noopener" class="wd-tg-link">@vizniago_bot</a> and send:</div>
+      <div class="wd-tg-cmd" data-cmd="${cmd}" onclick="copyTgCmd(this)">${cmd}</div>
+      <div class="wd-tg-copy-hint">Tap to copy</div>
+    </div>`;
+  }
+  html += `</div>`;
+
   // ── LP Positions summary ────────────────────────────────────────────────
   html += `
     <div class="wd-section">
@@ -1239,7 +1261,7 @@ window.saasSignIn = async function () {
 
     // 2. Sign with wallet
     const signer  = await state.provider.getSigner();
-    const message = `Sign in to VIZNAGO FURY\nNonce: ${nonce}`;
+    const message = `Sign in to VIZNIAGO FURY\nNonce: ${nonce}`;
     const signature = await signer.signMessage(message);
 
     // 3. Verify and get JWT
@@ -1362,6 +1384,8 @@ async function saasLoadBots() {
     if (state.positions.length > 0) renderPositions();
     renderLiveBots();
     renderWhaleSection();
+    // Check Telegram link status (fire-and-forget, updates wallet dropdown)
+    loadTgLinkStatus();
   } catch (err) {
     // Silently ignore — JWT may be expired (apiCall handles 401)
     console.warn('[SaaS] loadBots:', err.message);
@@ -1413,7 +1437,7 @@ function renderLiveBots() {
       return `
         <div class="hedge-panel" style="margin-top:16px">
           <div class="hedge-panel-header">
-            <div class="section-label">VIZNAGO FURY</div>
+            <div class="section-label">VIZNIAGO FURY</div>
             <h3 class="hedge-panel-title">
               RSI Trader · ${symbol} ${statusTag}
             </h3>
@@ -1523,7 +1547,7 @@ function renderLiveBots() {
       return `
         <div class="hedge-panel" style="margin-top:16px" id="whale-panel-${bot.id}">
           <div class="hedge-panel-header">
-            <div class="section-label">VIZNAGO WHALE</div>
+            <div class="section-label">VIZNIAGO WHALE</div>
             <h3 class="hedge-panel-title">
               Whale Tracker ${modeTag}${paperTag}
             </h3>
@@ -2396,6 +2420,33 @@ window.resetTradingPanelDefaults = function (tokenId) {
   document.getElementById('deviation-advisory')?.remove();
 };
 
+// ── Telegram link helpers ─────────────────────────────────────────────────
+
+async function loadTgLinkStatus() {
+  if (!saas.jwt) return;
+  try {
+    const data = await apiCall('GET', '/telegram/link-status');
+    saas.tgLinked = data.linked ? { hint: data.hint } : false;
+    // Refresh wallet dropdown if it's open
+    const menu = document.getElementById('wallet-dropdown-menu');
+    if (menu && menu.style.display !== 'none') renderWalletDropdown();
+  } catch { /* silent — non-critical */ }
+}
+
+window.copyTgCmd = function (el) {
+  const cmd = el.dataset.cmd || el.textContent.trim();
+  navigator.clipboard.writeText(cmd).then(() => {
+    const hint = el.nextElementSibling;
+    if (hint) { hint.textContent = '✓ Copied!'; setTimeout(() => { hint.textContent = 'Tap to copy'; }, 2000); }
+  }).catch(() => {
+    // Fallback: select text
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  });
+};
+
 // Maintenance banner — checked once on dashboard load
 async function checkMaintenanceStatus() {
   try {
@@ -2434,7 +2485,7 @@ function renderWhaleSection() {
   const stoppedCards = stoppedBots.map(bot => `
     <div class="hedge-panel" style="margin-top:12px;opacity:0.7">
       <div class="hedge-panel-header">
-        <div class="section-label" style="color:#3d6b8c">VIZNAGO WHALE · STOPPED</div>
+        <div class="section-label" style="color:#3d6b8c">VIZNIAGO WHALE · STOPPED</div>
         <h3 class="hedge-panel-title" style="font-size:0.85rem">
           Top-${bot.whale_top_n || 50} · $${Number(bot.whale_min_notional||50000).toLocaleString()} min
           <span class="badge badge--muted" style="margin-left:8px">ID ${bot.id}</span>

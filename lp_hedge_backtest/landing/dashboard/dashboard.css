@@ -1,5 +1,5 @@
 /* ============================================================
-   VIZNAGO FURY — Dashboard CSS
+   VIZNIAGO FURY — Dashboard CSS
    LP Pool Monitor (extends global.css)
    ============================================================ */
 
@@ -381,6 +381,45 @@
   font-family: inherit;
 }
 .wd-disconnect-btn:hover { background: rgba(248,113,113,0.18); }
+/* Telegram alerts section */
+.wd-tg-linked {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #10b981;
+}
+.wd-tg-check { font-size: 0.8rem; }
+.wd-tg-hint {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-family: monospace;
+  font-size: 0.65rem;
+}
+.wd-tg-setup { display: flex; flex-direction: column; gap: 5px; }
+.wd-tg-step  { font-size: 0.7rem; color: var(--color-text-muted); }
+.wd-tg-link  { color: var(--color-neon-cyan); text-decoration: none; }
+.wd-tg-link:hover { text-decoration: underline; }
+.wd-tg-cmd {
+  font-family: monospace;
+  font-size: 0.68rem;
+  color: var(--color-text-primary);
+  background: rgba(0,212,255,0.07);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s;
+}
+.wd-tg-cmd:hover { background: rgba(0,212,255,0.14); }
+.wd-tg-copy-hint {
+  font-size: 0.62rem;
+  color: var(--color-text-muted);
+  text-align: right;
+}
 
 /* ── Price Ticker ────────────────────────────────────────────── */
 .price-ticker {
