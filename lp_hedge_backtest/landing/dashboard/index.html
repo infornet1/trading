@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VIZNAGO FURY — Panel de Control LP</title>
+  <title>VIZNIAGO FURY — Panel de Control LP</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦄</text></svg>" />
   <meta name="description" content="Monitor your Uniswap v3 LP positions live. Connect Rabby Wallet to track range status, fees earned, and impermanent loss." />
   <link rel="stylesheet" href="../global.css" />
@@ -15,20 +15,33 @@
        NAVBAR
   ============================================================ -->
   <nav class="navbar">
-    <a href="../index.html" class="navbar-back" title="Back to Landing">
-      &#8592;
+    <!-- Brand -->
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/vizniago-logo.jpeg" alt="VIZNIAGO" class="navbar-logo" />
     </a>
-    <img src="../assets/Gemini_Generated_Image_i12tnji12tnji12t.png"
-         alt="VIZNAGO FURY"
-         class="navbar-logo" />
-    <div class="navbar-title" data-i18n="dash.nav.title">Panel de Control LP</div>
 
-    <div class="lang-toggle">
-      <button class="lang-btn" data-lang-btn="es" onclick="window.setLanguage('es')">ES</button>
-      <button class="lang-btn" data-lang-btn="en" onclick="window.setLanguage('en')">EN</button>
+    <!-- Center links -->
+    <div class="navbar-links" id="navbar-links">
+      <div class="nav-item nav-dd-wrap">
+        <button class="nav-link nav-dd-btn">
+          DeFi <span class="nav-caret">▾</span>
+        </button>
+        <div class="nav-dd-menu">
+          <a href="index.html" class="nav-dd-item nav-dd-item--active">&#128202; Dashboard</a>
+          <div class="nav-dd-item nav-dd-item--soon">&#9889; FURY Perps <span class="nav-soon-tag">Soon</span></div>
+          <div class="nav-dd-item nav-dd-item--soon">&#128011; WHALE Signals <span class="nav-soon-tag">Soon</span></div>
+        </div>
+      </div>
+      <a href="../index.html#bot-explainer" class="nav-link" data-i18n="nav.docs">Docs</a>
+      <a href="https://t.me/vizniago_bot" class="nav-link nav-link--tg" target="_blank">@vizniago_bot</a>
     </div>
 
-    <div class="navbar-wallet-area">
+    <!-- Right side -->
+    <div class="navbar-right">
+      <div class="lang-toggle">
+        <button class="lang-btn" data-lang-btn="es" onclick="window.setLanguage('es')">ES</button>
+        <button class="lang-btn" data-lang-btn="en" onclick="window.setLanguage('en')">EN</button>
+      </div>
       <!-- Auto-refresh control (hidden until wallet connected) -->
       <div id="refresh-control" class="refresh-control hidden"></div>
       <!-- Nuclear stop button — only rendered for admin wallets -->
@@ -44,6 +57,10 @@
         </button>
         <div id="wallet-dropdown-menu" class="wallet-dropdown-menu hidden"></div>
       </div>
+      <!-- Hamburger -->
+      <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu" onclick="toggleMobileNav()">
+        <span></span><span></span><span></span>
+      </button>
     </div>
   </nav>
 
@@ -292,9 +309,9 @@
   <footer>
     <div class="footer">
       <img src="../assets/Gemini_Generated_Image_i12tnji12tnji12t.png"
-           alt="VIZNAGO FURY"
+           alt="VIZNIAGO FURY"
            class="footer-logo" />
-      <span class="footer-text" data-i18n="dash.footer.text">Panel de Control LP — VIZNAGO FURY © 2026</span>
+      <span class="footer-text" data-i18n="dash.footer.text">Panel de Control LP — VIZNIAGO FURY © 2026</span>
       <div class="footer-links">
         <a href="../index.html" class="footer-link" data-i18n="dash.footer.backtest">Backtester</a>
         <a href="#" class="footer-link" data-i18n="dash.nav.title">Dashboard</a>
@@ -311,6 +328,22 @@
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
   <script src="dashboard.js"></script>
   <script src="../chat-widget.js"></script>
+  <script>
+    function toggleMobileNav() {
+      const links = document.getElementById('navbar-links');
+      const btn   = document.getElementById('navbar-hamburger');
+      links.classList.toggle('open');
+      btn.classList.toggle('open');
+    }
+    document.addEventListener('click', function (e) {
+      const btn   = document.getElementById('navbar-hamburger');
+      const nav   = document.querySelector('.navbar');
+      if (btn && nav && !nav.contains(e.target)) {
+        document.getElementById('navbar-links').classList.remove('open');
+        btn.classList.remove('open');
+      }
+    });
+  </script>
 
 </body>
 </html>

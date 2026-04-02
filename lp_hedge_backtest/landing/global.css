@@ -189,7 +189,8 @@ section { padding: 80px 0; }
   cursor: pointer;
 }
 .nav-dd-item:hover:not(.nav-dd-item--soon) { background: rgba(0,212,255,0.07); }
-.nav-dd-item--soon { opacity: 0.4; cursor: default; }
+.nav-dd-item--soon   { opacity: 0.4; cursor: default; }
+.nav-dd-item--active { color: var(--color-accent); font-weight: 600; }
 .nav-dd-icon { font-size: 1.1rem; flex-shrink: 0; }
 .nav-dd-text { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .nav-dd-label { font-size: 0.78rem; font-weight: 600; color: var(--color-text-primary); }
