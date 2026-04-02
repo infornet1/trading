@@ -678,7 +678,40 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 
 ---
 
-## 11. Security Checklist
+## 11. Frontend Navigation — dApps Architecture
+
+> Added 2026-04-02. Horizontal navbar with DeFi dropdown.
+
+### Design decision: horizontal navbar (landing) + future sidebar (dashboard)
+
+All major DeFi platforms (Uniswap, Aave, Hyperliquid, dYdX) use horizontal top navbars on landing pages. VIZNAGO follows this convention.
+
+**Landing page navbar structure:**
+```
+[Logo]    [DeFi ▼]  [Docs]  [@vizniago_bot]    [ES|EN]  [v1.0 BETA]
+               │
+          📊 Dashboard          ← live (dashboard/index.html)
+          ⚡ FURY Perps          ← Coming soon (greyed)
+          🐋 WHALE Signals       ← Coming soon (greyed)
+```
+
+**Mobile:** hamburger → full-width slide-down panel. CSS-only dropdown on desktop, JS toggle on mobile.
+
+### dApps roadmap (each becomes a dedicated page under /lp-hedge/)
+
+| dApp | Route | Status | Description |
+|---|---|---|---|
+| Dashboard | `/dashboard/` | ✅ Live | LP hedge bot monitor + WHALE signals |
+| FURY Perps | `/fury/` | 🔲 Planned | Standalone RSI perps interface |
+| WHALE Signals | `/whale/` | 🔲 Planned | Public whale leaderboard feed |
+
+### When to add a sidebar (v2 consideration)
+
+A persistent left sidebar makes sense only when the dashboard grows to 8+ sections (portfolio, analytics, settings, multi-chain). Not needed now. Current dashboard stays single-page with tabs.
+
+---
+
+## 12. Security Checklist
 
 | Risk | Mitigation |
 |---|---|

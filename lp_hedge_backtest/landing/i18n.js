@@ -18,8 +18,12 @@ const TRANSLATIONS = {
   ══════════════════════════════════════════════════════════════ */
   es: {
     // ── Landing: navbar ──────────────────────────────────────────
-    'nav.title':              'LP + Perps Hedge Backtester',
-    'nav.dashboard':          '📈 Panel en Vivo',
+    'nav.title':                 'LP + Perps Hedge Backtester',
+    'nav.dashboard':             '📈 Panel en Vivo',
+    'nav.docs':                  'Docs',
+    'nav.defi.dashboard':        'Dashboard',
+    'nav.defi.dashboard.sub':    'Bots LP en vivo',
+    'nav.soon':                  'Próximamente',
 
     // ── Landing: hero ─────────────────────────────────────────────
     'hero.label':             'Investigación de Estrategia DeFi',
@@ -280,8 +284,12 @@ const TRANSLATIONS = {
   ══════════════════════════════════════════════════════════════ */
   en: {
     // ── Landing: navbar ──────────────────────────────────────────
-    'nav.title':              'LP + Perps Hedge Backtester',
-    'nav.dashboard':          '📈 Live Dashboard',
+    'nav.title':                 'LP + Perps Hedge Backtester',
+    'nav.dashboard':             '📈 Live Dashboard',
+    'nav.docs':                  'Docs',
+    'nav.defi.dashboard':        'Dashboard',
+    'nav.defi.dashboard.sub':    'Live LP hedge bots',
+    'nav.soon':                  'Coming soon',
 
     // ── Landing: hero ─────────────────────────────────────────────
     'hero.label':             'DeFi Strategy Research',
