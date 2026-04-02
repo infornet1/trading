@@ -102,6 +102,16 @@ class BotEvent(Base):
     config = relationship("BotConfig", back_populates="events")
 
 
+class TelegramLink(Base):
+    """Maps a VIZNAGO user wallet → Telegram chat_id for push alerts."""
+    __tablename__ = "telegram_links"
+
+    id               = Column(Integer,    primary_key=True, autoincrement=True)
+    user_address     = Column(String(42), nullable=False, unique=True)  # lowercase 0x…
+    telegram_chat_id = Column(BigInteger, nullable=False, unique=True)
+    linked_at        = Column(DateTime,   default=datetime.utcnow)
+
+
 class Subscription(Base):
     __tablename__ = "subscriptions"
 

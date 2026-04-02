@@ -1,5 +1,5 @@
 """
-VIZNAGO FURY — SaaS API
+VIZNIAGO FURY — SaaS API
 FastAPI app on port 8001.
 """
 
@@ -20,6 +20,7 @@ from api.routers import bots as bots_router
 from api.routers import ws as ws_router
 from api.routers import admin as admin_router
 from api.routers import assistant as assistant_router
+from api.routers import telegram as telegram_router
 
 
 async def _run_column_migrations():
@@ -40,6 +41,15 @@ async def _run_column_migrations():
         # WHALE mode missing columns
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS whale_use_websocket TINYINT(1) NULL DEFAULT 0",
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS whale_oi_spike_threshold DECIMAL(5,3) NULL DEFAULT 0.030",
+        # Telegram alerts
+        (
+            "CREATE TABLE IF NOT EXISTS telegram_links ("
+            "  id               INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            "  user_address     VARCHAR(42)  NOT NULL UNIQUE,"
+            "  telegram_chat_id BIGINT       NOT NULL UNIQUE,"
+            "  linked_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        ),
     ]
     async with engine.begin() as conn:
         for sql in migrations:
@@ -116,7 +126,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="VIZNAGO FURY API",
+    title="VIZNIAGO FURY API",
     version="0.1.0",
     description="SaaS LP hedge bot management API",
     lifespan=lifespan,
@@ -142,6 +152,7 @@ app.include_router(bots_router.router)
 app.include_router(ws_router.router)
 app.include_router(admin_router.router)
 app.include_router(assistant_router.router)
+app.include_router(telegram_router.router)
 
 
 @app.get("/health")

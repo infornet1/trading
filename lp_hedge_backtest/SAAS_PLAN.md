@@ -1,4 +1,4 @@
-# VIZNAGO FURY — SaaS Option B: Hosted LP Hedge Bot Service
+# VIZNIAGO FURY — SaaS Option B: Hosted LP Hedge Bot Service
 > Architecture & Implementation Plan — v1.5 (2026-03-21)
 > Status: **Steps 0–8.5 Complete · Step 8 (Unlock Protocol) + Step 9 (Telegram) Pending**
 
@@ -6,7 +6,7 @@
 
 ## 1. Goal
 
-Allow any user to connect their wallet to the VIZNAGO FURY dashboard, select a
+Allow any user to connect their wallet to the VIZNIAGO FURY dashboard, select a
 Uniswap v3 LP position, configure hedge parameters, and activate a managed Bot
 Defensor Bajista/Defensor Alcista instance — without running anything locally.
 
@@ -98,7 +98,7 @@ Users prove wallet ownership by signing a challenge. No email/password required.
         → server stores nonce, returns: { nonce: "abc123" }
 
 2. Rabby signs message:
-        "Sign in to VIZNAGO FURY\nNonce: abc123"
+        "Sign in to VIZNIAGO FURY\nNonce: abc123"
 
 3. POST /auth/verify { address, signature }
         → server recovers signer address via eth_account
@@ -279,7 +279,7 @@ Access is gated by on-chain NFT ownership — no payment database, no trust-the-
 2. User clicks "Subscribe" in dashboard
    → Wallet prompts: approve 29 USDC on Arbitrum → confirm (~$0.01–$0.05 gas)
    → One transaction → NFT "Key" lands in their wallet
-   → NFT shows: "VIZNAGO FURY — Starter — expires April 21 2026"
+   → NFT shows: "VIZNIAGO FURY — Starter — expires April 21 2026"
    → NFT has a Key ID (e.g. Key #42) — this IS their subscription identity
 
 3. API checks access on every sign-in (one on-chain call):
@@ -448,13 +448,20 @@ receipts, grace period warnings). Never mandatory.
 ### 9.2 Setup flow (one-time per user)
 
 ```
+Alpha flow (wallet-based, implemented 2026-04-02):
+1. User connects wallet on dashboard
+2. Dashboard shows: "Enable Telegram Alerts"
+   → "Message @vizniago_bot and send: /start 0xYourWallet"
+3. User opens Telegram → sends /start 0xWalletAddress
+4. Bot stores: { user_address: "0x...", telegram_chat_id: 7291834 }
+5. Replies: "✅ Wallet linked! You'll receive alerts for: ..."
+
+Step 8+ flow (NFT key on-chain verification — future):
 1. User mints NFT Key #42 → Starter plan activated
 2. Dashboard shows: "Enable Telegram Alerts"
-   → "Message @ViznagoFuryBot and send: /start 42"
-3. User opens Telegram → sends /start 42
-4. Bot verifies Key #42 owner matches their connected wallet (on-chain)
-5. Stores: { nft_key_id: 42, telegram_chat_id: 7291834 }
-6. Replies: "✅ Alertas activadas para Key #42"
+   → "Message @vizniago_bot and send: /start 42"
+3. Bot verifies Key #42 owner matches wallet on-chain
+4. Stores: { nft_key_id: 42, telegram_chat_id: 7291834 }
 
 No email. No name. Nothing identifiable stored on Viznago's side.
 ```
@@ -519,11 +526,11 @@ critical for traders on the move.
 ### 9.6 Privacy architecture
 
 ```
-What Viznago stores:
+What Vizniago stores:
   nft_key_id:        42          ← on-chain number, not a person
   telegram_chat_id:  7291834     ← Telegram's internal ID number
 
-What Viznago does NOT store:
+What Vizniago does NOT store:
   ✗ Name
   ✗ Email address
   ✗ Phone number
@@ -534,18 +541,48 @@ What Viznago does NOT store:
 
 ---
 
-### 9.7 Backend pieces to build
+### 9.7 Backend implementation (2026-04-02)
 
-- **Telegram Bot**: create via `@BotFather` → get `TELEGRAM_BOT_TOKEN` → store in `.env`
-- **Webhook endpoint** `POST /telegram/webhook`: parse `/start <key_id>`, verify NFT
-  ownership on-chain, store `{ nft_key_id, telegram_chat_id }` in new `telegram_links` table
-- **Alert dispatcher** `api/telegram_alerts.py`: async `send_alert(config_id, event, details)`
-  — looks up `telegram_chat_id` by config → sends via Bot API
-- **Hook into BotManager** `_handle_event()`: fire `send_alert()` as background task after
-  DB write + WS broadcast (non-blocking)
-- **Command handler**: `/status` queries live bot state + last event; `/stop` triggers
-  `manager.stop(config_id)` after `/confirm`
-- **New DB table**: `telegram_links (nft_key_id, telegram_chat_id, linked_at)`
+**Status: Core built — webhook registration pending**
+
+| Piece | File | Status |
+|---|---|---|
+| Bot created | `@vizniago_bot` via BotFather | ✅ Done |
+| Token stored | `api/.env` → `TELEGRAM_BOT_TOKEN` | ✅ Done |
+| Alert dispatcher | `api/telegram_alerts.py` | ✅ Built |
+| Webhook router | `api/routers/telegram.py` | ✅ Built |
+| DB table | `telegram_links (user_address, telegram_chat_id, linked_at)` | ✅ Built (auto-created on startup) |
+| BotManager hook | `_handle_event()` fires `send_alert()` as background task | ✅ Built |
+| Webhook registration | `POST .../setWebhook` on Telegram API | ⏳ Pending deploy + restart |
+
+**Auth model (alpha):** wallet address trust-based (`/start 0xWallet`).
+Step 8 will upgrade to NFT key on-chain verification.
+
+**Register webhook after deploy/restart:**
+```bash
+curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+  -d "url=https://dev.ueipab.edu.ve/trading/lp-hedge/api/telegram/webhook"
+```
+
+**Commands implemented:**
+- `/start 0xWallet` — link wallet, enables all high-priority alerts
+- `/status` — list all bots for linked wallet (running/stopped, mode, pair)
+- `/help` — list commands
+
+**High-priority alert events (all tiers):**
+`hedge_opened`, `sl_hit`, `tp_hit`, `trailing_stop`,
+`fury_entry`, `fury_sl`, `fury_tp`, `fury_circuit_breaker`,
+`error`, `lp_removed`, `lp_burned`
+
+**DB table schema:**
+```sql
+CREATE TABLE telegram_links (
+  id               INT         NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  user_address     VARCHAR(42) NOT NULL UNIQUE,
+  telegram_chat_id BIGINT      NOT NULL UNIQUE,
+  linked_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
 
 ---
 
@@ -608,7 +645,7 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 
 **Implemented in `landing/dashboard/dashboard.js` + `dashboard.css` + `i18n.js`:**
 
-- **Auth flow**: wallet sign-in button in drawer → `GET /auth/nonce` → `signMessage("Sign in to VIZNAGO FURY\nNonce: {nonce}")` → `POST /auth/verify` → JWT stored in `localStorage['vf_jwt']`
+- **Auth flow**: wallet sign-in button in drawer → `GET /auth/nonce` → `signMessage("Sign in to VIZNIAGO FURY\nNonce: {nonce}")` → `POST /auth/verify` → JWT stored in `localStorage['vf_jwt']`
 - **Collapsible drawer** on every active position card; open/closed state persists across re-renders
 - **Mode toggle**: Defensor Bajista / Defensor Alcista radio buttons (Defensor Alcista disabled for BTC pairs — golden rule enforced in UI and API)
 - **Config form**: trigger %, hedge size %, HL API Key (64-hex private key, password field, red label), HL wallet address (yellow label)
@@ -670,9 +707,9 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 | **7.5** | Admin hardening: nuclear stop, bot persistence, auto-refresh control, waitlist CTA | ✅ Complete |
 | **8.5** | Admin monitoring dashboard: pool health, HL live positions, event history, fills, wallet acquisition funnel | ✅ Complete |
 | **8** | Subscriptions via Unlock Protocol NFT Keys + grace period state machine | 🔲 Pending |
-| **9** | Telegram Bot alerts (anonymous, NFT Key linked, two-way commands) | 🔲 Pending |
+| **9** | Telegram Bot alerts (anonymous, wallet-linked, two-way commands) | 🟡 In Progress — bot created, core built, webhook pending |
 | **10** | Alpha test with 3–5 real users | 🔲 Pending |
-| **W1** | VIZNAGO WHALE — leaderboard tracker, position diffing, copy-trade signals, dashboard panel | ✅ Complete |
+| **W1** | VIZNIAGO WHALE — leaderboard tracker, position diffing, copy-trade signals, dashboard panel | ✅ Complete |
 | **W2** | Whale signal enrichment — leverage, liq price, margin, ROE%, funding delta in every signal row | ✅ Complete |
 | **W3** | Whale Intelligence Agent Phase 1 — HistoryStore, PatternEngine, SignalEnricher, convergence panel | 🔲 Planned |
 | **W4** | Whale Intelligence Agent Phase 2 — backtest framework, Telegram CRITICAL alerts, pinned watchlist | 🔲 Planned |
@@ -683,12 +720,12 @@ Each position card gains a collapsible **"Enable Protection"** drawer:
 
 ## 13. Feature Modules
 
-In addition to the core SaaS steps above, VIZNAGO ships three intelligence modules:
+In addition to the core SaaS steps above, VIZNIAGO ships three intelligence modules:
 
 | Module | Doc | Status |
 |--------|-----|--------|
-| VIZNAGO WHALE — Tracker | [WHALE_TRACKER.md](WHALE_TRACKER.md) | ✅ Live |
-| VIZNAGO WHALE — Intelligence Agent | [WHALE_INTELLIGENCE_AGENT.md](WHALE_INTELLIGENCE_AGENT.md) | 🔲 Planned |
+| VIZNIAGO WHALE — Tracker | [WHALE_TRACKER.md](WHALE_TRACKER.md) | ✅ Live |
+| VIZNIAGO WHALE — Intelligence Agent | [WHALE_INTELLIGENCE_AGENT.md](WHALE_INTELLIGENCE_AGENT.md) | 🔲 Planned |
 | FURY RSI Bot + Backtest | [RSI_AI_STRATEGY_RESEARCH.md](RSI_AI_STRATEGY_RESEARCH.md) | ✅ Live (ETH) |
 
 ---
@@ -724,13 +761,16 @@ Migration is low-friction:
 - [ ] Confirm Pro plan price: $79 USDC/mo
 - [ ] Free plan: monitor-only dashboard OR 7-day trial with 1 active bot?
 
-**Blocking Step 9 (Telegram):**
-- [ ] Create `@ViznagoFuryBot` via Telegram `@BotFather` → store `TELEGRAM_BOT_TOKEN` in `.env`
-- [ ] Confirm two-way commands scope for Pro plan (`/status`, `/stop` — see Section 9.5)
+**Step 9 (Telegram) — remaining:**
+- [x] Create `@vizniago_bot` via Telegram `@BotFather` → token stored in `api/.env`
+- [x] `api/telegram_alerts.py` — alert dispatcher built
+- [x] `api/routers/telegram.py` — webhook + commands built
+- [x] `BotManager._handle_event()` hooked
+- [ ] Restart API service + register webhook URL (see Section 9.7)
+- [ ] Add "Link Telegram" widget to dashboard (show `/start 0x...` instructions)
 
 **Infrastructure (pre-alpha):**
 - [ ] Create dedicated `viznago` Linux system user (API currently runs as root — security risk)
-- [ ] Configure Telegram webhook URL in production (`POST /telegram/webhook`)
 
 ---
 
@@ -838,7 +878,7 @@ immutable, timestamped on-chain transaction. No PDF needed for most users.
 
 **Receipt format (no KYC required):**
 ```
-VIZNAGO — Subscription Receipt
+VIZNIAGO — Subscription Receipt
 Plan:        Starter ($29 USDC/mo)
 Period:      Apr 2 – May 2, 2026
 NFT Key ID:  #42
@@ -962,4 +1002,4 @@ Clickable wallet corner button (navbar top-right) opens a dropdown showing full 
 
 ---
 
-*VIZNAGO FURY — Bootcamp Cripto 2026 · LP + Perps Hedge Strategy*
+*VIZNIAGO FURY — Bootcamp Cripto 2026 · LP + Perps Hedge Strategy*

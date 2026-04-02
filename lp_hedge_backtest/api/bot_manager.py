@@ -48,6 +48,9 @@ _EVENT_MAP = {
     "whale_flip":           "whale_flip",
     "whale_snapshot":       "whale_snapshot",
     "whale_event":          "whale_event",
+    # LP safety events
+    "lp_removed":           "lp_removed",
+    "lp_burned":            "lp_burned",
 }
 
 
@@ -245,6 +248,9 @@ class BotManager:
             "details": details,
             "ts":      datetime.now(timezone.utc).isoformat(),
         })
+        # Telegram alert — non-blocking, fire-and-forget
+        from api.telegram_alerts import send_alert
+        asyncio.create_task(send_alert(config_id, event_type, price, pnl, details))
 
     # ── DB helpers ────────────────────────────────────────────────────────
 
