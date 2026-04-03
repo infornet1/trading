@@ -73,6 +73,36 @@ by bot code. This means they execute even if the bot process is down.
 
 ---
 
+## Audio Transcript Findings (4.1 / 6.1 / 8.1)
+
+### 4.1 — Buffer Capital bidirectional logic (Jaime)
+- +50% buffer is their **tested and audited default** — not just a setting, it's the recommended config
+- Key insight: **deactivate "no proteger desde arriba"** so the bot opens a SHORT when price breaks ABOVE the range too
+- With +50% extra capital, that SHORT protection is extra strong — covers commissions of failed opens and gains
+
+### 6.1 — Backtesting as acquisition tool (Raul)
+- Historical data loaded: **Q1 2026 + all 2025 + 2024** in daily candles
+- Backtester variables include: leverage, capital per bot, Stop Plus, and **monthly reinvestment %**
+- Raul personally uses **50% reinvest / 50% withdraws** — offered as educational reference
+- **Available to ALL users including free tier** — explicit acquisition/lead strategy
+
+### 8.1 — Catador (Insider) bot TP ladder (Raul)
+- **Breakeven trigger configurable**: default 1% gain → SL moves to breakeven. User can raise the threshold.
+- **Escalonado TPs**: range divided into 4 equal quarters, default 25% close at each quarter
+- Fully configurable: e.g. 25% close at 50% range, rest at 75%, 100% — user manages risk
+- Closes at 75% of range (not 100%) as a valid aggressive-conservative middle ground
+
+### New gaps identified from audio
+| Gap | DeFi Suite | VIZNIAGO | Priority |
+|---|---|---|---|
+| Upper + lower trigger both visible in bot card | ✅ Both shown | ❌ Lower only | 🔴 High |
+| Monthly reinvestment % in backtester | ✅ | ❌ | 🟡 Medium |
+| +50% buffer as default (not user-set) | ✅ Audited default | Manual input | 🟡 Medium |
+| Backtester open to free users | ✅ | Check current | 🟡 Medium |
+| Catador breakeven % (configurable threshold) | ✅ 1% default | Check | 🟡 Medium |
+
+---
+
 ## Gap Analysis: VIZNIAGO vs DeFi Suite
 
 | Feature | DeFi Suite | VIZNIAGO | Priority |
@@ -80,11 +110,16 @@ by bot code. This means they execute even if the bot process is down.
 | Fee projections (daily/weekly/monthly/annual) | ✅ | ❌ | 🔴 High |
 | APR + Fee APR in position header | ✅ | ❌ | 🔴 High |
 | Distance to trigger % | ✅ | ❌ | 🔴 High |
+| Both triggers (upper + lower) in bot card | ✅ | ❌ Lower only | 🔴 High |
 | HL balance in protection modal | ✅ | Wallet dropdown only | 🔴 High |
 | IL vs Fees P&L split | ✅ | ❌ | 🟡 Medium |
 | Buffer Capital pill selector | ✅ | Slider only | 🟡 Medium |
+| +50% buffer as tested default | ✅ Audited | Manual | 🟡 Medium |
 | Integrated backtesting | ✅ in platform | Separate page | 🟡 Medium |
-| Staged TP (Escalonado) | ✅ | ❌ | 🟡 Medium |
+| Monthly reinvestment % in backtester | ✅ | ❌ | 🟡 Medium |
+| Backtester open to free tier | ✅ | Check | 🟡 Medium |
+| Catador escalonado TP ladder | ✅ | ❌ | 🟡 Medium |
+| Configurable breakeven % threshold | ✅ 1% default | Check | 🟡 Medium |
 | TPs/SLs as real HL orders | ✅ | ❌ Code-evaluated | 🔴 Resilience risk |
 | Auto-reactivation after balance SL | ✅ < 5 min | Partial (AUTO_REARM) | 🟡 Medium |
 | Orphan order cleanup | ✅ | Needs verification | 🟡 Medium |
@@ -105,7 +140,7 @@ by bot code. This means they execute even if the bot process is down.
 |---|---|---|---|
 | M2-1 | Fee projections on position card (daily/weekly/monthly/annual) | Low | Most compelling investor metric — shows yield potential at a glance |
 | M2-2 | APR + Fee APR in position card header | Low | They see value immediately, no scrolling needed |
-| M2-3 | Distance to trigger % in active bot card | Low | "How close is the bot to firing?" — answered instantly |
+| M2-3 | Distance to trigger % + show BOTH upper and lower triggers in active bot card | Low | "How close is the bot to firing?" — both directions; they show upper+lower |
 | M2-4 | HL balance shown inside protection config modal | Low | Direct investor meeting 1 feedback, they already have it |
 
 ### TIER 2 — UX parity + important improvements
