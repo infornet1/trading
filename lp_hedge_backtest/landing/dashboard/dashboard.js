@@ -1936,16 +1936,23 @@ function buildProtectionDrawer(pos) {
               <input type="radio" name="prot-mode-${tokenId}" value="aragan"
                      ${modeVal === 'aragan' ? 'checked' : ''}
                      onchange="onModeChange('${tokenId}', this)" />
-              ${t('prot.mode.aragan')}
+              <span class="prot-mode-text">
+                <span class="prot-mode-name">${t('prot.mode.aragan')}</span>
+                <span class="prot-mode-desc">${t('prot.mode.aragan.desc')}</span>
+              </span>
             </label>
             <label class="prot-mode-opt ${!isBTC && modeVal === 'avaro' ? 'prot-mode-opt--active' : ''} ${isBTC ? 'prot-mode-opt--disabled' : ''}">
               <input type="radio" name="prot-mode-${tokenId}" value="avaro"
                      ${!isBTC && modeVal === 'avaro' ? 'checked' : ''}
                      ${isBTC ? 'disabled' : ''}
                      onchange="onModeChange('${tokenId}', this)" />
-              ${t('prot.mode.avaro')}
+              <span class="prot-mode-text">
+                <span class="prot-mode-name">${t('prot.mode.avaro')}</span>
+                <span class="prot-mode-desc">${t('prot.mode.avaro.desc')}</span>
+              </span>
             </label>
           </div>
+          <p class="prot-mode-neutral-note">${t('prot.mode.neutral.note')}</p>
         </div>
 
         <!-- Capital por Operación -->
