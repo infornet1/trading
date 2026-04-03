@@ -94,6 +94,7 @@ const STABLES = new Set(['USDC', 'USDC.e', 'USDT', 'DAI']);
 const NFPM_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
   'function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)',
+  'function ownerOf(uint256 tokenId) view returns (address)',
   'function positions(uint256 tokenId) view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)',
 ];
 
@@ -116,6 +117,7 @@ const state = {
   refreshTimer:    null,
   refreshInterval: parseInt(localStorage.getItem('vf_refresh_interval') || '0', 10), // ms; 0 = off
   watchMode:  false,     // true = read-only address watch, no wallet connected
+  watchNftId: null,      // NFT token ID used to initiate watch (null = wallet search)
   activeTab:  'active',  // 'active' | 'history'
 };
 
@@ -217,8 +219,9 @@ window.disconnectWallet = function () {
   state.chainId   = null;
   state.provider  = null;
   state.positions = [];
-  state.watchMode = false;
-  state.activeTab = 'active';
+  state.watchMode  = false;
+  state.watchNftId = null;
+  state.activeTab  = 'active';
   // Close bot WebSockets on disconnect
   for (const ws of Object.values(saas.sockets)) {
     try { ws.close(); } catch (_) {}
@@ -247,6 +250,12 @@ window.setTab = function (tab) {
 // ── Watch Address (read-only) ─────────────────────────────────────────────
 
 window.startWatchMode = async function () {
+  // Branch to NFT search if that mode is active
+  const nftRow = document.getElementById('watch-nft-row');
+  if (nftRow && !nftRow.classList.contains('hidden')) {
+    return startNftSearchMode();
+  }
+
   const input   = document.getElementById('watch-addr-input');
   const rawAddr = (input?.value || '').trim();
   if (!rawAddr) return;
@@ -256,12 +265,11 @@ window.startWatchMode = async function () {
     return;
   }
 
-  const addr    = ethers.getAddress(rawAddr); // normalise to checksum form
+  const addr    = ethers.getAddress(rawAddr);
   const chainId = parseInt(document.getElementById('watch-chain-select').value, 10);
   if (!CHAINS[chainId]) return;
 
-  // Disable Watch button while probing RPCs
-  const watchBtn  = document.querySelector('.watch-card .btn');
+  const watchBtn  = document.querySelector('.watch-card .btn-active');
   const watchSpan = watchBtn?.querySelector('span');
   if (watchBtn)  { watchBtn.disabled = true; watchBtn.style.opacity = '0.6'; }
   if (watchSpan) { watchSpan.textContent = '…'; }
@@ -276,25 +284,91 @@ window.startWatchMode = async function () {
     return;
   }
 
-  // Restore button before navigating away from connect prompt
   if (watchBtn)  { watchBtn.disabled = false; watchBtn.style.opacity = ''; }
   if (watchSpan) { watchSpan.textContent = window.t ? window.t('dash.watch.btn') : 'Watch'; }
 
-  state.watchMode = true;
-  state.address   = addr;
-  state.chainId   = chainId;
-  state.provider  = provider;
+  state.watchMode  = true;
+  state.watchNftId = null;
+  state.address    = addr;
+  state.chainId    = chainId;
+  state.provider   = provider;
 
   hide('connect-prompt');
   show('dashboard-content');
   updateWalletBar();
   updateChainPills();
-
   fetchLivePrices();
   fetchPositions();
-
   applyRefreshInterval();
   renderRefreshControl();
+};
+
+async function startNftSearchMode() {
+  const input   = document.getElementById('watch-nft-input');
+  const rawId   = (input?.value || '').trim().replace(/^#/, '');
+  if (!rawId || isNaN(rawId) || rawId === '') {
+    showError('Ingresa un token ID válido (número entero)');
+    return;
+  }
+
+  const chainId = parseInt(document.getElementById('watch-nft-chain-select').value, 10);
+  if (!CHAINS[chainId]) return;
+
+  const watchBtn  = document.querySelector('#watch-nft-row .btn');
+  const watchSpan = watchBtn?.querySelector('span');
+  if (watchBtn)  { watchBtn.disabled = true; watchBtn.style.opacity = '0.6'; }
+  if (watchSpan) { watchSpan.textContent = '…'; }
+
+  let provider;
+  try {
+    provider = await makeWatchProvider(chainId);
+  } catch (e) {
+    showError(e.message);
+    if (watchBtn)  { watchBtn.disabled = false; watchBtn.style.opacity = ''; }
+    if (watchSpan) { watchSpan.textContent = window.t ? window.t('dash.watch.btn') : 'Watch'; }
+    return;
+  }
+
+  let owner;
+  try {
+    const nfpm = new ethers.Contract(CHAINS[chainId].nfpmAddr, NFPM_ABI, provider);
+    owner = await nfpm.ownerOf(BigInt(rawId));
+  } catch (e) {
+    showError('NFT no encontrado en esta red. Verifica el ID y la red seleccionada.');
+    if (watchBtn)  { watchBtn.disabled = false; watchBtn.style.opacity = ''; }
+    if (watchSpan) { watchSpan.textContent = window.t ? window.t('dash.watch.btn') : 'Watch'; }
+    return;
+  }
+
+  if (watchBtn)  { watchBtn.disabled = false; watchBtn.style.opacity = ''; }
+  if (watchSpan) { watchSpan.textContent = window.t ? window.t('dash.watch.btn') : 'Watch'; }
+
+  state.watchMode  = true;
+  state.watchNftId = rawId;
+  state.address    = owner;
+  state.chainId    = chainId;
+  state.provider   = provider;
+
+  hide('connect-prompt');
+  show('dashboard-content');
+  updateWalletBar();
+  updateChainPills();
+  fetchLivePrices();
+  fetchPositions();
+  applyRefreshInterval();
+  renderRefreshControl();
+}
+
+window.switchWatchMode = function (mode) {
+  const walletRow = document.getElementById('watch-wallet-row');
+  const nftRow    = document.getElementById('watch-nft-row');
+  const nftNote   = document.getElementById('watch-nft-note');
+  document.querySelectorAll('.watch-mode-pill').forEach(p =>
+    p.classList.toggle('watch-mode-pill--active', p.dataset.mode === mode)
+  );
+  walletRow?.classList.toggle('hidden', mode !== 'wallet');
+  nftRow?.classList.toggle('hidden', mode !== 'nft');
+  nftNote?.classList.toggle('hidden', mode !== 'nft');
 };
 
 window.refreshAll = async function () {
@@ -638,7 +712,9 @@ function updateWalletBar() {
   if (watchBanner) {
     watchBanner.classList.toggle('hidden', !state.watchMode);
     const addrEl = document.getElementById('watch-mode-addr');
-    if (addrEl) addrEl.textContent = truncateAddr(state.address);
+    if (addrEl) addrEl.textContent = state.watchNftId
+      ? `NFT #${state.watchNftId} · ${truncateAddr(state.address)}`
+      : truncateAddr(state.address);
   }
 
   // Chain badge in navbar

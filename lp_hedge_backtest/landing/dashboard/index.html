@@ -165,11 +165,21 @@
 
         <!-- ── Watch Address (read-only) ──────────────────── -->
         <div class="watch-divider">
-          <span data-i18n="dash.watch.or">o ver una dirección</span>
+          <span data-i18n="dash.watch.or">o explorar posiciones LP</span>
         </div>
 
         <div class="watch-card">
-          <div class="watch-form">
+
+          <!-- Mode toggle pills -->
+          <div class="watch-mode-pills">
+            <button class="watch-mode-pill watch-mode-pill--active" data-mode="wallet"
+                    onclick="switchWatchMode('wallet')">Por Wallet</button>
+            <button class="watch-mode-pill" data-mode="nft"
+                    onclick="switchWatchMode('nft')">NFT ID</button>
+          </div>
+
+          <!-- Wallet address form (default) -->
+          <div class="watch-form" id="watch-wallet-row">
             <div class="watch-input-wrapper">
               <span class="watch-input-prefix">0x</span>
               <input type="text" id="watch-addr-input" class="watch-input"
@@ -182,10 +192,34 @@
               <option value="1">Ethereum</option>
               <option value="8453">Base</option>
             </select>
+            <button class="btn btn-outline btn-sm btn-active" onclick="startWatchMode()">
+              &#128065;&nbsp;<span data-i18n="dash.watch.btn">Ver</span>
+            </button>
+          </div>
+
+          <!-- NFT ID form (hidden by default) -->
+          <div class="watch-form hidden" id="watch-nft-row">
+            <div class="watch-input-wrapper">
+              <span class="watch-input-prefix watch-input-prefix--nft">#</span>
+              <input type="text" id="watch-nft-input" class="watch-input"
+                     placeholder="Token ID  ej. 847291"
+                     autocomplete="off" spellcheck="false" inputmode="numeric" />
+            </div>
+            <select id="watch-nft-chain-select" class="watch-chain-select">
+              <option value="42161">Arbitrum</option>
+              <option value="1">Ethereum</option>
+              <option value="8453">Base</option>
+            </select>
             <button class="btn btn-outline btn-sm" onclick="startWatchMode()">
               &#128065;&nbsp;<span data-i18n="dash.watch.btn">Ver</span>
             </button>
           </div>
+
+          <!-- NFT note — only visible in NFT mode -->
+          <p class="watch-nft-note hidden" id="watch-nft-note">
+            &#8505; Uniswap&nbsp;v3 únicamente &mdash; otros protocolos LP usarán búsqueda por wallet
+          </p>
+
           <p class="watch-hint" data-i18n="dash.watch.hint">Solo lectura — sin conexión de billetera</p>
         </div>
 

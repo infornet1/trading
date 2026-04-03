@@ -997,6 +997,62 @@
   white-space: nowrap;
 }
 
+/* Mode toggle pills */
+.watch-mode-pills {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.watch-mode-pill {
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.watch-mode-pill:hover {
+  border-color: rgba(0, 212, 255, 0.3);
+  color: var(--color-text-secondary);
+}
+
+.watch-mode-pill--active {
+  border-color: rgba(0, 212, 255, 0.5);
+  background: rgba(0, 212, 255, 0.08);
+  color: var(--color-neon-cyan);
+}
+
+/* NFT prefix — muted gold instead of cyan (distinct from wallet 0x) */
+.watch-input-prefix--nft {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: var(--color-border);
+  color: #f59e0b;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+.watch-input-wrapper:focus-within .watch-input-prefix--nft {
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fbbf24;
+}
+
+/* NFT-only info note */
+.watch-nft-note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin-top: 8px;
+  margin-bottom: 0;
+  opacity: 0.75;
+  font-style: italic;
+}
+
 /* Card wrapper */
 .watch-card {
   width: 100%;
