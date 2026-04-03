@@ -1991,16 +1991,18 @@ function buildProtectionDrawer(pos) {
                   Cuando el precio cae a tu límite inferior, tu LP pasa a ser 100% ETH (IL máximo).
                   El bot abre un short equivalente a este porcentaje de ese ETH para compensar.<br><br>
                   <span style="color:#00d4ff">50%</span> → mitad cubierta, menor costo de margen.<br>
-                  <span style="color:#00d4ff">100%</span> → cobertura total, mayor margen requerido.
+                  <span style="color:#00d4ff">100%</span> → cobertura total, delta neutral.<br>
+                  <span style="color:#f59e0b">&gt;100%</span> → <strong>Modo Ofensivo</strong>: short mayor que la LP. Ganas más que lo que pierde la LP en bajadas — apuesta direccional.
                 </span>
               </span>
             </span>
             <span class="tp-slider-value" id="tp-hedge-val-${tokenId}">${hedgeVal}%</span>
           </div>
           <input type="range" class="tp-slider" id="prot-hedge-${tokenId}"
-                 min="10" max="100" step="5" value="${hedgeVal}"
+                 min="10" max="200" step="5" value="${hedgeVal}"
                  oninput="onTradingPanelChange('${tokenId}')" />
-          <div class="tp-slider-range-labels"><span>10%</span><span>100%</span></div>
+          <div class="tp-slider-range-labels"><span>10%</span><span>100% neutral</span><span>200% ofensivo</span></div>
+          <div id="tp-offensive-warn-${tokenId}" class="tp-offensive-warn hidden"></div>
           <div class="tp-hedge-sublabel" id="tp-hedge-sub-${tokenId}">calculando…</div>
         </div>
 
@@ -2400,7 +2402,20 @@ window.onTradingPanelChange = function (tokenId) {
 
   if (lev && levValEl) levValEl.textContent = `${lev.value}x`;
   if (buf && bufValEl) bufValEl.textContent = `${parseFloat(buf.value).toFixed(1)}%`;
-  if (hdg && hdgValEl) hdgValEl.textContent = `${hdg.value}%`;
+  if (hdg && hdgValEl) {
+    const hVal = parseInt(hdg.value, 10);
+    const isOffensive = hVal > 100;
+    hdgValEl.textContent = isOffensive ? `${hVal}% ⚡` : `${hVal}%`;
+    hdgValEl.style.color = isOffensive ? '#f59e0b' : '';
+    hdg.classList.toggle('tp-slider--offensive', isOffensive);
+    const warnEl = document.getElementById(`tp-offensive-warn-${tokenId}`);
+    if (warnEl) {
+      warnEl.textContent = isOffensive
+        ? `⚡ Modo Ofensivo — short mayor que la LP. Ganas en bajadas más allá del IL, pero asumes riesgo direccional. No es cobertura pura.`
+        : '';
+      warnEl.classList.toggle('hidden', !isOffensive);
+    }
+  }
 
   // Recalculate margin box using cached pos from state
   const pos = state.positions?.find(p => p.tokenId === tokenId);
