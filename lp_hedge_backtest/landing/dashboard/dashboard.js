@@ -2086,9 +2086,32 @@ function buildProtectionDrawer(pos) {
         </div>
         <div class="prot-field" style="margin-bottom:4px">
           <label class="prot-label prot-label--warning">${t('prot.wallet.label')}</label>
-          <input type="text" class="prot-input prot-input-full"
-                 id="prot-wallet-${tokenId}" value="${hlWallet}"
-                 placeholder="${t('prot.wallet.placeholder')}" />
+          ${(() => {
+            const knownWallets = [...new Set(
+              Object.values(saas.bots)
+                .map(b => b.hl_wallet_addr)
+                .filter(w => w && w.length > 0)
+            )];
+            if (knownWallets.length > 0) {
+              const options = knownWallets.map(w =>
+                `<option value="${w}" ${w === hlWallet ? 'selected' : ''}>${w.slice(0,8)}…${w.slice(-6)}</option>`
+              ).join('');
+              return `
+                <select class="prot-input prot-input-full prot-wallet-select"
+                        id="prot-wallet-select-${tokenId}"
+                        onchange="onWalletSelectChange('${tokenId}')">
+                  <option value="">— ${t('prot.wallet.new')} —</option>
+                  ${options}
+                </select>
+                <input type="text" class="prot-input prot-input-full"
+                       id="prot-wallet-${tokenId}" value="${hlWallet}"
+                       placeholder="${t('prot.wallet.placeholder')}"
+                       style="${hlWallet ? 'display:none' : ''}" />`;
+            }
+            return `<input type="text" class="prot-input prot-input-full"
+                           id="prot-wallet-${tokenId}" value="${hlWallet}"
+                           placeholder="${t('prot.wallet.placeholder')}" />`;
+          })()}
         </div>
 
         <button class="btn btn-primary btn-sm prot-btn-full"
@@ -2145,6 +2168,27 @@ window.onModeChange = function (tokenId, radio) {
     const input = label.querySelector('input[type="radio"]');
     label.classList.toggle('prot-mode-opt--active', !!input?.checked);
   });
+};
+
+// ── Wallet dropdown handler ───────────────────────────────────────────────
+window.onWalletSelectChange = function (tokenId) {
+  const sel      = document.getElementById(`prot-wallet-select-${tokenId}`);
+  const input    = document.getElementById(`prot-wallet-${tokenId}`);
+  const apkeyEl  = document.getElementById(`prot-apikey-${tokenId}`);
+  if (!sel || !input) return;
+  if (sel.value) {
+    // Known wallet selected — fill hidden input, hint that API key is saved
+    input.value = sel.value;
+    input.style.display = 'none';
+    if (apkeyEl && !apkeyEl.placeholder.includes('keep')) {
+      apkeyEl.placeholder = t('prot.apikey.keepcurrent');
+    }
+  } else {
+    // "Enter new" selected — show text input for manual entry
+    input.value = '';
+    input.style.display = '';
+    input.focus();
+  }
 };
 
 // ── Activate bot ──────────────────────────────────────────────────────────
