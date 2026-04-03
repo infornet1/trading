@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIZNIAGO — Whale Tracker</title>
+  <link rel="icon" href="../assets/vizniago-logo.jpeg" type="image/jpeg" />
+  <meta name="description" content="Monitor top Hyperliquid traders in real-time. Detect large position opens, closes, and side flips." />
+  <link rel="stylesheet" href="../global.css" />
+  <link rel="stylesheet" href="whale.css" />
+</head>
+<body>
+
+  <!-- ============================================================
+       NAVBAR
+  ============================================================ -->
+  <nav class="navbar">
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/vizniago-logo.jpeg" alt="VIZNIAGO" class="navbar-logo" />
+    </a>
+
+    <div class="navbar-links" id="navbar-links">
+      <div class="nav-item nav-dd-wrap">
+        <button class="nav-link nav-dd-btn">
+          DeFi <span class="nav-caret">▾</span>
+        </button>
+        <div class="nav-dd-menu">
+          <a href="../dashboard/index.html" class="nav-dd-item">
+            <span class="nav-dd-icon">📊</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">Dashboard</span>
+              <span class="nav-dd-sub">Bots LP en vivo</span>
+            </div>
+          </a>
+          <div class="nav-dd-item nav-dd-item--soon">
+            <span class="nav-dd-icon">⚡</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">FURY Perps</span>
+              <span class="nav-dd-sub">Próximamente</span>
+            </div>
+            <span class="nav-soon-tag">Soon</span>
+          </div>
+          <a href="index.html" class="nav-dd-item nav-dd-item--active">
+            <span class="nav-dd-icon">🐋</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">Whale Tracker</span>
+              <span class="nav-dd-sub">Señales en tiempo real</span>
+            </div>
+          </a>
+        </div>
+      </div>
+      <a href="../index.html#bot-explainer" class="nav-link">Docs</a>
+      <a href="https://t.me/vizniago_bot" class="nav-link nav-link--tg" target="_blank">@vizniago_bot</a>
+    </div>
+
+    <div class="navbar-right">
+      <div class="lang-toggle">
+        <button class="lang-btn active" id="lang-es" onclick="setLang('es')">ES</button>
+        <button class="lang-btn" id="lang-en" onclick="setLang('en')">EN</button>
+      </div>
+      <!-- Wallet connect -->
+      <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()">
+        🟢&nbsp; Conectar Wallet
+      </button>
+      <span id="wallet-chip" class="wallet-chip hidden"></span>
+      <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu" onclick="toggleMobileNav()">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO HEADER
+  ============================================================ -->
+  <div class="whale-hero">
+    <div class="whale-hero-icon">🐋</div>
+    <h1 class="whale-hero-title">Whale Tracker</h1>
+    <p class="whale-hero-sub">
+      Monitorea los top traders de Hyperliquid en tiempo real.
+      Detecta aperturas, cierres y side flips de posiciones grandes.
+    </p>
+  </div>
+
+  <!-- ============================================================
+       MAIN CONTENT
+  ============================================================ -->
+  <main class="whale-main">
+    <div class="container">
+
+      <!-- Error banner -->
+      <div id="error-banner" class="alert alert-error hidden"></div>
+
+      <!-- Auth banner (shown when not signed in) -->
+      <div id="auth-banner" class="alert alert-info hidden">
+        <span>🔒 Conecta tu wallet para gestionar bots de whale tracking.</span>
+        <button class="btn btn-sm" style="margin-left:12px" onclick="connectWallet()">Conectar</button>
+      </div>
+
+      <!-- Stats bar -->
+      <div class="wt-stats-bar" id="wt-stats-bar">
+        <div class="wt-stat">
+          <div class="wt-stat-value" id="stat-signals-today">—</div>
+          <div class="wt-stat-label">Señales hoy</div>
+        </div>
+        <div class="wt-stat">
+          <div class="wt-stat-value" id="stat-active-trackers">—</div>
+          <div class="wt-stat-label">Trackers activos</div>
+        </div>
+        <div class="wt-stat">
+          <div class="wt-stat-value" id="stat-whales-watched">—</div>
+          <div class="wt-stat-label">Whales monitoreados</div>
+        </div>
+        <div class="wt-stat">
+          <div class="wt-stat-value" id="stat-last-signal">—</div>
+          <div class="wt-stat-label">Última señal</div>
+        </div>
+      </div>
+
+      <!-- Live signals feed -->
+      <section class="wt-section">
+        <div class="wt-section-header">
+          <div class="wt-section-title">📡 Señales en Vivo</div>
+          <div class="wt-section-meta" id="signals-updated">Actualizando…</div>
+        </div>
+        <div id="signals-feed" class="signals-feed">
+          <div class="wt-empty">
+            <div class="wt-empty-icon">🌊</div>
+            <p>Sin señales aún — el tracker está sondeando…</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- My trackers (requires auth) -->
+      <section class="wt-section" id="my-trackers-section">
+        <div class="wt-section-header">
+          <div class="wt-section-title">⚙️ Mis Trackers</div>
+          <span id="my-trackers-auth-hint" class="wt-auth-hint">Conecta wallet para gestionar</span>
+        </div>
+        <div id="my-trackers-list"></div>
+      </section>
+
+      <!-- Launch new tracker -->
+      <section class="wt-section" id="launch-section">
+        <div class="wt-section-header">
+          <div class="wt-section-title">🚀 Nuevo Tracker</div>
+        </div>
+
+        <div id="launch-form-wrap" class="wt-launch-form">
+          <!-- Overlay when not authed -->
+          <div id="launch-overlay" class="wt-overlay">
+            <span>🔒 Conecta tu wallet para lanzar un tracker</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+            <div class="wt-field">
+              <label class="wt-label">
+                Leaderboard Top N
+                <span class="wt-info" tabindex="0">❓
+                  <span class="wt-popover">Número de top traders de HL (por PnL) a monitorear. <span style="color:#00d4ff">30–50 es un buen balance.</span></span>
+                </span>
+              </label>
+              <input type="number" class="wt-input" id="whale-top-n" min="5" max="100" step="5" value="30" />
+            </div>
+
+            <div class="wt-field">
+              <label class="wt-label">
+                Min Notional (USD)
+                <span class="wt-info" tabindex="0">❓
+                  <span class="wt-popover">Solo emite señales para posiciones superiores a este valor. <span style="color:#00d4ff">$50K–$100K filtra traders pequeños.</span></span>
+                </span>
+              </label>
+              <input type="number" class="wt-input" id="whale-min-notional" min="10000" max="10000000" step="10000" value="100000" />
+            </div>
+
+            <div class="wt-field">
+              <label class="wt-label">Poll Interval (seg)</label>
+              <input type="number" class="wt-input" id="whale-poll-interval" min="10" max="300" step="5" value="30" />
+            </div>
+
+            <div class="wt-field">
+              <label class="wt-label">
+                Watch Assets
+                <span class="wt-info" tabindex="0">❓
+                  <span class="wt-popover">Lista separada por comas, ej. <strong>BTC,ETH</strong>. Vacío = todos los activos.</span>
+                </span>
+              </label>
+              <input type="text" class="wt-input" id="whale-watch-assets" placeholder="BTC,ETH (vacío = todos)" />
+            </div>
+
+          </div>
+
+          <div class="wt-field" style="margin-top:10px">
+            <label class="wt-label">
+              Addresses Personalizadas (opcional)
+              <span class="wt-info" tabindex="0">❓
+                <span class="wt-popover">Addresses 0x separadas por comas, adicionales al leaderboard. Útil para wallets whale conocidas.</span>
+              </span>
+            </label>
+            <input type="text" class="wt-input" id="whale-custom-addresses" placeholder="0xABC..., 0xDEF... (opcional)" />
+          </div>
+
+          <div style="display:flex;gap:16px;margin-top:12px;align-items:center;flex-wrap:wrap">
+            <label class="wt-checkbox-label">
+              <input type="checkbox" id="whale-use-ws" />
+              <span>
+                Modo WebSocket
+                <span class="wt-info" tabindex="0">❓
+                  <span class="wt-popover wt-popover--left"><strong>WebSocket</strong>: ~100–500ms latencia por fill. Ideal para copy-trading.<br><br><strong>Poll mode</strong>: snapshots cada N segundos. Más simple.</span>
+                </span>
+              </span>
+            </label>
+            <label class="wt-checkbox-label">
+              <input type="checkbox" id="whale-paper-trade" checked />
+              <span style="color:#f59e0b">📋 Solo lectura / Paper mode</span>
+            </label>
+          </div>
+
+          <button class="btn wt-launch-btn" id="whale-launch-btn" onclick="launchWhaleBot()">
+            🐋&nbsp; Launch Whale Tracker
+          </button>
+          <p id="whale-launch-error" class="wt-error-msg"></p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ============================================================
+       FOOTER
+  ============================================================ -->
+  <hr class="divider" />
+  <footer>
+    <div class="footer">
+      <img src="../assets/vizniago-logo.jpeg" alt="VIZNIAGO" class="footer-logo" />
+      <span class="footer-text">Whale Tracker — VIZNIAGO © 2026</span>
+      <div class="footer-links">
+        <a href="../dashboard/index.html" class="footer-link">LP Dashboard</a>
+        <a href="../index.html" class="footer-link">Backtester</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       SCRIPTS
+  ============================================================ -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <script src="whale.js"></script>
+  <script src="../chat-widget.js"></script>
+  <script>
+    function toggleMobileNav() {
+      const links = document.getElementById('navbar-links');
+      const btn   = document.getElementById('navbar-hamburger');
+      links.classList.toggle('open');
+      btn.classList.toggle('open');
+    }
+    document.addEventListener('click', function (e) {
+      const btn = document.getElementById('navbar-hamburger');
+      const nav = document.querySelector('.navbar');
+      if (btn && nav && !nav.contains(e.target)) {
+        document.getElementById('navbar-links').classList.remove('open');
+        btn.classList.remove('open');
+      }
+    });
+    function setLang(l) {
+      document.getElementById('lang-es').classList.toggle('active', l === 'es');
+      document.getElementById('lang-en').classList.toggle('active', l === 'en');
+    }
+  </script>
+
+</body>
+</html>

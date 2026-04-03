@@ -129,10 +129,8 @@ const saas = {
   sockets:        {},      // config_id (number) → WebSocket
   statuses:       {},      // config_id → last event payload
   logs:           {},      // config_id → array of log line strings (max 50)
-  whaleSignals:   {},      // config_id → array of last N whale signal events (mode='whale' bots)
   tgLinked:       null,    // null=unknown, false=not linked, {hint:"...1234"}=linked
 };
-const WHALE_SIGNAL_MAX = 50; // max signals to keep in memory per whale bot
 const LOG_MAX = 50;
 
 // Track which protection drawers are open (survive re-render)
@@ -1189,9 +1187,6 @@ function init() {
   // Start price ticker even before wallet connects
   fetchLivePrices();
 
-  // Load public whale signals — no wallet required
-  loadPublicWhaleSignals();
-
   // Check if wallet already authorized (no popup)
   if (window.ethereum) {
     window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {
@@ -1369,40 +1364,18 @@ async function saasLoadBots() {
           });
           renderLiveBots();
         }).catch(() => {});
-        // Seed whale signals from API for whale-mode bots
-        if (bot.mode === 'whale') {
-          apiCall('GET', `/bots/${bot.id}/whale-signals?limit=20`).then(signals => {
-            if (!Array.isArray(signals) || !signals.length) return;
-            saas.whaleSignals[bot.id] = signals;
-            renderLiveBots();
-          }).catch(() => {});
-        }
         if (!saas.sockets[bot.id]) connectBotWS(bot.id);
       }
     }
-    // Re-render positions, live bots panel, and whale section
+    // Re-render positions and live bots panel
     if (state.positions.length > 0) renderPositions();
     renderLiveBots();
-    renderWhaleSection();
     // Check Telegram link status (fire-and-forget, updates wallet dropdown)
     loadTgLinkStatus();
   } catch (err) {
     // Silently ignore — JWT may be expired (apiCall handles 401)
     console.warn('[SaaS] loadBots:', err.message);
   }
-}
-
-// ── Public whale signal loader (no auth required) ────────────────────────
-
-async function loadPublicWhaleSignals() {
-  try {
-    const signals = await fetch(API_BASE + '/bots/public-whale-signals?limit=50')
-      .then(r => r.ok ? r.json() : []);
-    if (!Array.isArray(signals) || !signals.length) return;
-    // Store under a reserved key so renderWhaleSection can pick them up
-    saas.whaleSignals['__public__'] = signals;
-    renderWhaleSection();
-  } catch (_) {}
 }
 
 // ── Live Bots Panel ───────────────────────────────────────────────────────
@@ -1468,127 +1441,8 @@ function renderLiveBots() {
         </div>`;
     }
 
-    // ── WHALE mode panel ──────────────────────────────────────────────────
-    if (bot.mode === 'whale') {
-      const isPaper   = bot.paper_trade === true;
-      const wsMode    = bot.whale_use_websocket || false;
-      const topN      = bot.whale_top_n || 50;
-      const minNotional = (bot.whale_min_notional || 50000).toLocaleString();
-      const assets    = bot.whale_watch_assets || 'All assets';
-      const modeTag   = wsMode
-        ? `<span class="status-live-tag" style="background:#00d4ff;color:#000">WS LIVE</span>`
-        : `<span class="status-live-tag" style="background:#3d6b8c;color:#e8f4ff">POLL</span>`;
-      const paperTag  = isPaper
-        ? `<span class="status-live-tag" style="background:#f59e0b;color:#000">PAPER</span>` : '';
-
-      const lastSignals = (saas.whaleSignals[bot.id] || []).slice(0, 5);
-      const signalRows  = lastSignals.length
-        ? lastSignals.map(s => {
-            const d   = s.details || s;
-            const dir = (d.side || s.side) === 'LONG'
-              ? `<span style="color:#00ffb3">▲ LONG</span>`
-              : (d.side || s.side) === 'SHORT'
-                ? `<span style="color:#ff6b6b">▼ SHORT</span>`
-                : `<span style="color:#7aaccc">—</span>`;
-            const evt      = (s.event_type || '').replace('whale_','').replace(/_/g,' ').toUpperCase();
-            const sizeUsd  = Number(d.size_usd  || s.size_usd  || 0);
-            const entryPx  = Number(d.entry_px  || 0);
-            const liqPx    = Number(d.liq_px    || 0);
-            const lev      = d.leverage    || '—';
-            const levType  = d.leverage_type ? d.leverage_type.toUpperCase() : '';
-            const margin   = Number(d.margin_used    || 0);
-            const roe      = Number(d.roe_pct        || 0);
-            const funding  = Number(d.funding_since_open || 0);
-            const rank     = d.rank;
-            const addr     = d.address || '';
-            const deltaUsd = Number(d.delta_usd || 0);
-            const levHtml  = lev !== '—'
-              ? `<span class="whale-sig-lev">${lev}x${levType ? ' <span class="whale-sig-levtype">'+levType+'</span>' : ''}</span>`
-              : '';
-            const liqHtml  = liqPx
-              ? `<span class="whale-sig-liq" title="Liq price">Liq $${liqPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>`
-              : '';
-            const marginHtml = margin
-              ? `<span class="whale-sig-margin" title="Margin used">Mrg $${margin.toLocaleString(undefined,{maximumFractionDigits:0})}</span>`
-              : '';
-            const roeHtml  = roe
-              ? `<span class="whale-sig-roe ${roe>=0?'whale-sig-roe--pos':'whale-sig-roe--neg'}" title="ROE">ROE ${roe>=0?'+':''}${roe.toFixed(1)}%</span>`
-              : '';
-            const fundingHtml = funding
-              ? `<span class="whale-sig-funding" title="Funding since open" style="color:${funding>=0?'#00ffb3':'#ff6b6b'};font-size:0.6rem">Δf ${funding>=0?'+':''}$${Math.abs(funding).toFixed(0)}</span>`
-              : '';
-            const rankHtml = rank != null
-              ? `<span class="whale-sig-rank" title="Leaderboard rank">#${rank}</span>`
-              : '';
-            const addrHtml = addr
-              ? `<span class="whale-sig-addr" title="${addr}" onclick="navigator.clipboard.writeText('${addr}')" style="cursor:pointer">${addr.slice(0,6)}…${addr.slice(-4)}</span>`
-              : '';
-            const deltaHtml = deltaUsd && Math.abs(deltaUsd) > 0
-              ? `<span class="whale-sig-delta" title="Position size change" style="color:${deltaUsd>=0?'#00ffb3':'#ff6b6b'};font-size:0.6rem">${deltaUsd>=0?'▲':'▼'}$${Math.abs(deltaUsd).toLocaleString(undefined,{maximumFractionDigits:0})}</span>`
-              : '';
-            return `<div class="whale-signal-row">
-              <div class="whale-sig-top">
-                ${rankHtml}
-                <span class="whale-sig-evt">${evt}</span>
-                <span class="whale-sig-asset">${d.asset || s.asset || '—'}</span>
-                ${dir}
-                <span class="whale-sig-size">$${sizeUsd.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
-                ${deltaHtml}
-                ${entryPx ? `<span class="whale-sig-entry" title="Entry">@ $${entryPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>` : ''}
-                <span class="whale-sig-time">${s.ts ? new Date(s.ts.replace('+00:00','Z').replace(/\+\d{2}:\d{2}$/,'Z')).toLocaleTimeString() : ''}</span>
-              </div>
-              <div class="whale-sig-meta">
-                ${levHtml}${liqHtml}${marginHtml}${roeHtml}${fundingHtml}${addrHtml}
-              </div>
-            </div>`;
-          }).join('')
-        : `<div style="color:#3d6b8c;font-size:0.75rem;padding:8px 0">${t('whale.no.signals')}</div>`;
-
-      return `
-        <div class="hedge-panel" style="margin-top:16px" id="whale-panel-${bot.id}">
-          <div class="hedge-panel-header">
-            <div class="section-label">VIZNIAGO WHALE</div>
-            <h3 class="hedge-panel-title">
-              Whale Tracker ${modeTag}${paperTag}
-            </h3>
-          </div>
-          <div class="hedge-info-grid">
-            <div class="hedge-info-card">
-              <div class="hi-label">${t('whale.leaderboard.label')}</div>
-              <div class="hi-value text-neon">Top ${topN}</div>
-              <div class="hi-sub">HL Leaderboard</div>
-            </div>
-            <div class="hedge-info-card">
-              <div class="hi-label">${t('whale.notional.label')}</div>
-              <div class="hi-value">$${minNotional}</div>
-              <div class="hi-sub">${t('whale.notional.sub')}</div>
-            </div>
-            <div class="hedge-info-card">
-              <div class="hi-label">${t('whale.assets.label')}</div>
-              <div class="hi-value" style="font-size:0.8rem">${assets}</div>
-              <div class="hi-sub">${t('whale.mode.label')}: ${wsMode ? 'WebSocket' : 'Poll'}</div>
-            </div>
-            <div class="hedge-info-card">
-              <div class="hi-label">${t('whale.last.signal')}</div>
-              <div id="live-bot-evt-${bot.id}" style="font-size:0.7rem">
-                ${lastEvt ? `${(lastEvt.event||'').replace(/whale_/,'').replace(/_/g,' ').toUpperCase()} · ${lastEvt.price ? formatPrice(lastEvt.price) : '—'}` : t('prot.status.checking')}
-              </div>
-            </div>
-          </div>
-          <div class="whale-signals-panel">
-            <div class="bot-log-header" style="display:flex;justify-content:space-between;align-items:center">
-              <span>
-                <span class="bot-log-title">&#128011; WHALE SIGNALS</span>
-                <span class="bot-log-dot"></span>
-              </span>
-              <button class="btn btn-sm" style="border-color:rgba(255,100,100,0.35);color:#ff6b6b;font-size:0.68rem;padding:2px 10px"
-                      onclick="stopWhaleBot(${bot.id})">⏹ Stop</button>
-            </div>
-            <div class="whale-signals-list" id="whale-signals-${bot.id}">${signalRows}</div>
-          </div>
-          ${buildLogTerminal(bot.id)}
-        </div>`;
-    }
+    // Whale bots are managed via the dedicated Whale Tracker page (/whale/)
+    if (bot.mode === 'whale') return '';
     // ─────────────────────────────────────────────────────────────────────
 
     const modeName  = bot.mode === 'aragan'
@@ -1702,15 +1556,6 @@ function connectBotWS(configId) {
       } else {
         // Structured event
         saas.statuses[configId] = data;
-        // Whale signals: buffer and update live feed panel
-        const evt = data.event || data.event_type || '';
-        if (evt.startsWith('whale_') && evt !== 'whale_snapshot') {
-          if (!saas.whaleSignals[configId]) saas.whaleSignals[configId] = [];
-          saas.whaleSignals[configId].unshift(data);
-          if (saas.whaleSignals[configId].length > WHALE_SIGNAL_MAX)
-            saas.whaleSignals[configId].pop();
-          updateWhaleSignalDisplay(configId, data);
-        }
         updateBotStatusDisplay(configId, data);
         updateWalletDropdown();
       }
@@ -1746,54 +1591,6 @@ function updateBotStatusDisplay(configId, data) {
   // Update live bots panel
   const panelEl = document.getElementById(`live-bot-evt-${configId}`);
   if (panelEl) panelEl.innerHTML = `${evtType} · ${price}`;
-}
-
-function updateWhaleSignalDisplay(configId, data) {
-  const list = document.getElementById(`whale-signals-${configId}`);
-  if (!list) return;
-
-  const evt     = (data.event || data.event_type || '').replace('whale_','').replace(/_/g,' ').toUpperCase();
-  const d       = data.details || {};
-  const side    = d.side    || data.side    || '—';
-  const asset   = d.asset   || data.asset   || '—';
-  const sizeUsd = Number(d.size_usd         || data.size_usd || 0);
-  const entryPx = Number(d.entry_px         || 0);
-  const liqPx   = Number(d.liq_px           || 0);
-  const lev     = d.leverage                || null;
-  const levType = d.leverage_type           || '';
-  const margin  = Number(d.margin_used      || 0);
-  const roe     = Number(d.roe_pct          || 0);
-  const funding = Number(d.funding_since_open || 0);
-  const ts      = data.ts ? new Date(data.ts).toLocaleTimeString() : '';
-
-  const dirHtml = side === 'LONG'
-    ? `<span style="color:#00ffb3">▲ LONG</span>`
-    : side === 'SHORT'
-      ? `<span style="color:#ff6b6b">▼ SHORT</span>`
-      : `<span style="color:#7aaccc">—</span>`;
-
-  const levHtml    = lev ? `<span class="whale-sig-lev">${lev}x${levType ? ' <span class="whale-sig-levtype">'+levType.toUpperCase()+'</span>' : ''}</span>` : '';
-  const liqHtml    = liqPx ? `<span class="whale-sig-liq" title="Liq price">Liq $${liqPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>` : '';
-  const marginHtml = margin ? `<span class="whale-sig-margin" title="Margin used">Mrg $${margin.toLocaleString(undefined,{maximumFractionDigits:0})}</span>` : '';
-  const roeHtml    = roe ? `<span class="whale-sig-roe ${roe>=0?'whale-sig-roe--pos':'whale-sig-roe--neg'}" title="ROE">ROE ${roe>=0?'+':''}${roe.toFixed(1)}%</span>` : '';
-  const fundingHtml = funding ? `<span class="whale-sig-funding" title="Funding since open" style="color:${funding>=0?'#00ffb3':'#ff6b6b'};font-size:0.6rem">Δf ${funding>=0?'+':''}$${Math.abs(funding).toFixed(0)}</span>` : '';
-
-  const row = document.createElement('div');
-  row.className = 'whale-signal-row whale-signal-row--new';
-  row.innerHTML = `
-    <div class="whale-sig-top">
-      <span class="whale-sig-evt">${evt}</span>
-      <span class="whale-sig-asset">${asset}</span>
-      ${dirHtml}
-      <span class="whale-sig-size">$${sizeUsd.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
-      ${entryPx ? `<span class="whale-sig-entry" title="Entry">@ $${entryPx.toLocaleString(undefined,{maximumFractionDigits:2})}</span>` : ''}
-      <span class="whale-sig-time">${ts}</span>
-    </div>
-    <div class="whale-sig-meta">${levHtml}${liqHtml}${marginHtml}${roeHtml}${fundingHtml}</div>`;
-
-  list.insertBefore(row, list.firstChild);
-  setTimeout(() => row.classList.remove('whale-signal-row--new'), 800);
-  while (list.children.length > WHALE_SIGNAL_MAX) list.removeChild(list.lastChild);
 }
 
 // ── Protection Drawer HTML builder ────────────────────────────────────────
@@ -2576,315 +2373,12 @@ async function checkMaintenanceStatus() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// WHALE TRACKER SECTION
-// Standalone section — no LP position required.
-// Renders running whale bots + a form to launch a new one.
+// WHALE TRACKER — moved to /whale/ page
 // ══════════════════════════════════════════════════════════════════════════════
 
 function renderWhaleSection() {
-  const section = document.getElementById('whale-section');
-  if (!section) return;
-  const t = window.t || (k => k);
-
-  const whaleBots = Object.values(saas.bots).filter(b => b.mode === 'whale');
-
-  // Running panels (already rendered via renderLiveBots for active bots,
-  // but we also want stopped ones visible here with a restart option)
-  const stoppedBots = whaleBots.filter(b => !b.active);
-
-  const stoppedCards = stoppedBots.map(bot => `
-    <div class="hedge-panel" style="margin-top:12px;opacity:0.7">
-      <div class="hedge-panel-header">
-        <div class="section-label" style="color:#3d6b8c">VIZNIAGO WHALE · STOPPED</div>
-        <h3 class="hedge-panel-title" style="font-size:0.85rem">
-          Top-${bot.whale_top_n || 50} · $${Number(bot.whale_min_notional||50000).toLocaleString()} min
-          <span class="badge badge--muted" style="margin-left:8px">ID ${bot.id}</span>
-        </h3>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn btn-sm" style="border-color:rgba(0,212,255,0.4);color:#00d4ff"
-                onclick="restartWhaleBot(${bot.id})">▶ Restart</button>
-        <button class="btn btn-sm" style="border-color:rgba(255,100,100,0.3);color:#ff6b6b"
-                onclick="deleteWhaleBot(${bot.id})">🗑 Delete</button>
-      </div>
-    </div>`).join('');
-
-  section.innerHTML = `
-    <div class="hedge-panel" style="margin-top:24px;border-color:rgba(0,212,255,0.2)">
-      <div class="hedge-panel-header">
-        <div class="section-label" style="color:#00d4ff">🐋 WHALE TRACKER</div>
-        <h3 class="hedge-panel-title">
-          Monitor Top Traders &amp; Copy Signals
-        </h3>
-      </div>
-
-      <p style="font-size:0.78rem;color:var(--color-text-secondary);margin:0 0 16px">
-        Tracks Hyperliquid leaderboard addresses in real-time. Detects large position opens,
-        closes, side flips, and size changes. Signals appear live in the panel above when a
-        whale bot is running.
-      </p>
-
-      ${(() => {
-        // Aggregate signals: prefer live websocket data, fall back to public endpoint
-        const allSignals = [
-          ...Object.entries(saas.whaleSignals)
-            .filter(([k]) => k !== '__public__')
-            .flatMap(([, s]) => s),
-          ...(saas.whaleSignals['__public__'] || []),
-        ].filter((s, i, arr) => {
-          // deduplicate by ts+asset+event_type
-          const key = `${s.ts}|${s.asset}|${s.event_type}`;
-          return arr.findIndex(x => `${x.ts}|${x.asset}|${x.event_type}` === key) === i;
-        }).sort((a, b) => (b.ts > a.ts ? 1 : -1)).slice(0, 20);
-
-        if (!allSignals.length) return `
-          <p style="font-size:0.75rem;color:var(--color-text-secondary);margin:0 0 16px;text-align:center;opacity:0.6">
-            No signals yet — whale tracker is polling…
-          </p>`;
-
-        const evColor = t => ({ whale_new_position:'#00d4ff', whale_closed:'#9ca3af',
-          whale_flip:'#f59e0b', whale_size_increase:'#34d399', whale_size_decrease:'#f87171' }[t] || '#9ca3af');
-        const evLabel = t => t.replace('whale_','').replace(/_/g,' ').toUpperCase();
-
-        const rows = allSignals.map(s => {
-          const side  = (s.side||'').toUpperCase();
-          const sideColor = side === 'LONG' ? '#34d399' : side === 'SHORT' ? '#f87171' : '#9ca3af';
-          const sz    = s.size_usd ? `$${Number(s.size_usd).toLocaleString('en-US',{maximumFractionDigits:0})}` : '—';
-          const delta = s.delta_usd != null
-            ? `<span style="color:${s.delta_usd>=0?'#34d399':'#f87171'}">${s.delta_usd>=0?'▲':'▼'}$${Math.abs(Number(s.delta_usd)).toLocaleString('en-US',{maximumFractionDigits:0})}</span>` : '';
-          const addr  = s.address ? `<span title="${s.address}" style="cursor:pointer;font-size:0.68rem;color:#6b7280" onclick="navigator.clipboard?.writeText('${s.address}')">${s.address.slice(0,6)}…${s.address.slice(-4)}</span>` : '';
-          const ts    = (() => { try { return new Date(s.ts.replace(/[+-]\d{2}:\d{2}$/,'')).toLocaleTimeString(); } catch(_){return s.ts||'';} })();
-          return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-            <td style="padding:5px 6px;font-size:0.7rem;color:#6b7280;white-space:nowrap">${ts}</td>
-            <td style="padding:5px 6px;font-size:0.72rem;font-weight:600;color:${evColor(s.event_type)}">${evLabel(s.event_type)}</td>
-            <td style="padding:5px 6px;font-size:0.72rem;font-weight:600">${s.asset||'—'}</td>
-            <td style="padding:5px 6px;font-size:0.72rem;color:${sideColor}">${side||'—'}</td>
-            <td style="padding:5px 6px;font-size:0.72rem;text-align:right">${sz}</td>
-            <td style="padding:5px 6px;font-size:0.72rem;text-align:right">${delta}</td>
-            <td style="padding:5px 6px">${addr}</td>
-          </tr>`;
-        }).join('');
-
-        return `<div style="overflow-x:auto;margin-bottom:16px">
-          <table style="width:100%;border-collapse:collapse;font-size:0.72rem">
-            <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
-              <th style="padding:4px 6px;text-align:left;color:#6b7280;font-weight:500;font-size:0.68rem">TIME</th>
-              <th style="padding:4px 6px;text-align:left;color:#6b7280;font-weight:500;font-size:0.68rem">EVENT</th>
-              <th style="padding:4px 6px;text-align:left;color:#6b7280;font-weight:500;font-size:0.68rem">ASSET</th>
-              <th style="padding:4px 6px;text-align:left;color:#6b7280;font-weight:500;font-size:0.68rem">SIDE</th>
-              <th style="padding:4px 6px;text-align:right;color:#6b7280;font-weight:500;font-size:0.68rem">SIZE</th>
-              <th style="padding:4px 6px;text-align:right;color:#6b7280;font-weight:500;font-size:0.68rem">DELTA</th>
-              <th style="padding:4px 6px;color:#6b7280;font-weight:500;font-size:0.68rem">WHALE</th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>`;
-      })()}
-
-      ${saas.jwt ? stoppedCards : ''}
-
-      <!-- Launch form — requires wallet auth -->
-      ${saas.jwt ? `<div id="whale-launch-form" class="prot-form" style="margin-top:${stoppedBots.length ? '20px' : '0'}">` : `
-      <div id="whale-launch-form" class="prot-form" style="margin-top:0;opacity:0.5;pointer-events:none;position:relative">
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;background:rgba(10,15,26,0.7);border-radius:8px">
-          <span style="font-size:0.8rem;color:var(--color-text-secondary)">🔒 Connect wallet to launch a tracker</span>
-        </div>
-      <div>`}
-        <div class="tp-header" style="margin-bottom:14px">
-          <div class="tp-pair">New Whale Tracker</div>
-          <div class="tp-range">Hyperliquid · Public API</div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-
-          <!-- Leaderboard Top N -->
-          <div class="prot-field">
-            <label class="prot-label">
-              Leaderboard Top N
-              <span class="tp-info-anchor" tabindex="0">❓
-                <span class="tp-info-popover">
-                  Number of top HL leaderboard traders (ranked by PnL) to monitor.
-                  <span style="color:#00d4ff">30–50 is a good balance of coverage vs API load.</span>
-                </span>
-              </span>
-            </label>
-            <input type="number" class="prot-input" id="whale-top-n"
-                   min="5" max="100" step="5" value="30"
-                   placeholder="30" />
-          </div>
-
-          <!-- Min Notional -->
-          <div class="prot-field">
-            <label class="prot-label">
-              Min Notional (USD)
-              <span class="tp-info-anchor" tabindex="0">❓
-                <span class="tp-info-popover">
-                  Only emit signals for positions above this USD size.
-                  <span style="color:#00d4ff">$50K–$100K filters out small traders.</span>
-                </span>
-              </span>
-            </label>
-            <input type="number" class="prot-input" id="whale-min-notional"
-                   min="10000" max="10000000" step="10000" value="100000"
-                   placeholder="100000" />
-          </div>
-
-          <!-- Poll Interval -->
-          <div class="prot-field">
-            <label class="prot-label">Poll Interval (sec)</label>
-            <input type="number" class="prot-input" id="whale-poll-interval"
-                   min="10" max="300" step="5" value="30"
-                   placeholder="30" />
-          </div>
-
-          <!-- Watch Assets -->
-          <div class="prot-field">
-            <label class="prot-label">
-              Watch Assets
-              <span class="tp-info-anchor" tabindex="0">❓
-                <span class="tp-info-popover">
-                  Comma-separated list, e.g. <strong>BTC,ETH</strong>.
-                  Leave blank to track all assets.
-                </span>
-              </span>
-            </label>
-            <input type="text" class="prot-input" id="whale-watch-assets"
-                   placeholder="BTC,ETH (blank = all)" />
-          </div>
-
-        </div>
-
-        <!-- Custom addresses (full width) -->
-        <div class="prot-field" style="margin-top:10px">
-          <label class="prot-label">
-            Custom Addresses (optional)
-            <span class="tp-info-anchor" tabindex="0">❓
-              <span class="tp-info-popover">
-                Comma-separated 0x addresses to monitor in addition to the leaderboard.
-                Useful for known whale wallets.
-              </span>
-            </span>
-          </label>
-          <input type="text" class="prot-input" id="whale-custom-addresses"
-                 placeholder="0xABC..., 0xDEF... (optional)" />
-        </div>
-
-        <!-- Mode: WS vs Poll + Paper trade -->
-        <div style="display:flex;gap:16px;margin-top:12px;align-items:center;flex-wrap:wrap">
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--color-text-secondary);cursor:pointer">
-            <input type="checkbox" id="whale-use-ws" />
-            <span>
-              WebSocket mode
-              <span class="tp-info-anchor" tabindex="0">❓
-                <span class="tp-info-popover tp-info-popover--left">
-                  <strong>WebSocket mode</strong>: ~100–500ms latency per whale fill.
-                  Best for copy-trading signals.<br><br>
-                  <strong>Poll mode</strong>: snapshots every N seconds. Simpler, lower resource use.
-                </span>
-              </span>
-            </span>
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--color-text-secondary);cursor:pointer">
-            <input type="checkbox" id="whale-paper-trade" checked />
-            <span style="color:#f59e0b">📋 Read-only / Paper mode</span>
-          </label>
-        </div>
-
-        <button class="btn btn-primary btn-sm prot-btn-full"
-                style="margin-top:16px;background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(0,212,255,0.05));border-color:rgba(0,212,255,0.5);color:#00d4ff"
-                id="whale-launch-btn"
-                onclick="launchWhaleBot()">
-          🐋&nbsp; Launch Whale Tracker
-        </button>
-        <p id="whale-launch-error" style="color:#ff6b6b;font-size:0.75rem;min-height:16px;margin-top:6px"></p>
-      </div>
-
-    </div>`;
+  // Whale Tracker has moved to the dedicated /whale/ page.
 }
-
-window.launchWhaleBot = async function () {
-  const btn = document.getElementById('whale-launch-btn');
-  const err = document.getElementById('whale-launch-error');
-  if (btn) { btn.disabled = true; btn.textContent = 'Launching…'; }
-  if (err) err.textContent = '';
-
-  try {
-    const topN        = parseInt(document.getElementById('whale-top-n')?.value || '30', 10);
-    const minNotional = parseFloat(document.getElementById('whale-min-notional')?.value || '100000');
-    const pollInt     = parseInt(document.getElementById('whale-poll-interval')?.value || '30', 10);
-    const watchAssets = document.getElementById('whale-watch-assets')?.value.trim() || '';
-    const customAddrs = document.getElementById('whale-custom-addresses')?.value.trim() || '';
-    const useWs       = document.getElementById('whale-use-ws')?.checked ?? false;
-    const paperTrade  = document.getElementById('whale-paper-trade')?.checked ?? true;
-
-    // Create a unique placeholder token id for this whale bot
-    const tokenId = `whale-${Date.now()}`;
-
-    const res = await apiCall('POST', '/bots', {
-      mode:                    'whale',
-      chain_id:                state.chainId || 42161,
-      nft_token_id:            tokenId,
-      pair:                    'WHALE',
-      lower_bound:             0,
-      upper_bound:             0,
-      whale_top_n:             topN,
-      whale_min_notional:      minNotional,
-      whale_poll_interval:     pollInt,
-      whale_watch_assets:      watchAssets,
-      whale_custom_addresses:  customAddrs,
-      whale_use_websocket:     useWs,
-      whale_oi_spike_threshold: 0.03,
-      paper_trade:             paperTrade,
-    });
-
-    const configId = res.id;
-
-    // Start the bot
-    await apiCall('POST', `/bots/${configId}/start`);
-
-    // Reload bots + re-render
-    await saasLoadBots();
-    connectBotWS(configId);
-
-  } catch (e) {
-    if (err) err.textContent = 'Launch failed: ' + (e.message || e);
-    if (btn) { btn.disabled = false; btn.textContent = '🐋 Launch Whale Tracker'; }
-  }
-};
-
-window.restartWhaleBot = async function (configId) {
-  try {
-    await apiCall('POST', `/bots/${configId}/start`);
-    await saasLoadBots();
-    connectBotWS(configId);
-  } catch (e) {
-    showError('Restart failed: ' + (e.message || e));
-  }
-};
-
-window.stopWhaleBot = async function (configId) {
-  try {
-    await apiCall('POST', `/bots/${configId}/stop`);
-    await saasLoadBots();
-  } catch (e) {
-    showError('Stop failed: ' + (e.message || e));
-  }
-};
-
-window.deleteWhaleBot = async function (configId) {
-  if (!confirm('Delete this whale tracker config? This cannot be undone.')) return;
-  try {
-    await apiCall('DELETE', `/bots/${configId}`);
-    // Remove from local state
-    for (const [k, b] of Object.entries(saas.bots)) {
-      if (b.id === configId) { delete saas.bots[k]; break; }
-    }
-    renderWhaleSection();
-    renderLiveBots();
-  } catch (e) {
-    showError('Delete failed: ' + (e.message || e));
-  }
-};
 
 // ── Stop bot — confirmation modal with live HL position re-query ───────────
 
