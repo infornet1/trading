@@ -2087,15 +2087,15 @@ function buildProtectionDrawer(pos) {
 
         <!-- HL Credentials -->
         <div class="prot-field">
-          <label class="prot-label prot-label--danger">${t('prot.apikey.label')}</label>
-          <input type="password" class="prot-input prot-input-full"
-                 id="prot-apikey-${tokenId}" placeholder="${apiKeyPH}" autocomplete="off" />
-        </div>
-        <div class="prot-field" style="margin-bottom:4px">
           <label class="prot-label prot-label--warning">${t('prot.wallet.label')}</label>
           <input type="text" class="prot-input prot-input-full"
                  id="prot-wallet-${tokenId}" value="${hlWallet}"
                  placeholder="${t('prot.wallet.placeholder')}" />
+        </div>
+        <div class="prot-field" style="margin-bottom:4px">
+          <label class="prot-label prot-label--danger">${t('prot.apikey.label')}</label>
+          <input type="password" class="prot-input prot-input-full"
+                 id="prot-apikey-${tokenId}" placeholder="${apiKeyPH}" autocomplete="off" />
         </div>
 
         <button class="btn btn-primary btn-sm prot-btn-full"
