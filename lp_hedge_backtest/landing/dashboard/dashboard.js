@@ -2100,20 +2100,22 @@ function buildProtectionDrawer(pos) {
                 .filter(w => w && w.length > 0)
             )];
             if (knownWallets.length > 0) {
+              // Pre-select: current bot wallet if known, otherwise first in list
+              const preselect = hlWallet || knownWallets[0];
               const options = knownWallets.map(w =>
-                `<option value="${w}" ${w === hlWallet ? 'selected' : ''}>${w.slice(0,8)}…${w.slice(-6)}</option>`
+                `<option value="${w}" ${w === preselect ? 'selected' : ''}>${w.slice(0,8)}…${w.slice(-6)}</option>`
               ).join('');
               return `
                 <select class="prot-input prot-input-full prot-wallet-select"
                         id="prot-wallet-select-${tokenId}"
                         onchange="onWalletSelectChange('${tokenId}')">
-                  <option value="">— ${t('prot.wallet.new')} —</option>
                   ${options}
+                  <option value="">＋ ${t('prot.wallet.new')}</option>
                 </select>
                 <input type="text" class="prot-input prot-input-full"
-                       id="prot-wallet-${tokenId}" value="${hlWallet}"
+                       id="prot-wallet-${tokenId}" value="${preselect}"
                        placeholder="${t('prot.wallet.placeholder')}"
-                       style="${hlWallet ? 'display:none' : ''}" />`;
+                       style="display:none" />`;
             }
             return `<input type="text" class="prot-input prot-input-full"
                            id="prot-wallet-${tokenId}" value="${hlWallet}"
@@ -2179,22 +2181,21 @@ window.onModeChange = function (tokenId, radio) {
 
 // ── Wallet dropdown handler ───────────────────────────────────────────────
 window.onWalletSelectChange = function (tokenId) {
-  const sel      = document.getElementById(`prot-wallet-select-${tokenId}`);
-  const input    = document.getElementById(`prot-wallet-${tokenId}`);
-  const apkeyEl  = document.getElementById(`prot-apikey-${tokenId}`);
+  const sel     = document.getElementById(`prot-wallet-select-${tokenId}`);
+  const input   = document.getElementById(`prot-wallet-${tokenId}`);
+  const apkeyEl = document.getElementById(`prot-apikey-${tokenId}`);
   if (!sel || !input) return;
   if (sel.value) {
-    // Known wallet selected — fill hidden input, hint that API key is saved
+    // Known wallet selected — sync hidden input, keep API key hint
     input.value = sel.value;
     input.style.display = 'none';
-    if (apkeyEl && !apkeyEl.placeholder.includes('keep')) {
-      apkeyEl.placeholder = t('prot.apikey.keepcurrent');
-    }
+    if (apkeyEl) apkeyEl.placeholder = t('prot.apikey.keepcurrent');
   } else {
-    // "Enter new" selected — show text input for manual entry
+    // "＋ Nueva dirección" selected — show text input for manual entry
     input.value = '';
     input.style.display = '';
     input.focus();
+    if (apkeyEl) apkeyEl.placeholder = t('prot.apikey.placeholder');
   }
 };
 
