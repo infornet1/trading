@@ -1,5 +1,5 @@
 """
-VIZNAGO — Bot Defensor Bajista
+VIZNIAGO — Bot Defensor Bajista
 LP + Directional Bear Hedge Bot
 
 Strategy overview:
@@ -106,7 +106,9 @@ TP_PCT              = float(_tp_env) / 100.0 if _tp_env else None
 TRAILING_STOP       = os.getenv("TRAILING_STOP", "1").strip() not in ("0", "false", "False")
 AUTO_REARM          = os.getenv("AUTO_REARM",    "1").strip() not in ("0", "false", "False")
 
-MIN_HEDGE_ETH = 0.001
+MIN_HEDGE_ETH     = 0.001   # absolute ETH floor (kept for x_max guard)
+MIN_NOTIONAL_USD  = 10.0    # HL minimum order size — orders below this are rejected
+HL_SYNC_INTERVAL  = 300   # seconds — how often to verify HL position exists while hedge active
 
 # ── Email ──────────────────────────────────────────────────────────────────────
 EMAIL_CONFIG_PATH = os.getenv("EMAIL_CONFIG_PATH", "/var/www/dev/trading/email_config.json")
@@ -161,7 +163,7 @@ def log_event(event_type: str, price: float = None, pnl: float = None, details: 
 
 class LiveHedgeBot:
     def __init__(self):
-        print(f"⚙️  Initializing VIZNAGO Defensor Bajista | NFT #{NFT_ID}", flush=True)
+        print(f"⚙️  Initializing VIZNIAGO Defensor Bajista | NFT #{NFT_ID}", flush=True)
         self.w3       = Web3(Web3.HTTPProvider(RPC_URL))
         self.contract = self.w3.eth.contract(address=V3_POS_MANAGER, abi=V3_ABI)
         self.info     = Info(constants.MAINNET_API_URL, skip_ws=True)
@@ -208,6 +210,10 @@ class LiveHedgeBot:
         self._margin_fail_count    = 0
         self._margin_backoff_until = 0.0   # epoch seconds; 0 = not in backoff
 
+        # ── Position sync ─────────────────────────────────────────────────────
+        self.last_hl_sync = 0.0            # epoch seconds of last HL position check
+        self.last_lp_sync = 0.0            # epoch seconds of last LP / NFT check
+
         self.email_config = self._load_email_config()
 
     # ── Email ──────────────────────────────────────────────────────────────────
@@ -227,7 +233,7 @@ class LiveHedgeBot:
             msg = MIMEMultipart()
             msg["From"]    = self.email_config["sender_email"]
             msg["To"]      = ", ".join(RECIPIENTS)
-            msg["Subject"] = f"🛡️ [VIZNAGO Defensor Bajista] {subject}"
+            msg["Subject"] = f"🛡️ [VIZNIAGO Defensor Bajista] {subject}"
             msg.attach(MIMEText(body, "plain"))
             s = smtplib.SMTP(self.email_config["smtp_server"], self.email_config["smtp_port"])
             s.starttls()
@@ -304,6 +310,18 @@ class LiveHedgeBot:
         size     = round(min(size, x_max), 4)  # re-round after min to avoid float_to_wire error
         margin   = self.get_hl_margin_balance()
         notional = size * price
+
+        if notional < MIN_NOTIONAL_USD:
+            print(f"⚠️  Hedge notional ${notional:.2f} is below HL minimum ${MIN_NOTIONAL_USD:.0f} — skipping. "
+                  f"LP too small to hedge (x_max={x_max:.4f} ETH). Add more liquidity.", flush=True)
+            self.send_email(
+                "⚠️ Short SKIPPED — LP Too Small to Hedge",
+                f"NFT #{NFT_ID}: Calculated hedge notional is ${notional:.2f}, "
+                f"below Hyperliquid's minimum order size of ${MIN_NOTIONAL_USD:.0f}.\n\n"
+                f"Pool x_max: {x_max:.4f} ETH | Hedge ratio: {HEDGE_RATIO}% | Price: ${price:,.2f}\n\n"
+                f"Please add more liquidity to the LP or increase the hedge ratio to enable protection."
+            )
+            return None
 
         if margin <= 0:
             print("❌ HL account has no margin", flush=True)
@@ -515,6 +533,34 @@ class LiveHedgeBot:
     def close_hedge(self, price, reason):
         try:
             result = self.exchange.market_close("ETH")
+            if result is None:
+                # HL SDK returns None when no matching position is found in the
+                # account's assetPositions — the position was closed externally
+                # (manual close, liquidation, or agent-wallet mismatch).
+                # Reset state cleanly instead of looping on NoneType errors.
+                print(f"⚠️  market_close returned None — position already gone on HL. "
+                      f"Resetting to IDLE.", flush=True)
+                self.hedge_active        = False
+                self.breakeven_reached   = False
+                self.short_min_price     = None
+                self.open_trigger        = None
+                self.reentry_guard_price = price * (1 + REENTRY_BUFFER)
+                self.price_was_above     = False
+                log_event("stopped", price=price, details={
+                    "reason": "external_close",
+                    "note":   "HL position not found — manual close or liquidation",
+                })
+                self.send_email(
+                    "⚠️ Hedge Externally Closed",
+                    f"NFT #{NFT_ID}: HL SHORT not found during close attempt.\n"
+                    f"Likely closed manually or liquidated outside the bot.\n"
+                    f"Bot reset to IDLE — re-entry guard active.",
+                )
+                if not AUTO_REARM:
+                    print("🛑 AUTO_REARM disabled — bot stopping.", flush=True)
+                    log_event("stopped", price=price, details={"reason": "auto_rearm_disabled"})
+                    sys.exit(0)
+                return
             if result["status"] == "ok":
                 pnl_est = (
                     (self.entry_price - price) / self.entry_price * 100
@@ -563,10 +609,130 @@ class LiveHedgeBot:
             print(f"❌ close_hedge error: {e}", flush=True)
             log_event("error", price=price, details={"msg": str(e)})
 
+    # ── HL position sync ──────────────────────────────────────────────────────
+
+    def _sync_hl_position(self, price):
+        """
+        Verify the HL SHORT still exists while hedge is active.
+        Called periodically (HL_SYNC_INTERVAL) from the main loop.
+        Resets to IDLE if the position has disappeared externally.
+        """
+        try:
+            address = self.exchange.account_address or self.exchange.wallet.address
+            state   = self.info.user_state(address, "")
+            if state is None:
+                return  # API hiccup — skip this cycle, try again next interval
+            found = any(
+                p["position"]["coin"] == "ETH"
+                for p in state.get("assetPositions", [])
+            )
+            if not found:
+                print(f"⚠️  HL sync: ETH SHORT not found — external close detected. "
+                      f"Resetting to IDLE.", flush=True)
+                self.hedge_active        = False
+                self.breakeven_reached   = False
+                self.short_min_price     = None
+                self.open_trigger        = None
+                self.reentry_guard_price = price * (1 + REENTRY_BUFFER)
+                self.price_was_above     = False
+                log_event("stopped", price=price, details={
+                    "reason": "external_close",
+                    "note":   "HL position not found during periodic sync",
+                })
+                self.send_email(
+                    "⚠️ Hedge Externally Closed (sync)",
+                    f"NFT #{NFT_ID}: ETH SHORT disappeared from HL during routine sync.\n"
+                    f"Possible manual close or liquidation.\n"
+                    f"Bot reset to IDLE.",
+                )
+                if not AUTO_REARM:
+                    print("🛑 AUTO_REARM disabled — bot stopping.", flush=True)
+                    log_event("stopped", price=price, details={"reason": "auto_rearm_disabled"})
+                    sys.exit(0)
+        except Exception as e:
+            print(f"⚠️  HL sync check failed: {e}", flush=True)
+
+    # ── LP position sync ──────────────────────────────────────────────────────
+
+    def _sync_lp_position(self, price):
+        """
+        Verify the Uniswap v3 LP (NFT) still exists and has liquidity while
+        the hedge is active. Called periodically (HL_SYNC_INTERVAL) from the
+        main loop.
+
+        Core safety rule: an open SHORT with no underlying LP is unintended
+        directional exposure. If the LP is gone, VIZNIAGO closes the hedge
+        immediately and alerts the user — never leave the user with a naked
+        SHORT they didn't ask for.
+
+        Two scenarios handled:
+          lp_removed — NFT exists but liquidity = 0 (user withdrew funds)
+          lp_burned  — NFT destroyed entirely (user burned the position)
+
+        RPC failures are silently skipped so a momentary node hiccup does
+        not trigger a false close.
+        """
+        try:
+            pos       = self.contract.functions.positions(NFT_ID).call()
+            liquidity = pos[7]
+
+            if liquidity == 0:
+                print(
+                    f"⚠️  LP sync: NFT #{NFT_ID} liquidity = 0 — LP removed. "
+                    f"Closing hedge to prevent naked SHORT exposure.",
+                    flush=True,
+                )
+                log_event("lp_removed", price=price, details={
+                    "nft_id": NFT_ID,
+                    "note":   "LP liquidity = 0 while hedge was active — auto-closing SHORT",
+                })
+                self.send_email(
+                    "⚠️ LP Removed — Hedge Auto-Closed",
+                    f"NFT #{NFT_ID}: your Uniswap v3 LP has been withdrawn (liquidity = 0).\n\n"
+                    f"VIZNIAGO has automatically closed the Hyperliquid SHORT to prevent\n"
+                    f"leaving you with open directional exposure that is no longer backed\n"
+                    f"by an LP position.\n\n"
+                    f"What to do next:\n"
+                    f"  • Add liquidity back to your LP position, then\n"
+                    f"  • Re-arm protection from your VIZNIAGO dashboard.\n\n"
+                    f"Your capital is safe — no open positions remain.",
+                )
+                self.close_hedge(price, reason="stopped")
+
+        except Exception as e:
+            err = str(e)
+            if "nonexistent token" in err or "owner query" in err.lower() or "invalid token ID" in err.lower():
+                # NFT was burned entirely — cannot recover
+                print(
+                    f"⚠️  LP sync: NFT #{NFT_ID} no longer exists (burned). "
+                    f"Closing hedge.",
+                    flush=True,
+                )
+                log_event("lp_burned", price=price, details={
+                    "nft_id": NFT_ID,
+                    "note":   "NFT burned while hedge was active — auto-closing SHORT",
+                })
+                self.send_email(
+                    "⚠️ LP Burned — Hedge Auto-Closed",
+                    f"NFT #{NFT_ID}: your Uniswap v3 LP position has been burned entirely.\n\n"
+                    f"VIZNIAGO has automatically closed the Hyperliquid SHORT to prevent\n"
+                    f"leaving you with open directional exposure that is no longer backed\n"
+                    f"by an LP position.\n\n"
+                    f"What to do next:\n"
+                    f"  • Create a new LP position on Uniswap v3, then\n"
+                    f"  • Add it to VIZNIAGO from your dashboard to resume protection.\n\n"
+                    f"Your capital is safe — no open positions remain.",
+                )
+                self.close_hedge(price, reason="stopped")
+            else:
+                # RPC / connectivity error — skip this cycle, retry next interval
+                # Do NOT close the hedge on a node hiccup
+                print(f"⚠️  LP sync check failed (RPC): {e}", flush=True)
+
     # ── Main loop ──────────────────────────────────────────────────────────────
 
     def run(self):
-        print(f"🚀 VIZNAGO Defensor Bajista starting | NFT #{NFT_ID}", flush=True)
+        print(f"🚀 VIZNIAGO Defensor Bajista starting | NFT #{NFT_ID}", flush=True)
 
         self.fetch_position_bounds()
 
@@ -604,7 +770,7 @@ class LiveHedgeBot:
             "trail_pct":       TRAIL_PCT * 100,
         })
         self.send_email(
-            "VIZNAGO Defensor Bajista Started 🚀",
+            "VIZNIAGO Defensor Bajista Started 🚀",
             f"NFT #{NFT_ID}\n"
             f"Range:          ${self.lower_bound:.2f} — ${self.upper_bound:.2f}\n"
             f"Short triggers:\n"
@@ -622,6 +788,20 @@ class LiveHedgeBot:
         while True:
             now   = time.time()
             price = self.get_eth_price()
+
+            # ── Periodic safety syncs (hedge active only) ────────────────────
+            # Both checks run on the same interval so they share one clock tick.
+            # Order: LP first (if LP is gone we still close HL cleanly),
+            #        HL second (catches external closes from HL side).
+            if (self.hedge_active and
+                    now - self.last_lp_sync > HL_SYNC_INTERVAL):
+                self.last_lp_sync = now
+                self._sync_lp_position(price or 0)
+
+            if (self.hedge_active and
+                    now - self.last_hl_sync > HL_SYNC_INTERVAL):
+                self.last_hl_sync = now
+                self._sync_hl_position(price or 0)
 
             # ── Periodic bounds refresh (idle only) ──────────────────────────
             if (not self.hedge_active and

@@ -2023,6 +2023,10 @@ function buildProtectionDrawer(pos) {
               <span>Disponible después:</span>
               <span id="tp-mb-avail-${tokenId}">—</span>
             </div>
+            <div class="tp-margin-row" id="tp-mb-minpool-row-${tokenId}" style="border-top:1px solid #374151;margin-top:4px;padding-top:4px;">
+              <span style="color:#9ca3af;font-size:0.78rem;">Pool mínimo para cubrir:</span>
+              <span id="tp-mb-minpool-${tokenId}" style="font-size:0.78rem;font-weight:600;">—</span>
+            </div>
             <div class="tp-margin-note">Auto-ajustado. Siempre isolated.</div>
           </div>
         </div>
@@ -2313,8 +2317,27 @@ function _updateMarginBox(tokenId, pos) {
   const capEl   = document.getElementById(`tp-capital-${tokenId}`);
   const subEl   = document.getElementById(`tp-hedge-sub-${tokenId}`);
 
-  if (capEl)  capEl.textContent  = notional > 0 ? `$${notional.toFixed(2)}` : '—';
+  const HL_MIN_NOTIONAL = 10;
+  const tooSmall = notional > 0 && notional < HL_MIN_NOTIONAL;
+  if (capEl) {
+    capEl.textContent = notional > 0 ? `$${notional.toFixed(2)}` : '—';
+    capEl.style.color = tooSmall ? '#ef4444' : '';
+  }
   if (reqEl)  reqEl.textContent  = reqMargin > 0 ? `$${reqMargin.toFixed(2)}` : '—';
+
+  // Warning: LP too small for HL minimum order
+  let warnEl = document.getElementById(`tp-min-notional-warn-${tokenId}`);
+  if (!warnEl && capEl) {
+    warnEl = document.createElement('div');
+    warnEl.id = `tp-min-notional-warn-${tokenId}`;
+    warnEl.style.cssText = 'color:#ef4444;font-size:0.75rem;margin-top:4px;';
+    capEl.parentElement.appendChild(warnEl);
+  }
+  if (warnEl) {
+    warnEl.textContent = tooSmall
+      ? `⚠️ Below HL minimum ($${HL_MIN_NOTIONAL}). Add more liquidity to enable protection.`
+      : '';
+  }
 
   // Live hedge sub-label: show actual ETH and USD amounts
   if (subEl) {
@@ -2340,6 +2363,20 @@ function _updateMarginBox(tokenId, pos) {
       rowEl.classList.toggle('tp-margin-row--available', avail >= 0);
     } else {
       availEl.textContent = '—';
+    }
+  }
+
+  // Min pool calculator: minimum pool value so hedge notional >= $10
+  const minPoolEl = document.getElementById(`tp-mb-minpool-${tokenId}`);
+  if (minPoolEl) {
+    if (hedgeRatio > 0) {
+      const minPool = HL_MIN_NOTIONAL / hedgeRatio;
+      const poolOk  = poolUsd >= minPool;
+      minPoolEl.textContent = `$${minPool.toFixed(2)}`;
+      minPoolEl.style.color = poolOk ? '#34d399' : '#ef4444';
+    } else {
+      minPoolEl.textContent = '—';
+      minPoolEl.style.color = '';
     }
   }
 }
