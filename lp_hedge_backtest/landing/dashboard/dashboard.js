@@ -2093,34 +2093,9 @@ function buildProtectionDrawer(pos) {
         </div>
         <div class="prot-field" style="margin-bottom:4px">
           <label class="prot-label prot-label--warning">${t('prot.wallet.label')}</label>
-          ${(() => {
-            const knownWallets = [...new Set(
-              Object.values(saas.bots)
-                .map(b => b.hl_wallet_addr)
-                .filter(w => w && w.length > 0)
-            )];
-            if (knownWallets.length > 0) {
-              // Pre-select: current bot wallet if known, otherwise first in list
-              const preselect = hlWallet || knownWallets[0];
-              const options = knownWallets.map(w =>
-                `<option value="${w}" ${w === preselect ? 'selected' : ''}>${w.slice(0,8)}…${w.slice(-6)}</option>`
-              ).join('');
-              return `
-                <select class="prot-input prot-input-full prot-wallet-select"
-                        id="prot-wallet-select-${tokenId}"
-                        onchange="onWalletSelectChange('${tokenId}')">
-                  ${options}
-                  <option value="">＋ ${t('prot.wallet.new')}</option>
-                </select>
-                <input type="text" class="prot-input prot-input-full"
-                       id="prot-wallet-${tokenId}" value="${preselect}"
-                       placeholder="${t('prot.wallet.placeholder')}"
-                       style="display:none" />`;
-            }
-            return `<input type="text" class="prot-input prot-input-full"
-                           id="prot-wallet-${tokenId}" value="${hlWallet}"
-                           placeholder="${t('prot.wallet.placeholder')}" />`;
-          })()}
+          <input type="text" class="prot-input prot-input-full"
+                 id="prot-wallet-${tokenId}" value="${hlWallet}"
+                 placeholder="${t('prot.wallet.placeholder')}" />
         </div>
 
         <button class="btn btn-primary btn-sm prot-btn-full"
@@ -2332,6 +2307,31 @@ async function fetchHLBalance() {
 
 // Called once after the trading panel is injected into DOM
 async function initTradingPanel(tokenId, pos) {
+  // Inject wallet dropdown if known HL wallets exist (runs after saas.bots is populated)
+  const walletInput = document.getElementById(`prot-wallet-${tokenId}`);
+  if (walletInput && !document.getElementById(`prot-wallet-select-${tokenId}`)) {
+    const knownWallets = [...new Set(
+      Object.values(saas.bots)
+        .map(b => b.hl_wallet_addr)
+        .filter(w => w && w.length > 0)
+    )];
+    if (knownWallets.length > 0) {
+      const currentVal = walletInput.value;
+      const preselect  = currentVal || knownWallets[0];
+      const options    = knownWallets.map(w =>
+        `<option value="${w}" ${w === preselect ? 'selected' : ''}>${w.slice(0,8)}…${w.slice(-6)}</option>`
+      ).join('');
+      const sel = document.createElement('select');
+      sel.className = 'prot-input prot-input-full prot-wallet-select';
+      sel.id        = `prot-wallet-select-${tokenId}`;
+      sel.innerHTML = `${options}<option value="">＋ ${t('prot.wallet.new')}</option>`;
+      sel.onchange  = () => window.onWalletSelectChange(tokenId);
+      walletInput.parentNode.insertBefore(sel, walletInput);
+      walletInput.value        = preselect;
+      walletInput.style.display = 'none';
+    }
+  }
+
   // Compute capital estimate from current pool value (not theoretical xMax)
   const { amount0, amount1 } = computePositionAmounts(
     pos.sqrtPriceX96, pos.tickLower, pos.tickUpper, pos.liquidity,
