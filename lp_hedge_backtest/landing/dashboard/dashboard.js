@@ -1967,7 +1967,7 @@ function buildProtectionDrawer(pos) {
                   Este % se aplica a <em>ambos</em> disparadores:<br><br>
                   <strong>↑ Desde arriba:</strong> precio cae este % por debajo del <em>techo</em> del rango → SHORT abierto dentro del rango.<br><br>
                   <strong>↓ Ruptura inferior:</strong> precio cae este % por debajo del <em>piso</em> del rango → SHORT de protección IL.<br><br>
-                  <span style="color:#00d4ff">Ej: Techo $2,100 · 2% → disparo en $2,058 &nbsp;|&nbsp; Piso $1,900 · 2% → disparo en $1,862</span><br><br>
+                  <span style="color:#00d4ff">Ej con 0.5% (default): Techo $2,100 → disparo en $2,089.5 &nbsp;|&nbsp; Piso $1,900 → disparo en $1,890.5</span><br><br>
                   ⚠️ <strong>No es el Stop Loss</strong> — el SL es un campo separado.
                 </span>
               </span>
