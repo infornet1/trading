@@ -1200,6 +1200,67 @@ function renderPositions() {
   const sorted = [...filtered].sort((a, b) => (order[a.rangeStatus] ?? 4) - (order[b.rangeStatus] ?? 4));
 
   sorted.forEach(pos => grid.appendChild(buildPositionCard(pos)));
+  // Load event history for each position (no-op if no bot configured or not authed)
+  sorted.forEach(pos => loadPositionEvents(pos.tokenId));
+}
+
+// ── Position Event History ────────────────────────────────────────────────
+
+async function loadPositionEvents(tokenId) {
+  const bot = saas.bots[String(tokenId)];
+  const el  = document.getElementById(`pos-events-${tokenId}`);
+  if (!el || !bot || !saas.jwt) return;
+
+  try {
+    const events = await apiCall('GET', `/bots/${bot.id}/events?limit=5`);
+    if (!Array.isArray(events) || !events.length) {
+      el.innerHTML = `
+        <div class="pos-events-header"><span>Eventos del Bot</span></div>
+        <div class="pos-events-empty">Sin eventos registrados aún</div>`;
+      el.style.display = '';
+      return;
+    }
+    const typeMap = {
+      hedge_opened:          { icon: '🔴', label: 'SHORT Abierto',      cls: 'evt-short'   },
+      stopped:               { icon: '🟢', label: 'SHORT Cerrado',      cls: 'evt-close'   },
+      hedge_closed:          { icon: '🟢', label: 'SHORT Cerrado',      cls: 'evt-close'   },
+      breakeven:             { icon: '🟡', label: 'Breakeven',          cls: 'evt-neutral' },
+      started:               { icon: '⚙️',  label: 'Bot Iniciado',      cls: 'evt-info'    },
+      lp_removed:            { icon: '📤', label: 'LP Removida',        cls: 'evt-info'    },
+      lp_burned:             { icon: '🔥', label: 'LP Quemada',         cls: 'evt-info'    },
+      bounds_refreshed:      { icon: '🔄', label: 'Rango Actualizado',  cls: 'evt-info'    },
+      reentry_guard_cleared: { icon: '🔓', label: 'Re-entrada Lista',   cls: 'evt-info'    },
+      error:                 { icon: '⚠️',  label: 'Error',             cls: 'evt-error'   },
+    };
+
+    const rows = events.map(ev => {
+      const m     = typeMap[ev.event_type] || { icon: '●', label: ev.event_type.replace(/_/g,' '), cls: 'evt-info' };
+      const ts    = ev.ts.endsWith('Z') ? ev.ts : ev.ts + 'Z';
+      const time  = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const price = ev.price_at_event
+        ? `<span class="evt-price">@ $${Number(ev.price_at_event).toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>`
+        : '<span class="evt-price" style="opacity:0"></span>';
+      const pnl   = ev.pnl != null
+        ? `<span class="evt-pnl ${ev.pnl >= 0 ? 'evt-pnl-pos' : 'evt-pnl-neg'}">${ev.pnl >= 0 ? '+' : ''}$${Number(ev.pnl).toFixed(2)}</span>`
+        : '';
+      return `<div class="pos-event-row">
+        <span class="evt-icon">${m.icon}</span>
+        <span class="evt-label ${m.cls}">${m.label}</span>
+        ${price}${pnl}
+        <span class="evt-time">${time}</span>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="pos-events-header">
+        <span>Eventos del Bot</span>
+        <span class="pos-events-count">${events.length} recientes</span>
+      </div>
+      <div class="pos-events-list">${rows}</div>`;
+    el.style.display = '';
+  } catch (e) {
+    // Silently skip — non-critical
+  }
 }
 
 function buildPositionCard(pos) {
@@ -1345,6 +1406,7 @@ function buildPositionCard(pos) {
     </div>
 
     ${buildProtectionDrawer(pos)}
+    <div id="pos-events-${tokenId}" class="pos-events-section" style="display:none"></div>
   `;
 
   return card;

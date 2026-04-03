@@ -2161,3 +2161,69 @@
   .wallet-summary  { flex-direction: column; align-items: flex-start; }
   .pc-prices       { grid-template-columns: 1fr; gap: 6px; text-align: left; }
 }
+
+/* ── Position Event History ───────────────────────────────────────────── */
+.pos-events-section {
+  margin-top: 12px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+.pos-events-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 7px;
+}
+.pos-events-count {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.55rem;
+  color: var(--color-text-muted);
+}
+.pos-events-list { display: flex; flex-direction: column; gap: 4px; }
+.pos-events-empty {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+.pos-event-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.73rem;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.pos-event-row:last-child { border-bottom: none; }
+.evt-icon  { font-size: 0.75rem; flex-shrink: 0; width: 16px; }
+.evt-label { flex-shrink: 0; font-weight: 600; min-width: 110px; }
+.evt-short   { color: #f87171; }
+.evt-close   { color: var(--color-neon-green); }
+.evt-neutral { color: #fbbf24; }
+.evt-info    { color: var(--color-text-secondary); }
+.evt-error   { color: #f87171; }
+.evt-price {
+  color: var(--color-accent);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.68rem;
+  flex: 1;
+}
+.evt-pnl {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.evt-pnl-pos { color: var(--color-neon-green); }
+.evt-pnl-neg { color: #f87171; }
+.evt-time {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  font-family: monospace;
+}
