@@ -1256,6 +1256,79 @@
   background: rgba(245, 158, 11, 0.12);
 }
 
+/* ── Explore Tab ─────────────────────────────────────────────── */
+
+.tab-btn--explore {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+.tab-btn--explore.tab-btn--active {
+  color: var(--color-neon-cyan);
+  border-color: var(--color-neon-cyan);
+}
+
+.explore-search {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 18px 20px 14px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.explore-search::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-neon-blue), var(--color-neon-cyan));
+  opacity: 0.5;
+}
+
+.explore-owner-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 0.78rem;
+  flex-wrap: wrap;
+}
+
+.explore-owner-label {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.explore-nft-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 4px;
+  padding: 1px 7px;
+}
+
+.explore-clear-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 3px 9px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.explore-clear-btn:hover {
+  border-color: rgba(255, 107, 107, 0.4);
+  color: #ff6b6b;
+}
+
 /* ── Live Log Terminal ───────────────────────────────────────── */
 .bot-log-header {
   display: flex;

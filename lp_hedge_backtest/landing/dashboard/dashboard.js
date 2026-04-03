@@ -244,7 +244,9 @@ window.setTab = function (tab) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('tab-btn--active', btn.id === 'tab-' + tab);
   });
-  renderPositions();
+  const isExplore = tab === 'explore';
+  document.getElementById('explore-panel')?.classList.toggle('hidden', !isExplore);
+  if (!isExplore) renderPositions();
 };
 
 // ── Watch Address (read-only) ─────────────────────────────────────────────
@@ -369,6 +371,192 @@ window.switchWatchMode = function (mode) {
   walletRow?.classList.toggle('hidden', mode !== 'wallet');
   nftRow?.classList.toggle('hidden', mode !== 'nft');
   nftNote?.classList.toggle('hidden', mode !== 'nft');
+};
+
+// ── Explore Tab ───────────────────────────────────────────────────────────
+
+window.switchExploreMode = function (mode) {
+  document.querySelectorAll('#explore-panel .watch-mode-pill').forEach(p =>
+    p.classList.toggle('watch-mode-pill--active', p.dataset.mode === mode)
+  );
+  document.getElementById('explore-wallet-row')?.classList.toggle('hidden', mode !== 'wallet');
+  document.getElementById('explore-nft-row')?.classList.toggle('hidden', mode !== 'nft');
+  document.getElementById('explore-nft-note')?.classList.toggle('hidden', mode !== 'nft');
+};
+
+window.exploreSearch = async function () {
+  const isNft = !document.getElementById('explore-nft-row')?.classList.contains('hidden');
+  let address, chainId, provider, nftId = null;
+
+  // Show loading state
+  show('explore-loading');
+  hide('explore-empty');
+  hide('explore-owner-bar');
+  document.getElementById('explore-results').innerHTML = '';
+
+  if (isNft) {
+    const rawId = (document.getElementById('explore-nft-input')?.value || '').trim().replace(/^#/, '');
+    if (!rawId || isNaN(rawId)) {
+      hide('explore-loading');
+      showError('Ingresa un token ID válido (número entero)');
+      return;
+    }
+    chainId = parseInt(document.getElementById('explore-nft-chain-select').value, 10);
+    if (!CHAINS[chainId]) { hide('explore-loading'); return; }
+    try {
+      provider = await makeWatchProvider(chainId);
+    } catch (e) { hide('explore-loading'); showError(e.message); return; }
+    try {
+      const nfpm = new ethers.Contract(CHAINS[chainId].nfpmAddr, NFPM_ABI, provider);
+      address = await nfpm.ownerOf(BigInt(rawId));
+      nftId   = rawId;
+    } catch (_) {
+      hide('explore-loading');
+      showError('NFT no encontrado en esta red. Verifica el ID y la red seleccionada.');
+      return;
+    }
+  } else {
+    const rawAddr = (document.getElementById('explore-addr-input')?.value || '').trim();
+    if (!rawAddr) { hide('explore-loading'); return; }
+    if (!ethers.isAddress(rawAddr)) {
+      hide('explore-loading');
+      showError(window.t ? window.t('dash.watch.invalid') : 'Invalid address');
+      return;
+    }
+    address = ethers.getAddress(rawAddr);
+    chainId = parseInt(document.getElementById('explore-chain-select').value, 10);
+    if (!CHAINS[chainId]) { hide('explore-loading'); return; }
+    try {
+      provider = await makeWatchProvider(chainId);
+    } catch (e) { hide('explore-loading'); showError(e.message); return; }
+  }
+
+  await lookupPositions(address, chainId, provider, nftId);
+};
+
+async function lookupPositions(address, chainId, provider, nftId) {
+  const chainCfg  = CHAINS[chainId];
+  const resultsEl = document.getElementById('explore-results');
+  if (!resultsEl) return;
+
+  try {
+    const nfpm    = new ethers.Contract(chainCfg.nfpmAddr, NFPM_ABI, provider);
+    const balance = Number(await nfpm.balanceOf(address));
+
+    hide('explore-loading');
+
+    if (balance === 0) { show('explore-empty'); return; }
+
+    const tokenIds = await Promise.all(
+      Array.from({ length: balance }, (_, i) => nfpm.tokenOfOwnerByIndex(address, i))
+    );
+
+    const rawPositions = await Promise.all(
+      tokenIds.map(id => nfpm.positions(id).then(p => ({
+        tokenId:     id,
+        token0:      p.token0,
+        token1:      p.token1,
+        fee:         p.fee,
+        tickLower:   p.tickLower,
+        tickUpper:   p.tickUpper,
+        liquidity:   p.liquidity,
+        tokensOwed0: p.tokensOwed0,
+        tokensOwed1: p.tokensOwed1,
+      })))
+    );
+
+    const uniquePools = new Map();
+    const factory = new ethers.Contract(chainCfg.factoryAddr, FACTORY_ABI, provider);
+    for (const pos of rawPositions) {
+      const key = `${pos.token0.toLowerCase()}-${pos.token1.toLowerCase()}-${pos.fee}`;
+      if (!uniquePools.has(key))
+        uniquePools.set(key, { token0: pos.token0, token1: pos.token1, fee: Number(pos.fee), slot0: null });
+    }
+    await Promise.all(Array.from(uniquePools.entries()).map(async ([key, pool]) => {
+      try {
+        const addr = await factory.getPool(pool.token0, pool.token1, pool.fee);
+        if (addr === '0x0000000000000000000000000000000000000000') return;
+        const slot0 = await new ethers.Contract(addr, POOL_ABI, provider).slot0();
+        uniquePools.get(key).slot0 = { sqrtPriceX96: slot0[0], tick: Number(slot0[1]) };
+      } catch (_) {}
+    }));
+
+    const positions = rawPositions.map(raw => {
+      const key        = `${raw.token0.toLowerCase()}-${raw.token1.toLowerCase()}-${Number(raw.fee)}`;
+      const pool       = uniquePools.get(key);
+      const token0Info = KNOWN_TOKENS[raw.token0.toLowerCase()] || { symbol: raw.token0.slice(0,6)+'…', decimals: 18 };
+      const token1Info = KNOWN_TOKENS[raw.token1.toLowerCase()] || { symbol: raw.token1.slice(0,6)+'…', decimals: 18 };
+      const tickLower   = Number(raw.tickLower);
+      const tickUpper   = Number(raw.tickUpper);
+      const currentTick = pool?.slot0?.tick ?? null;
+      const liquidity   = BigInt(raw.liquidity.toString());
+      const tokensOwed0 = BigInt(raw.tokensOwed0.toString());
+      const tokensOwed1 = BigInt(raw.tokensOwed1.toString());
+      const priceLowerObj   = tickToDisplayPrice(tickLower,   token0Info, token1Info);
+      const priceUpperObj   = tickToDisplayPrice(tickUpper,   token0Info, token1Info);
+      const priceCurrentObj = currentTick !== null ? tickToDisplayPrice(currentTick, token0Info, token1Info) : null;
+      let priceLower   = priceLowerObj.price;
+      let priceUpper   = priceUpperObj.price;
+      let priceCurrent = priceCurrentObj?.price ?? null;
+      if (priceLower > priceUpper) [priceLower, priceUpper] = [priceUpper, priceLower];
+      let rangeStatus = 'unknown';
+      if (currentTick !== null) {
+        if (liquidity === 0n)             rangeStatus = 'closed';
+        else if (currentTick < tickLower) rangeStatus = 'out-low';
+        else if (currentTick > tickUpper) rangeStatus = 'out-high';
+        else                              rangeStatus = 'in-range';
+      }
+      let rangePercent = null;
+      if (priceCurrent !== null && priceUpper > priceLower) {
+        rangePercent = Math.max(0, Math.min(100,
+          (priceCurrent - priceLower) / (priceUpper - priceLower) * 100
+        ));
+      }
+      return {
+        tokenId:      raw.tokenId.toString(),
+        token0:       raw.token0,
+        token1:       raw.token1,
+        fee:          Number(raw.fee),
+        token0Info,   token1Info,
+        tickLower,    tickUpper,
+        priceLower,   priceUpper,  priceCurrent,
+        priceBase:    priceLowerObj.base,
+        priceQuote:   priceLowerObj.quote,
+        rangeStatus,  rangePercent,
+        liquidity,    tokensOwed0, tokensOwed1,
+        sqrtPriceX96: pool?.slot0?.sqrtPriceX96 ?? null,
+        _exploreOnly: true,
+      };
+    });
+
+    const order = { 'in-range':0, 'out-low':1, 'out-high':2, 'closed':3, 'unknown':4 };
+    positions.sort((a, b) => (order[a.rangeStatus] ?? 4) - (order[b.rangeStatus] ?? 4));
+    positions.forEach(pos => resultsEl.appendChild(buildPositionCard(pos)));
+
+    // Update owner bar
+    const ownerAddrEl = document.getElementById('explore-owner-addr');
+    if (ownerAddrEl) ownerAddrEl.textContent = truncateAddr(address);
+    const nftTagEl = document.getElementById('explore-owner-nft');
+    if (nftTagEl) {
+      nftTagEl.textContent = nftId ? `NFT #${nftId}` : '';
+      nftTagEl.classList.toggle('hidden', !nftId);
+    }
+    show('explore-owner-bar');
+
+  } catch (e) {
+    hide('explore-loading');
+    showError('Error al buscar posiciones: ' + (e.message || e));
+  }
+}
+
+window.clearExplore = function () {
+  document.getElementById('explore-results').innerHTML = '';
+  if (document.getElementById('explore-addr-input'))
+    document.getElementById('explore-addr-input').value = '';
+  if (document.getElementById('explore-nft-input'))
+    document.getElementById('explore-nft-input').value = '';
+  hide('explore-owner-bar');
+  hide('explore-empty');
 };
 
 window.refreshAll = async function () {
@@ -987,6 +1175,7 @@ function renderPriceTicker() {
 }
 
 function renderPositions() {
+  if (state.activeTab === 'explore') return;
   const grid = document.getElementById('positions-grid');
   grid.innerHTML = '';
 
@@ -1699,8 +1888,8 @@ function buildProtectionDrawer(pos) {
 
   let bodyHtml;
 
-  if (state.watchMode) {
-    // Watch mode — no protection available
+  if (state.watchMode || pos._exploreOnly) {
+    // Watch / explore mode — no protection available
     bodyHtml = `<p class="prot-info-msg">${t('prot.watch.disabled')}</p>`;
 
   } else if (!saas.jwt && saas.sessionExpired) {
