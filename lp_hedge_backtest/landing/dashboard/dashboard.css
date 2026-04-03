@@ -1124,15 +1124,80 @@
 /* Watch mode badge in wallet summary */
 .watch-mode-badge {
   display: inline-block;
-  background: rgba(0, 212, 255, 0.08);
-  border: 1px solid var(--color-neon-cyan);
-  color: var(--color-neon-cyan);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
   font-family: 'Orbitron', sans-serif;
   font-size: 0.55rem;
   letter-spacing: 0.12em;
   padding: 3px 10px;
   border-radius: 20px;
   margin-top: 4px;
+}
+
+/* Watch mode — amber navbar wallet button */
+#wallet-btn.btn--watch-mode {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
+}
+#wallet-btn.btn--watch-mode:hover {
+  background: rgba(245, 158, 11, 0.18);
+}
+
+/* ── Watch-Mode Banner ───────────────────────────────────── */
+.alert-watch-mode {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(245, 158, 11, 0.07);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.83rem;
+  line-height: 1.4;
+}
+
+.watch-mode-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.watch-mode-text {
+  flex: 1;
+  color: #fbbf24;
+  font-size: 0.82rem;
+}
+
+.watch-mode-text strong {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.watch-mode-addr {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.watch-mode-stop {
+  background: none;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 6px;
+  color: #f59e0b;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.watch-mode-stop:hover {
+  background: rgba(245, 158, 11, 0.12);
 }
 
 /* ── Live Log Terminal ───────────────────────────────────────── */

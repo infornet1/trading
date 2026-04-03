@@ -28,7 +28,6 @@
         </button>
         <div class="nav-dd-menu">
           <a href="index.html" class="nav-dd-item nav-dd-item--active">&#128202; LP Defensor</a>
-          <div class="nav-dd-item nav-dd-item--soon">&#9889; FURY Perps <span class="nav-soon-tag">Soon</span></div>
           <a href="../whale/index.html" class="nav-dd-item">&#128011; Whale Tracker</a>
         </div>
       </div>
@@ -224,6 +223,17 @@
               <span id="disconnect-label" data-i18n="dash.ws.disconnect">Desconectar</span>
             </button>
           </div>
+        </div>
+
+        <!-- Watch-mode banner (amber, persistent while watching) -->
+        <div id="watch-mode-banner" class="alert alert-watch-mode hidden">
+          <span class="watch-mode-icon">👁</span>
+          <div class="watch-mode-text">
+            <strong>Modo Solo Lectura</strong> — viendo
+            <span id="watch-mode-addr" class="watch-mode-addr"></span>.
+            Tu wallet no está conectada. Los bots de protección no están disponibles.
+          </div>
+          <button class="watch-mode-stop" onclick="disconnectWallet()">✕ Salir</button>
         </div>
 
         <!-- Error banner -->

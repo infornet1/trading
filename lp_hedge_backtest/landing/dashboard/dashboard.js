@@ -629,8 +629,17 @@ function updateWalletBar() {
 
   // Navbar wallet button → shows address + dropdown toggle (eye prefix in watch mode)
   const btn = document.getElementById('wallet-btn');
-  btn.textContent = (state.watchMode ? '👁 ' : '● ') + truncateAddr(state.address) + ' ▾';
+  btn.textContent = (state.watchMode ? '👁 ' : '🟢 ') + truncateAddr(state.address) + ' ▾';
+  btn.classList.toggle('btn--watch-mode', state.watchMode);
   btn.onclick = toggleWalletDropdown;
+
+  // Watch-mode banner — prominent amber bar, shown only in watch mode
+  const watchBanner = document.getElementById('watch-mode-banner');
+  if (watchBanner) {
+    watchBanner.classList.toggle('hidden', !state.watchMode);
+    const addrEl = document.getElementById('watch-mode-addr');
+    if (addrEl) addrEl.textContent = truncateAddr(state.address);
+  }
 
   // Chain badge in navbar
   const badge = document.getElementById('chain-badge');
