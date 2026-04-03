@@ -477,7 +477,8 @@ async function lookupPositions(address, chainId, provider, nftId) {
         const addr = await factory.getPool(pool.token0, pool.token1, pool.fee);
         if (addr === '0x0000000000000000000000000000000000000000') return;
         const slot0 = await new ethers.Contract(addr, POOL_ABI, provider).slot0();
-        uniquePools.get(key).slot0 = { sqrtPriceX96: slot0[0], tick: Number(slot0[1]) };
+        uniquePools.get(key).slot0        = { sqrtPriceX96: slot0[0], tick: Number(slot0[1]) };
+        uniquePools.get(key).poolAddress  = addr.toLowerCase();
       } catch (_) {}
     }));
 
@@ -525,6 +526,7 @@ async function lookupPositions(address, chainId, provider, nftId) {
         rangeStatus,  rangePercent,
         liquidity,    tokensOwed0, tokensOwed1,
         sqrtPriceX96: pool?.slot0?.sqrtPriceX96 ?? null,
+        poolAddress:  pool?.poolAddress ?? null,
         _exploreOnly: true,
       };
     });
@@ -532,6 +534,7 @@ async function lookupPositions(address, chainId, provider, nftId) {
     const order = { 'in-range':0, 'out-low':1, 'out-high':2, 'closed':3, 'unknown':4 };
     positions.sort((a, b) => (order[a.rangeStatus] ?? 4) - (order[b.rangeStatus] ?? 4));
     positions.forEach(pos => resultsEl.appendChild(buildPositionCard(pos)));
+    positions.forEach(pos => loadPositionAPR(pos));
 
     // Update owner bar
     const ownerAddrEl = document.getElementById('explore-owner-addr');
@@ -743,7 +746,8 @@ async function fetchPositions() {
         if (poolAddr === '0x0000000000000000000000000000000000000000') return;
         const poolContract = new ethers.Contract(poolAddr, POOL_ABI, readProvider);
         const slot0 = await poolContract.slot0();
-        uniquePools.get(key).slot0 = { sqrtPriceX96: slot0[0], tick: Number(slot0[1]) };
+        uniquePools.get(key).slot0      = { sqrtPriceX96: slot0[0], tick: Number(slot0[1]) };
+        uniquePools.get(key).poolAddress = poolAddr.toLowerCase();
       } catch (err) {
         console.warn(`Could not fetch pool slot0 for key ${key}:`, err.message);
       }
@@ -810,6 +814,7 @@ async function fetchPositions() {
         tokensOwed0,
         tokensOwed1,
         sqrtPriceX96: pool?.slot0?.sqrtPriceX96 ?? null,
+        poolAddress:  pool?.poolAddress ?? null,
         priceLower,
         priceUpper,
         priceCurrent,
@@ -1225,10 +1230,11 @@ function computeUniV3PoolAddress(chainId, token0Addr, token1Addr, fee) {
 }
 
 async function fetchPoolFeeAPR(pos) {
-  const chainId     = state.chainId;
-  const network     = GT_NETWORK[chainId];
+  const chainId  = state.chainId;
+  const network  = GT_NETWORK[chainId];
   if (!network) return null;
-  const poolAddr = computeUniV3PoolAddress(chainId, pos.token0, pos.token1, pos.fee);
+  // Use the on-chain verified pool address stored during fetchPositions (no CREATE2 guessing)
+  const poolAddr = pos.poolAddress;
   if (!poolAddr) return null;
   const cacheKey = poolAddr.toLowerCase();
   if (_aprCache[cacheKey] !== undefined) return _aprCache[cacheKey];
@@ -1257,7 +1263,12 @@ async function loadPositionAPR(pos) {
   if (!aprEl && !projEl) return;
 
   const data = await fetchPoolFeeAPR(pos);
-  if (!data) return;  // leave placeholders as-is
+  if (!data) {
+    // Clear "cargando…" gracefully
+    const projElFallback = document.getElementById(`pc-proj-${tokenId}`);
+    if (projElFallback) projElFallback.innerHTML = `<div class="pc-proj-label-row" style="color:var(--color-text-muted)">Fee APR — datos no disponibles</div>`;
+    return;
+  }
 
   const { apr } = data;
   const aprPct = (apr * 100).toFixed(1);
