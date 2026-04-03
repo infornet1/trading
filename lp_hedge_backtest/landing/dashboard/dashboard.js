@@ -1202,6 +1202,92 @@ function renderPositions() {
   sorted.forEach(pos => grid.appendChild(buildPositionCard(pos)));
   // Load event history for each position (no-op if no bot configured or not authed)
   sorted.forEach(pos => loadPositionEvents(pos.tokenId));
+  // Load fee APR + projections for each position (M2-1/M2-2)
+  sorted.forEach(pos => loadPositionAPR(pos));
+}
+
+// ── Pool Fee APR (M2-1 / M2-2) ───────────────────────────────────────────
+
+const GT_NETWORK = { 42161: 'arbitrum', 1: 'eth', 8453: 'base' };
+// Cache keyed by pool address so we don't hammer GeckoTerminal on re-renders
+const _aprCache = {};
+
+function computeUniV3PoolAddress(chainId, token0Addr, token1Addr, fee) {
+  try {
+    const factory = CHAINS[chainId]?.factoryAddr;
+    if (!factory) return null;
+    const [t0, t1] = token0Addr.toLowerCase() < token1Addr.toLowerCase()
+      ? [token0Addr, token1Addr] : [token1Addr, token0Addr];
+    const INIT_HASH = '0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54';
+    const salt = ethers.solidityPackedKeccak256(['address', 'address', 'uint24'], [t0, t1, fee]);
+    return ethers.getCreate2Address(factory, salt, INIT_HASH);
+  } catch { return null; }
+}
+
+async function fetchPoolFeeAPR(pos) {
+  const chainId     = state.chainId;
+  const network     = GT_NETWORK[chainId];
+  if (!network) return null;
+  const poolAddr = computeUniV3PoolAddress(chainId, pos.token0, pos.token1, pos.fee);
+  if (!poolAddr) return null;
+  const cacheKey = poolAddr.toLowerCase();
+  if (_aprCache[cacheKey] !== undefined) return _aprCache[cacheKey];
+  try {
+    const res = await fetch(
+      `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${cacheKey}`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+    if (!res.ok) { _aprCache[cacheKey] = null; return null; }
+    const data  = await res.json();
+    const attrs = data?.data?.attributes;
+    const vol24h = parseFloat(attrs?.volume_usd?.h24 || 0);
+    const tvl    = parseFloat(attrs?.reserve_in_usd  || 0);
+    if (!vol24h || !tvl || tvl < 1) { _aprCache[cacheKey] = null; return null; }
+    const feeFrac = pos.fee / 1_000_000;   // 500 → 0.0005
+    const apr     = (vol24h * feeFrac / tvl) * 365;  // annualised fraction
+    _aprCache[cacheKey] = { apr };
+    return { apr };
+  } catch { _aprCache[cacheKey] = null; return null; }
+}
+
+async function loadPositionAPR(pos) {
+  const tokenId     = pos.tokenId;
+  const aprEl       = document.getElementById(`pc-apr-${tokenId}`);
+  const projEl      = document.getElementById(`pc-proj-${tokenId}`);
+  if (!aprEl && !projEl) return;
+
+  const data = await fetchPoolFeeAPR(pos);
+  if (!data) return;  // leave placeholders as-is
+
+  const { apr } = data;
+  const aprPct = (apr * 100).toFixed(1);
+
+  if (aprEl) {
+    aprEl.textContent = `${aprPct}% Fee APR`;
+    aprEl.style.color = apr > 0.5 ? '#34d399' : apr > 0.1 ? '#fbbf24' : '#9ca3af';
+  }
+
+  const { amount0, amount1 } = computePositionAmounts(
+    pos.sqrtPriceX96, pos.tickLower, pos.tickUpper, pos.liquidity,
+    pos.token0Info.decimals, pos.token1Info.decimals
+  );
+  const usd0 = tokenToUsd(pos.token0Info.symbol, amount0);
+  const usd1 = tokenToUsd(pos.token1Info.symbol, amount1);
+  const poolVal = (usd0 !== null && usd1 !== null) ? usd0 + usd1 : 0;
+  if (!poolVal || !projEl) return;
+
+  const daily   = poolVal * apr / 365;
+  const weekly  = daily * 7;
+  const monthly = daily * 30;
+  const annual  = poolVal * apr;
+  projEl.innerHTML = `
+    <div class="pc-proj-label-row">Fee Yield Estimado (24h rate × posición)</div>
+    <div class="pc-proj-row">
+      <span class="pc-proj-item"><span class="pc-proj-period">Diario</span><span class="pc-proj-val">$${daily.toFixed(2)}</span></span>
+      <span class="pc-proj-item"><span class="pc-proj-period">Semanal</span><span class="pc-proj-val">$${weekly.toFixed(2)}</span></span>
+      <span class="pc-proj-item"><span class="pc-proj-period">Mensual</span><span class="pc-proj-val">$${monthly.toFixed(2)}</span></span>
+      <span class="pc-proj-item"><span class="pc-proj-period">Anual</span><span class="pc-proj-val pc-proj-val--annual">$${annual.toFixed(0)}</span></span>
+    </div>`;
 }
 
 // ── Position Event History ────────────────────────────────────────────────
@@ -1342,9 +1428,12 @@ function buildPositionCard(pos) {
         <div class="pc-pair">${pairLabel}</div>
         <div class="pc-fee">${t('pos.fee.tier')} ${feeDisplay}</div>
       </div>
-      <div class="pc-status ${statusClass}">
-        <span class="status-dot ${dotClass}"></span>
-        ${statusLabel}
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div class="pc-status ${statusClass}">
+          <span class="status-dot ${dotClass}"></span>
+          ${statusLabel}
+        </div>
+        <div class="pc-apr-badge" id="pc-apr-${tokenId}">APR —</div>
       </div>
     </div>
 
@@ -1395,6 +1484,10 @@ function buildPositionCard(pos) {
         </span>
       </div>
     </div>` : ''}
+
+    <div class="pc-proj-section" id="pc-proj-${tokenId}">
+      <div class="pc-proj-label-row">Fee Yield Estimado — cargando…</div>
+    </div>
 
     <div class="pc-fees">
       <div class="pc-fees-label">${t('pos.fees.label')}${feesValueUsd !== null && feesValueUsd > 0 ? ` <span style="color:#34d399;font-size:0.72rem">≈ $${feesValueUsd.toFixed(2)}</span>` : ''}</div>
@@ -1781,12 +1874,31 @@ function renderLiveBots() {
     if (bot.mode === 'whale') return '';
     // ─────────────────────────────────────────────────────────────────────
 
-    const modeName  = bot.mode === 'aragan'
+    const modeName      = bot.mode === 'aragan'
       ? t('dash.hedge.mode.val')
       : 'Defensor Alcista (Cobertura + Long)';
-    const triggerPx = (bot.lower_bound * (1 + bot.trigger_pct / 100)).toFixed(2);
-    const rangePct  = (((bot.upper_bound - bot.lower_bound) / bot.lower_bound) * 100).toFixed(1);
-    const chainName = { 42161: 'Arbitrum', 1: 'Ethereum', 8453: 'Base' }[bot.chain_id] || `Chain ${bot.chain_id}`;
+    const lowerTrigPx   = bot.lower_bound * (1 + bot.trigger_pct / 100);
+    const upperTrigPx   = bot.upper_bound * (1 - bot.trigger_pct / 100);
+    const rangePct      = (((bot.upper_bound - bot.lower_bound) / bot.lower_bound) * 100).toFixed(1);
+    const chainName     = { 42161: 'Arbitrum', 1: 'Ethereum', 8453: 'Base' }[bot.chain_id] || `Chain ${bot.chain_id}`;
+
+    // Distance to nearest trigger using live position price
+    const matchPos      = state.positions.find(p => String(p.tokenId) === String(bot.nft_token_id));
+    const curPrice      = matchPos?.priceCurrent ?? null;
+    let distanceHtml    = '';
+    if (curPrice !== null) {
+      const distLower   = ((curPrice - lowerTrigPx) / curPrice) * 100;
+      const distUpper   = ((upperTrigPx - curPrice) / curPrice) * 100;
+      const nearest     = Math.abs(distLower) <= Math.abs(distUpper) ? distLower : distUpper;
+      const nearestDir  = Math.abs(distLower) <= Math.abs(distUpper) ? '↓' : '↑';
+      const distColor   = Math.abs(nearest) < 2 ? '#f87171' : Math.abs(nearest) < 5 ? '#fbbf24' : '#34d399';
+      distanceHtml = `
+        <div class="hedge-distance-row">
+          <span class="hedge-dist-label">DISTANCIA</span>
+          <span class="hedge-dist-value" style="color:${distColor}">${nearestDir} ${Math.abs(nearest).toFixed(2)}% al trigger</span>
+          <span class="hedge-dist-price">precio actual $${Number(curPrice).toLocaleString('en-US',{maximumFractionDigits:2})}</span>
+        </div>`;
+    }
 
     return `
       <div class="hedge-panel" style="margin-top:16px">
@@ -1810,16 +1922,17 @@ function renderLiveBots() {
             <div class="hi-sub">~${rangePct}% ${t('dash.hedge.range.width')}</div>
           </div>
           <div class="hedge-info-card">
-            <div class="hi-label">${t('dash.hedge.trig.label')}</div>
-            <div class="hi-value text-neon">$${Number(triggerPx).toLocaleString('en-US',{maximumFractionDigits:2})}</div>
-            <div class="hi-sub">${bot.trigger_pct}% ${t('dash.hedge.trig.below')}</div>
+            <div class="hi-label">↓ Trigger Bajista</div>
+            <div class="hi-value text-neon">$${Number(lowerTrigPx).toLocaleString('en-US',{maximumFractionDigits:2})}</div>
+            <div class="hi-sub">${Math.abs(bot.trigger_pct)}% bajo el piso</div>
           </div>
           <div class="hedge-info-card">
-            <div class="hi-label">${t('dash.hedge.mode.label')}</div>
-            <div class="hi-value" style="font-size:0.75rem">${modeName}</div>
-            ${lastEvtHtml}
+            <div class="hi-label">↑ Trigger Alcista</div>
+            <div class="hi-value" style="color:#fbbf24">$${Number(upperTrigPx).toLocaleString('en-US',{maximumFractionDigits:2})}</div>
+            <div class="hi-sub">${Math.abs(bot.trigger_pct)}% sobre el techo</div>
           </div>
         </div>
+        ${distanceHtml}
         <div class="hedge-rule">
           <span class="hedge-rule-icon">&#9888;</span>
           <span data-i18n-html="dash.hedge.rule">${t('dash.hedge.rule')}</span>
@@ -1987,7 +2100,12 @@ function buildProtectionDrawer(pos) {
         })()
       : t('prot.status.checking');
 
+    const hlBalActive = _hlBalanceCache?.account_value;
     bodyHtml = `
+      <div class="prot-hl-balance-bar">
+        <span class="prot-hl-bal-label">HL Balance</span>
+        <span class="prot-hl-bal-value">${hlBalActive != null ? '$' + Number(hlBalActive).toFixed(2) : '—'}</span>
+      </div>
       <div class="prot-status-row" id="prot-status-${bot.id}">${statusInner}</div>
       <div class="prot-active-info">
         <div class="prot-info-item">
@@ -2059,6 +2177,12 @@ function buildProtectionDrawer(pos) {
         <div class="tp-header">
           <div class="tp-pair">${pair}</div>
           <div class="tp-range">Range ${range}</div>
+        </div>
+
+        <!-- HL Balance (M2-4) -->
+        <div class="prot-hl-balance-bar" id="prot-hl-bal-${tokenId}">
+          <span class="prot-hl-bal-label">HL Balance</span>
+          <span class="prot-hl-bal-value" id="prot-hl-bal-val-${tokenId}">cargando…</span>
         </div>
 
         <!-- Mode toggle -->
@@ -2547,6 +2671,11 @@ function _updateMarginBox(tokenId, pos) {
   const bal = _hlBalanceCache?.account_value;
   if (balEl) {
     balEl.textContent = bal != null ? `$${Number(bal).toFixed(2)}` : '—';
+  }
+  // M2-4: also update the prominent balance bar at top of modal
+  const hlBarValEl = document.getElementById(`prot-hl-bal-val-${tokenId}`);
+  if (hlBarValEl) {
+    hlBarValEl.textContent = bal != null ? `$${Number(bal).toFixed(2)}` : '—';
   }
   if (availEl && rowEl) {
     if (bal != null && reqMargin > 0) {
