@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIZNIAGO — Whitepaper DeFi</title>
+  <link rel="icon" href="../assets/vizniago-logo.jpeg" type="image/jpeg" />
+  <meta name="description" content="VIZNIAGO DeFi Whitepaper — Gestión automatizada de liquidez concentrada con cobertura Delta Neutral via Hyperliquid." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=Orbitron:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../global.css" />
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────── */
+    :root {
+      --wp-bg:        #040d1a;
+      --wp-bg-card:   #071428;
+      --wp-border:    rgba(0,212,255,0.12);
+      --wp-accent:    #00d4ff;
+      --wp-green:     #00ff88;
+      --wp-amber:     #f59e0b;
+      --wp-text:      #e2e8f0;
+      --wp-muted:     #64748b;
+      --wp-secondary: #94a3b8;
+      --wp-font:      'IBM Plex Sans', -apple-system, sans-serif;
+      --wp-mono:      'IBM Plex Mono', monospace;
+      --wp-brand:     'Orbitron', sans-serif;
+      --wp-max:       740px;
+    }
+
+    body {
+      font-family: var(--wp-font);
+      background: var(--wp-bg);
+      color: var(--wp-text);
+      line-height: 1.75;
+      font-size: 16px;
+    }
+
+    /* ── Navbar (reuse global) ────────────────────────────────────── */
+
+    /* ── Paper shell ──────────────────────────────────────────────── */
+    .wp-wrap {
+      display: grid;
+      grid-template-columns: 1fr min(var(--wp-max), 100%) 1fr;
+      padding: 0 1rem;
+    }
+    .wp-wrap > * { grid-column: 2; }
+
+    /* ── Stats bar ────────────────────────────────────────────────── */
+    .wp-stats-bar {
+      display: flex;
+      justify-content: center;
+      gap: 2.5rem;
+      flex-wrap: wrap;
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--wp-border);
+      font-size: 0.75rem;
+      color: var(--wp-muted);
+      font-family: var(--wp-mono);
+    }
+    .wp-stat { display: flex; align-items: center; gap: 0.4rem; }
+    .wp-stat-label { color: var(--wp-muted); }
+    .wp-stat-value { color: var(--wp-accent); font-weight: 500; }
+    .wp-stat-badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      background: rgba(0,255,136,0.08); color: var(--wp-green);
+      border: 1px solid rgba(0,255,136,0.2);
+      padding: 0.1rem 0.5rem; border-radius: 4px;
+      font-size: 0.7rem; font-family: var(--wp-mono);
+    }
+
+    /* ── Paper header ─────────────────────────────────────────────── */
+    .wp-header {
+      text-align: center;
+      padding: 4rem 0 2.5rem;
+      border-bottom: 1px solid var(--wp-border);
+    }
+    .wp-logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .wp-logo-img {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      border: 2px solid rgba(0,212,255,0.3);
+      box-shadow: 0 0 20px rgba(0,212,255,0.2);
+    }
+    .wp-logo-text {
+      font-family: var(--wp-brand);
+      font-size: 1.6rem;
+      letter-spacing: 0.05em;
+      color: var(--wp-text);
+    }
+    .wp-logo-text span { color: var(--wp-accent); }
+    .wp-paper-title {
+      font-family: var(--wp-font);
+      font-size: 1.55rem;
+      font-weight: 600;
+      color: var(--wp-text);
+      margin-bottom: 0.4rem;
+      line-height: 1.3;
+    }
+    .wp-paper-subtitle {
+      font-size: 0.92rem;
+      color: var(--wp-secondary);
+      font-style: italic;
+      margin-bottom: 0.75rem;
+    }
+    .wp-author-line {
+      font-size: 0.82rem;
+      color: var(--wp-muted);
+    }
+    .wp-version-line {
+      margin-top: 0.5rem;
+      font-family: var(--wp-mono);
+      font-size: 0.7rem;
+      color: var(--wp-muted);
+    }
+
+    /* ── Language toggle ──────────────────────────────────────────── */
+    .wp-lang-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0;
+      font-size: 0.75rem;
+      color: var(--wp-muted);
+      font-family: var(--wp-mono);
+      border-bottom: 1px solid var(--wp-border);
+    }
+    .wp-lang-btn {
+      background: none;
+      border: 1px solid var(--wp-border);
+      color: var(--wp-muted);
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: var(--wp-mono);
+      font-size: 0.7rem;
+      transition: all 0.15s;
+    }
+    .wp-lang-btn.active {
+      border-color: var(--wp-accent);
+      color: var(--wp-accent);
+      background: rgba(0,212,255,0.06);
+    }
+    .wp-lang-btn:hover:not(.active) {
+      border-color: var(--wp-secondary);
+      color: var(--wp-secondary);
+    }
+
+    /* ── TOC ──────────────────────────────────────────────────────── */
+    .wp-toc {
+      background: var(--wp-bg-card);
+      border: 1px solid var(--wp-border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin: 2rem 0;
+      font-size: 0.8rem;
+    }
+    .wp-toc-title {
+      font-family: var(--wp-brand);
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--wp-muted);
+      margin-bottom: 0.75rem;
+    }
+    .wp-toc ol {
+      margin: 0; padding-left: 1.2rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.1rem 1.5rem;
+    }
+    .wp-toc li { margin-bottom: 0.25rem; }
+    .wp-toc a {
+      color: var(--wp-secondary);
+      text-decoration: none;
+      font-family: var(--wp-mono);
+      font-size: 0.75rem;
+      transition: color 0.15s;
+    }
+    .wp-toc a:hover { color: var(--wp-accent); }
+
+    /* ── Main content ─────────────────────────────────────────────── */
+    .wp-content {
+      padding: 2rem 0 4rem;
+    }
+
+    .wp-content h2 {
+      font-family: var(--wp-font);
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--wp-text);
+      margin-top: 3rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--wp-border);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .wp-content h2 .wp-section-num {
+      font-family: var(--wp-mono);
+      font-size: 0.65rem;
+      color: var(--wp-accent);
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.2);
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .wp-content h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--wp-text);
+      margin-top: 1.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .wp-content p {
+      color: var(--wp-secondary);
+      margin-bottom: 1.1rem;
+      font-size: 0.95rem;
+    }
+
+    .wp-content strong { color: var(--wp-text); }
+
+    .wp-content hr {
+      border: none;
+      border-top: 1px solid var(--wp-border);
+      margin: 2.5rem 0;
+    }
+
+    /* Code blocks */
+    .wp-content pre {
+      background: #020810;
+      border: 1px solid var(--wp-border);
+      border-left: 3px solid var(--wp-accent);
+      color: #a8d4f0;
+      padding: 1.1rem 1.25rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: var(--wp-mono);
+      font-size: 0.78rem;
+      line-height: 1.65;
+      margin: 1.25rem 0;
+    }
+    .wp-content code {
+      font-family: var(--wp-mono);
+      font-size: 0.82em;
+      background: rgba(0,212,255,0.07);
+      color: var(--wp-accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+    }
+    .wp-content pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+      font-size: 1em;
+    }
+
+    /* Blockquotes */
+    .wp-content blockquote {
+      border-left: 3px solid var(--wp-accent);
+      padding: 0.75rem 1.25rem;
+      margin: 1.5rem 0;
+      background: rgba(0,212,255,0.04);
+      border-radius: 0 6px 6px 0;
+    }
+    .wp-content blockquote p {
+      color: var(--wp-text);
+      font-style: italic;
+      margin-bottom: 0;
+    }
+
+    /* Tables */
+    .wp-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.83rem;
+    }
+    .wp-content th {
+      font-family: var(--wp-mono);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--wp-muted);
+      background: rgba(255,255,255,0.03);
+      padding: 0.6rem 0.85rem;
+      text-align: left;
+      border-bottom: 1px solid var(--wp-border);
+    }
+    .wp-content td {
+      padding: 0.55rem 0.85rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: var(--wp-secondary);
+      font-size: 0.85rem;
+    }
+    .wp-content tr:last-child td { border-bottom: none; }
+    .wp-content td strong { color: var(--wp-text); }
+    .td-green { color: var(--wp-green) !important; }
+    .td-red   { color: #f87171 !important; }
+    .td-amber { color: var(--wp-amber) !important; }
+    .td-cyan  { color: var(--wp-accent) !important; }
+
+    /* Lists */
+    .wp-content ul, .wp-content ol {
+      margin: 0.75rem 0 1.25rem 1.4rem;
+      color: var(--wp-secondary);
+    }
+    .wp-content li {
+      margin-bottom: 0.4rem;
+      font-size: 0.95rem;
+    }
+    .wp-content li strong { color: var(--wp-text); }
+
+    /* Callout boxes */
+    .wp-callout {
+      border: 1px solid var(--wp-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+      font-size: 0.88rem;
+    }
+    .wp-callout--info  { border-left: 3px solid var(--wp-accent); background: rgba(0,212,255,0.04); }
+    .wp-callout--warn  { border-left: 3px solid var(--wp-amber);  background: rgba(245,158,11,0.05); }
+    .wp-callout--success { border-left: 3px solid var(--wp-green); background: rgba(0,255,136,0.04); }
+    .wp-callout-label {
+      font-family: var(--wp-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+    .wp-callout--info .wp-callout-label    { color: var(--wp-accent); }
+    .wp-callout--warn .wp-callout-label    { color: var(--wp-amber); }
+    .wp-callout--success .wp-callout-label { color: var(--wp-green); }
+    .wp-callout p { color: var(--wp-secondary); margin-bottom: 0; font-size: 0.88rem; }
+
+    /* Abstract box */
+    .wp-abstract {
+      background: var(--wp-bg-card);
+      border: 1px solid var(--wp-border);
+      border-radius: 10px;
+      padding: 1.5rem 1.75rem;
+      margin: 2rem 0;
+    }
+    .wp-abstract-label {
+      font-family: var(--wp-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--wp-accent);
+      margin-bottom: 0.75rem;
+    }
+    .wp-abstract p { color: var(--wp-secondary); font-size: 0.93rem; margin-bottom: 0.75rem; }
+    .wp-abstract p:last-child { margin-bottom: 0; }
+
+    /* Language visibility */
+    [data-lang] { display: block; }
+    .wp-lang-hidden { display: none !important; }
+
+    /* Footer */
+    .wp-footer {
+      border-top: 1px solid var(--wp-border);
+      padding: 1.5rem 0;
+      font-size: 0.75rem;
+      color: var(--wp-muted);
+      font-family: var(--wp-mono);
+      text-align: center;
+      margin-top: 2rem;
+    }
+    .wp-footer a { color: var(--wp-muted); text-decoration: none; margin: 0 0.6rem; }
+    .wp-footer a:hover { color: var(--wp-accent); }
+
+    /* Print */
+    @media print {
+      .navbar, .wp-lang-bar { display: none; }
+      body { background: white; color: black; }
+      .wp-content h2 { color: black; border-color: #ccc; }
+      .wp-content p, .wp-content li, .wp-content td { color: #333; }
+      [data-lang="en"] { display: none !important; }
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .wp-stats-bar   { gap: 0.75rem 1.5rem; font-size: 0.68rem; }
+      .wp-header      { padding: 2.5rem 0 1.75rem; }
+      .wp-paper-title { font-size: 1.2rem; }
+      .wp-toc ol      { grid-template-columns: 1fr; }
+      .wp-content h2  { font-size: 1.05rem; }
+      .wp-content pre { font-size: 0.7rem; }
+      table           { font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================
+       NAVBAR
+  ============================================================ -->
+  <nav class="navbar">
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/vizniago-logo.jpeg" alt="VIZNIAGO" class="navbar-logo" />
+    </a>
+    <div class="navbar-links" id="navbar-links">
+      <div class="nav-item nav-dd-wrap">
+        <button class="nav-link nav-dd-btn">DeFi <span class="nav-caret">▾</span></button>
+        <div class="nav-dd-menu">
+          <a href="../dashboard/index.html" class="nav-dd-item">
+            <span class="nav-dd-icon">📊</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">LP Defensor</span>
+              <span class="nav-dd-sub">Bots LP en vivo</span>
+            </div>
+          </a>
+          <a href="../whale/index.html" class="nav-dd-item">
+            <span class="nav-dd-icon">🐋</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">Whale Tracker</span>
+              <span class="nav-dd-sub">Señales en tiempo real</span>
+            </div>
+          </a>
+        </div>
+      </div>
+      <a href="index.html" class="nav-link nav-link--active">Whitepaper</a>
+      <a href="https://t.me/vizniago_bot" class="nav-link nav-link--tg" target="_blank">@vizniago_bot</a>
+    </div>
+    <div class="navbar-right">
+      <div class="lang-toggle">
+        <button class="lang-btn" id="nav-lang-es" onclick="setWpLang('es')">ES</button>
+        <button class="lang-btn" id="nav-lang-en" onclick="setWpLang('en')">EN</button>
+      </div>
+      <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu" onclick="toggleMobileNav()">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       STATS BAR
+  ============================================================ -->
+  <div class="wp-stats-bar">
+    <div class="wp-stat">
+      <span class="wp-stat-label">Versión</span>
+      <span class="wp-stat-value">v1.0</span>
+    </div>
+    <div class="wp-stat">
+      <span class="wp-stat-label">Fecha</span>
+      <span class="wp-stat-value">Abril 2026</span>
+    </div>
+    <div class="wp-stat">
+      <span class="wp-stat-label">Estrategia validada</span>
+      <span class="wp-stat-badge">ETH/USDT ✓</span>
+    </div>
+    <div class="wp-stat">
+      <span class="wp-stat-label">Estado</span>
+      <span class="wp-stat-value">Beta Pública</span>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       LANGUAGE BAR
+  ============================================================ -->
+  <div class="wp-wrap">
+    <div class="wp-lang-bar">
+      <span>Idioma / Language:</span>
+      <button class="wp-lang-btn active" id="wp-lang-es" onclick="setWpLang('es')">ES</button>
+      <button class="wp-lang-btn" id="wp-lang-en" onclick="setWpLang('en')">EN</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       PAPER HEADER
+  ============================================================ -->
+  <div class="wp-wrap">
+    <header class="wp-header">
+      <div class="wp-logo-wrap">
+        <img src="../assets/vizniago-logo.jpeg" alt="VIZNIAGO" class="wp-logo-img" />
+        <span class="wp-logo-text">VIZNIAGO <span>DeFi</span></span>
+      </div>
+      <div class="wp-paper-title" data-lang="es">
+        Gestión Automatizada de Liquidez Concentrada<br/>con Cobertura Delta Neutral
+      </div>
+      <div class="wp-paper-title wp-lang-hidden" data-lang="en">
+        Automated Concentrated Liquidity Management<br/>with Delta Neutral Hedging
+      </div>
+      <div class="wp-paper-subtitle" data-lang="es">
+        Un sistema de protección LP no custodial sobre Uniswap v3 y Hyperliquid
+      </div>
+      <div class="wp-paper-subtitle wp-lang-hidden" data-lang="en">
+        A non-custodial LP protection system on Uniswap v3 and Hyperliquid
+      </div>
+      <div class="wp-author-line">
+        Un grupo de investigadores DeFi independientes · <a href="https://t.me/vizniago_bot" target="_blank" style="color:var(--wp-accent);text-decoration:none;">@vizniago_bot</a>
+      </div>
+      <div class="wp-version-line">v1.0 · Abril 2026 · Beta Pública</div>
+    </header>
+  </div>
+
+  <!-- ============================================================
+       CONTENT
+  ============================================================ -->
+  <div class="wp-wrap">
+    <main class="wp-content">
+
+      <!-- ABSTRACT -->
+      <div class="wp-abstract">
+        <div class="wp-abstract-label">Abstract</div>
+        <p data-lang="es">
+          VIZNIAGO es una plataforma de operaciones DeFi que automatiza la cobertura de pérdida impermanente
+          en posiciones de liquidez concentrada (Uniswap v3) mediante posiciones cortas en Hyperliquid.
+          Nació del estudio de la teoría Delta Neutral LP y lleva por primera vez esta estrategia avanzada
+          al alcance de usuarios retail, sin custodia y sin intermediarios.
+        </p>
+        <p class="wp-lang-hidden" data-lang="en">
+          VIZNIAGO is a DeFi operations platform that automates impermanent loss hedging on concentrated
+          liquidity positions (Uniswap v3) using short positions on Hyperliquid. Born from the study of
+          Delta Neutral LP theory, it brings this advanced strategy to retail users for the first time —
+          non-custodial and without intermediaries.
+        </p>
+        <p data-lang="es">
+          La plataforma combina tres capas: un backtester de validación de estrategias, un bot de
+          defensa LP en vivo (LP Defensor), y un sistema de inteligencia sobre grandes posiciones
+          (Whale Tracker). Los resultados del backtester muestran valor esperado positivo en ETH/USDT
+          y negativo en BTC/USDT — hallazgos que comunicamos con total transparencia.
+        </p>
+        <p class="wp-lang-hidden" data-lang="en">
+          The platform combines three layers: a strategy validation backtester, a live LP defense bot
+          (LP Defensor), and a large-position intelligence system (Whale Tracker). Backtester results
+          show positive expected value on ETH/USDT and negative on BTC/USDT — findings we communicate
+          with full transparency.
+        </p>
+      </div>
+
+      <!-- TOC -->
+      <nav class="wp-toc">
+        <div class="wp-toc-title">Tabla de Contenidos</div>
+        <ol>
+          <li><a href="#s1" data-lang="es">El Problema</a><a href="#s1" class="wp-lang-hidden" data-lang="en">The Problem</a></li>
+          <li><a href="#s2" data-lang="es">Teoría Delta Neutral LP</a><a href="#s2" class="wp-lang-hidden" data-lang="en">Delta Neutral LP Theory</a></li>
+          <li><a href="#s3" data-lang="es">¿Por Qué es Difícil Manualmente?</a><a href="#s3" class="wp-lang-hidden" data-lang="en">Why It's Hard Manually</a></li>
+          <li><a href="#s4">LP Defensor</a></li>
+          <li><a href="#s5">Whale Tracker</a></li>
+          <li><a href="#s6" data-lang="es">Backtester — Resultados</a><a href="#s6" class="wp-lang-hidden" data-lang="en">Backtester — Results</a></li>
+          <li><a href="#s7" data-lang="es">Arquitectura</a><a href="#s7" class="wp-lang-hidden" data-lang="en">Architecture</a></li>
+          <li><a href="#s8">Roadmap</a></li>
+          <li><a href="#s9" data-lang="es">Lo Que No Somos (Aún)</a><a href="#s9" class="wp-lang-hidden" data-lang="en">What We Are Not (Yet)</a></li>
+          <li><a href="#s10" data-lang="es">Contacto</a><a href="#s10" class="wp-lang-hidden" data-lang="en">Contact</a></li>
+        </ol>
+      </nav>
+
+      <!-- ── 1. El Problema ──────────────────────────────────────── -->
+      <h2 id="s1">
+        <span class="wp-section-num">01</span>
+        <span data-lang="es">El Problema</span>
+        <span class="wp-lang-hidden" data-lang="en">The Problem</span>
+      </h2>
+
+      <p data-lang="es">
+        La liquidez concentrada de Uniswap v3 es la herramienta más eficiente en capital que existe en DeFi:
+        permite a los proveedores de liquidez ganar comisiones varias veces superiores a los modelos anteriores,
+        concentrando su capital en rangos de precio específicos. Sin embargo, esta eficiencia tiene un costo:
+        la <strong>pérdida impermanente (IL)</strong>.
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        Uniswap v3 concentrated liquidity is the most capital-efficient tool in DeFi: it allows liquidity
+        providers to earn fees several times higher than previous models by concentrating capital in specific
+        price ranges. However, this efficiency comes at a cost: <strong>impermanent loss (IL)</strong>.
+      </p>
+
+      <p data-lang="es">
+        Cuando el precio del activo sale del rango definido por el LP, ocurren dos cosas simultáneamente
+        y ambas son negativas: la posición <strong>deja de generar comisiones</strong> (está fuera de rango)
+        y <strong>sufre pérdida impermanente</strong> porque el pool ha rebalanceado la composición de activos
+        en la dirección desfavorable para el LP.
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        When the asset price exits the LP's defined range, two things happen simultaneously — both negative:
+        the position <strong>stops generating fees</strong> (it's out of range) and <strong>suffers
+        impermanent loss</strong> because the pool has rebalanced asset composition in the direction
+        unfavorable to the LP.
+      </p>
+
+      <div class="wp-callout wp-callout--warn">
+        <div class="wp-callout-label">⚠ El problema central</div>
+        <p data-lang="es">La mayoría de las herramientas LP existentes (Zapper, DeBank, Revert Finance) <strong>muestran</strong> el daño. Ninguna lo previene automáticamente. El LP se entera de su pérdida después de que ya ocurrió.</p>
+        <p class="wp-lang-hidden" data-lang="en">Most existing LP tools (Zapper, DeBank, Revert Finance) <strong>show</strong> the damage. None prevent it automatically. The LP finds out about their loss after it has already happened.</p>
+      </div>
+
+      <p data-lang="es">
+        Gestionar manualmente una cobertura requiere monitoreo continuo, una cuenta de perpetuos activa,
+        coordinación exacta en el tamaño de la cobertura y velocidad de reacción que el mercado no
+        espera. En la práctica, casi ningún usuario retail lo hace.
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        Manually managing a hedge requires continuous monitoring, an active perpetuals account,
+        precise hedge sizing coordination, and reaction speed that the market doesn't wait for.
+        In practice, almost no retail user does this.
+      </p>
+
+      <!-- ── 2. Teoría Delta Neutral LP ──────────────────────────── -->
+      <h2 id="s2">
+        <span class="wp-section-num">02</span>
+        <span data-lang="es">Teoría Delta Neutral LP</span>
+        <span class="wp-lang-hidden" data-lang="en">Delta Neutral LP Theory</span>
+      </h2>
+
+      <p data-lang="es">
+        La idea central detrás de VIZNIAGO proviene del estudio de la teoría <strong>Delta Neutral</strong>
+        aplicada a posiciones LP. Un grupo de investigadores DeFi identificó que la exposición direccional
+        de una posición LP fuera de rango puede modelarse y compensarse exactamente con una posición
+        corta en perpetuos del mismo activo.
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        The core idea behind VIZNIAGO comes from the study of <strong>Delta Neutral</strong> theory
+        applied to LP positions. A group of DeFi researchers identified that the directional exposure
+        of an out-of-range LP position can be modeled and precisely offset with a short position in
+        perpetuals of the same asset.
+      </p>
+
+      <h3 data-lang="es">La matemática simplificada</h3>
+      <h3 class="wp-lang-hidden" data-lang="en">The Simplified Math</h3>
+
+      <p data-lang="es">
+        En una posición ETH/USDC en Uniswap v3, cuando el precio de ETH cae por debajo del
+        <code>tick inferior</code>, el pool ha convertido toda la posición a ETH puro. En ese punto,
+        el LP tiene una exposición 100% larga en ETH sin recibir comisiones.
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        In an ETH/USDC position on Uniswap v3, when the ETH price falls below the <code>lower tick</code>,
+        the pool has converted the entire position to pure ETH. At that point, the LP has 100% long
+        ETH exposure while receiving zero fees.
+      </p>
+
+<pre>
+Precio dentro del rango  →  LP gana comisiones  →  Delta ≈ 0.5 (neutral)
+Precio bajo el tick inf  →  LP = 100% ETH long  →  Delta = 1.0 (exposed)
+Precio sobre el tick sup →  LP = 100% USDC      →  Delta = 0.0
+</pre>
+
+      <p data-lang="es">
+        La solución: cuando el precio cae por debajo del tick inferior, abrir un SHORT en ETH perps
+        proporcional a la cantidad de ETH en la posición LP. Las ganancias del SHORT compensan la
+        pérdida de valor del ETH mantenido en el pool.
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        The solution: when price falls below the lower tick, open a SHORT on ETH perps proportional
+        to the ETH amount in the LP position. SHORT profits offset the loss in value of the ETH
+        held in the pool.
+      </p>
+
+      <div class="wp-callout wp-callout--info">
+        <div class="wp-callout-label">💡 La cobertura no es gratis</div>
+        <p data-lang="es">Las posiciones cortas en perpetuos tienen un costo: la <strong>tasa de financiamiento</strong>. En mercados con tasas de financiamiento positivas (el corto paga al largo), esta tasa actúa como una "prima de seguro". El backtester modela este costo en cada vela, lo que explica por qué BTC no funciona: el costo del seguro supera la protección que ofrece en ese par.</p>
+        <p class="wp-lang-hidden" data-lang="en">Short positions in perpetuals have a cost: the <strong>funding rate</strong>. In markets with positive funding rates (short pays long), this rate acts as an "insurance premium." The backtester models this cost at every candle, which explains why BTC doesn't work: the insurance cost exceeds the protection it offers for that pair.</p>
+      </div>
+
+      <!-- ── 3. Por qué es difícil manualmente ──────────────────── -->
+      <h2 id="s3">
+        <span class="wp-section-num">03</span>
+        <span data-lang="es">¿Por Qué es Difícil Manualmente?</span>
+        <span class="wp-lang-hidden" data-lang="en">Why Is It Hard Manually?</span>
+      </h2>
+
+      <p data-lang="es">
+        Aunque la lógica es clara, la ejecución manual es prácticamente inviable para usuarios retail:
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        Although the logic is clear, manual execution is practically unviable for retail users:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th data-lang="es">Requisito</th>
+            <th class="wp-lang-hidden" data-lang="en">Requirement</th>
+            <th data-lang="es">Por qué es un problema</th>
+            <th class="wp-lang-hidden" data-lang="en">Why It's a Problem</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-lang="es"><strong>Monitoreo 24/7</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>24/7 Monitoring</strong></td>
+            <td data-lang="es">El precio puede salir del rango en cualquier momento, incluyendo la madrugada</td>
+            <td class="wp-lang-hidden" data-lang="en">Price can exit range at any time, including overnight</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Cálculo del tamaño</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Size calculation</strong></td>
+            <td data-lang="es">La exposición en ETH cambia con el precio; el SHORT debe ajustarse proporcionalmente</td>
+            <td class="wp-lang-hidden" data-lang="en">ETH exposure changes with price; the SHORT must be adjusted proportionally</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Cuenta perps activa</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Active perps account</strong></td>
+            <td data-lang="es">Requiere capital separado en Hyperliquid con margen disponible en todo momento</td>
+            <td class="wp-lang-hidden" data-lang="en">Requires separate capital on Hyperliquid with available margin at all times</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Velocidad de reacción</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Reaction speed</strong></td>
+            <td data-lang="es">Un movimiento rápido puede generar IL significativa antes de que el humano reaccione</td>
+            <td class="wp-lang-hidden" data-lang="en">A fast move can generate significant IL before a human can react</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Tracking de tasas</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Rate tracking</strong></td>
+            <td data-lang="es">La tasa de financiamiento acumulada debe compararse contra la IL compensada continuamente</td>
+            <td class="wp-lang-hidden" data-lang="en">Accumulated funding rate must be compared against compensated IL continuously</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ── 4. LP Defensor ──────────────────────────────────────── -->
+      <h2 id="s4">
+        <span class="wp-section-num">04</span>
+        LP Defensor
+      </h2>
+
+      <p data-lang="es">
+        LP Defensor es el bot central de VIZNIAGO. Monitorea posiciones Uniswap v3 en tiempo real
+        y ejecuta automáticamente la cobertura Delta Neutral cuando el precio sale del rango.
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        LP Defensor is VIZNIAGO's core bot. It monitors Uniswap v3 positions in real time and
+        automatically executes the Delta Neutral hedge when price exits the range.
+      </p>
+
+      <h3 data-lang="es">Ciclo de vida del bot</h3>
+      <h3 class="wp-lang-hidden" data-lang="en">Bot lifecycle</h3>
+
+<pre>
+1. MONITOREO  →  Lee estado del tick cada N segundos vía RPC
+2. TRIGGER    →  Precio sale del tick inferior (bajista)
+3. COBERTURA  →  Abre SHORT en HL proporcional a exposición ETH
+4. ACTIVO     →  Monitorea P&G del SHORT vs IL del pool
+5. CIERRE     →  Precio re-entra al rango → cierra SHORT
+6. REPOSO     →  Vuelve a modo monitoreo, acumula comisiones
+</pre>
+
+      <h3 data-lang="es">Principios de diseño</h3>
+      <h3 class="wp-lang-hidden" data-lang="en">Design principles</h3>
+
+      <ul>
+        <li data-lang="es"><strong>No custodial:</strong> Las claves privadas nunca salen del wallet del usuario. El bot solo ejecuta órdenes a través de la API de HL con permisos limitados.</li>
+        <li class="wp-lang-hidden" data-lang="en"><strong>Non-custodial:</strong> Private keys never leave the user's wallet. The bot only executes orders through the HL API with limited permissions.</li>
+        <li data-lang="es"><strong>Paper mode primero:</strong> Todos los usuarios nuevos comienzan en modo solo lectura. El modo live requiere confirmación explícita.</li>
+        <li class="wp-lang-hidden" data-lang="en"><strong>Paper mode first:</strong> All new users start in read-only mode. Live mode requires explicit confirmation.</li>
+        <li data-lang="es"><strong>Parada de emergencia:</strong> Un botón de nuclear stop cierra todas las posiciones activas en HL instantáneamente desde el panel.</li>
+        <li class="wp-lang-hidden" data-lang="en"><strong>Emergency stop:</strong> A nuclear stop button closes all active HL positions instantly from the dashboard.</li>
+        <li data-lang="es"><strong>Ratio configurable:</strong> El usuario define qué porcentaje de la exposición cubrir (por defecto 80%).</li>
+        <li class="wp-lang-hidden" data-lang="en"><strong>Configurable ratio:</strong> The user defines what percentage of exposure to hedge (default 80%).</li>
+      </ul>
+
+      <div class="wp-callout wp-callout--success">
+        <div class="wp-callout-label">✓ Estado actual</div>
+        <p data-lang="es">LP Defensor está en producción y disponible en <strong>beta pública</strong>. Compatible con pools Uniswap v3 en Ethereum mainnet. Soporte multi-chain en roadmap.</p>
+        <p class="wp-lang-hidden" data-lang="en">LP Defensor is in production and available in <strong>public beta</strong>. Compatible with Uniswap v3 pools on Ethereum mainnet. Multi-chain support on the roadmap.</p>
+      </div>
+
+      <!-- ── 5. Whale Tracker ────────────────────────────────────── -->
+      <h2 id="s5">
+        <span class="wp-section-num">05</span>
+        Whale Tracker
+      </h2>
+
+      <p data-lang="es">
+        La segunda capa de VIZNIAGO es de inteligencia. Los movimientos de grandes posiciones en
+        Hyperliquid son un indicador adelantado relevante para cualquier gestor de LP.
+        Si un whale abre un SHORT masivo en ETH, la presión sobre tu rango LP aumenta.
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        VIZNIAGO's second layer is intelligence. Large position moves on Hyperliquid are a relevant
+        leading indicator for any LP manager. If a whale opens a massive ETH SHORT, pressure on
+        your LP range increases.
+      </p>
+
+      <h3 data-lang="es">Cómo funciona</h3>
+      <h3 class="wp-lang-hidden" data-lang="en">How it works</h3>
+
+      <ul>
+        <li data-lang="es">Monitorea los top traders de HL clasificados por PnL histórico (leaderboard)</li>
+        <li class="wp-lang-hidden" data-lang="en">Monitors top HL traders ranked by historical PnL (leaderboard)</li>
+        <li data-lang="es">Detecta aperturas, cierres y <em>side flips</em> (long→short o short→long) de posiciones grandes</li>
+        <li class="wp-lang-hidden" data-lang="en">Detects opens, closes and <em>side flips</em> (long→short or short→long) of large positions</li>
+        <li data-lang="es">Emite señales cuando el notional supera un umbral configurable (por defecto $100K)</li>
+        <li class="wp-lang-hidden" data-lang="en">Emits signals when notional exceeds a configurable threshold (default $100K)</li>
+        <li data-lang="es">Envía alertas vía Telegram con contexto de activo, dirección y tamaño</li>
+        <li class="wp-lang-hidden" data-lang="en">Sends alerts via Telegram with asset, direction, and size context</li>
+      </ul>
+
+      <div class="wp-callout wp-callout--info">
+        <div class="wp-callout-label">💡 Por qué importa para LPs</div>
+        <p data-lang="es">Las señales whale no son señales de trading directo. Son <strong>contexto de riesgo</strong>: si los mejores traders del mercado están apostando fuerte a la baja, un LP en ese activo debería considerar reducir su rango o activar la cobertura con mayor anticipación.</p>
+        <p class="wp-lang-hidden" data-lang="en">Whale signals are not direct trading signals. They are <strong>risk context</strong>: if the market's best traders are betting heavily short, an LP in that asset should consider narrowing their range or activating the hedge earlier.</p>
+      </div>
+
+      <!-- ── 6. Backtester ───────────────────────────────────────── -->
+      <h2 id="s6">
+        <span class="wp-section-num">06</span>
+        <span data-lang="es">Backtester — Resultados</span>
+        <span class="wp-lang-hidden" data-lang="en">Backtester — Results</span>
+      </h2>
+
+      <p data-lang="es">
+        Antes de poner capital en vivo, VIZNIAGO incluye un motor de backtesting que modela con
+        precisión los tres componentes de la estrategia: comisiones LP, pérdida impermanente y
+        costo de cobertura (tasa de financiamiento).
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        Before committing live capital, VIZNIAGO includes a backtesting engine that precisely models
+        the three components of the strategy: LP fees, impermanent loss, and hedging cost (funding rate).
+      </p>
+
+      <h3 data-lang="es">Hallazgos principales</h3>
+      <h3 class="wp-lang-hidden" data-lang="en">Key findings</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th data-lang="es">Par</th><th class="wp-lang-hidden" data-lang="en">Pair</th>
+            <th data-lang="es">Estrategia LP + Hedge</th><th class="wp-lang-hidden" data-lang="en">LP + Hedge Strategy</th>
+            <th data-lang="es">vs Solo LP</th><th class="wp-lang-hidden" data-lang="en">vs LP Only</th>
+            <th data-lang="es">Veredicto</th><th class="wp-lang-hidden" data-lang="en">Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>ETH/USDT</strong></td>
+            <td class="td-green" data-lang="es">Valor esperado positivo</td>
+            <td class="td-green wp-lang-hidden" data-lang="en">Positive expected value</td>
+            <td class="td-green" data-lang="es">Superior en bajadas fuertes</td>
+            <td class="td-green wp-lang-hidden" data-lang="en">Superior in sharp drawdowns</td>
+            <td class="td-green" data-lang="es">✓ Recomendado</td>
+            <td class="td-green wp-lang-hidden" data-lang="en">✓ Recommended</td>
+          </tr>
+          <tr>
+            <td><strong>BTC/USDT</strong></td>
+            <td class="td-red" data-lang="es">Tasa financiamiento > IL compensada</td>
+            <td class="td-red wp-lang-hidden" data-lang="en">Funding rate > IL compensated</td>
+            <td class="td-red" data-lang="es">Inferior a largo plazo</td>
+            <td class="td-red wp-lang-hidden" data-lang="en">Inferior long-term</td>
+            <td class="td-red" data-lang="es">✗ No recomendado</td>
+            <td class="td-red wp-lang-hidden" data-lang="en">✗ Not recommended</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="wp-callout wp-callout--warn">
+        <div class="wp-callout-label">⚠ Sobre los resultados BTC</div>
+        <p data-lang="es">El resultado negativo en BTC no es un fallo del backtester — es exactamente lo que el backtester debe hacer: <strong>impedir que despliegues una estrategia que no funciona</strong>. La alta demanda de largos en BTC genera tasas de financiamiento que hacen que el costo del SHORT supere la protección contra IL.</p>
+        <p class="wp-lang-hidden" data-lang="en">The negative BTC result is not a backtester failure — it's exactly what the backtester should do: <strong>prevent you from deploying a strategy that doesn't work</strong>. High long demand on BTC generates funding rates that make the SHORT cost exceed IL protection.</p>
+      </div>
+
+      <h3 data-lang="es">Qué modela el backtester</h3>
+      <h3 class="wp-lang-hidden" data-lang="en">What the backtester models</h3>
+
+      <ul>
+        <li data-lang="es">Matemática de liquidez concentrada Uniswap v3 (cálculo real de ticks y L)</li>
+        <li class="wp-lang-hidden" data-lang="en">Uniswap v3 concentrated liquidity math (real tick and L calculation)</li>
+        <li data-lang="es">Comisiones acumuladas dentro del rango por vela</li>
+        <li class="wp-lang-hidden" data-lang="en">Fees accumulated in-range per candle</li>
+        <li data-lang="es">IL calculada en cada vela fuera del rango</li>
+        <li class="wp-lang-hidden" data-lang="en">IL calculated on each out-of-range candle</li>
+        <li data-lang="es">Tasa de financiamiento acumulada sobre la posición SHORT</li>
+        <li class="wp-lang-hidden" data-lang="en">Accumulated funding rate on the SHORT position</li>
+        <li data-lang="es">Costos de entrada/salida (slippage, gas estimado)</li>
+        <li class="wp-lang-hidden" data-lang="en">Entry/exit costs (slippage, estimated gas)</li>
+        <li data-lang="es">Comparativa contra HODL 50/50 y Solo LP como benchmarks</li>
+        <li class="wp-lang-hidden" data-lang="en">Comparison against HODL 50/50 and LP Only as benchmarks</li>
+      </ul>
+
+      <!-- ── 7. Arquitectura ─────────────────────────────────────── -->
+      <h2 id="s7">
+        <span class="wp-section-num">07</span>
+        <span data-lang="es">Arquitectura</span>
+        <span class="wp-lang-hidden" data-lang="en">Architecture</span>
+      </h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th data-lang="es">Capa</th><th class="wp-lang-hidden" data-lang="en">Layer</th>
+            <th data-lang="es">Tecnología</th><th class="wp-lang-hidden" data-lang="en">Technology</th>
+            <th data-lang="es">Notas</th><th class="wp-lang-hidden" data-lang="en">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-lang="es"><strong>Frontend</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Frontend</strong></td>
+            <td>Vanilla JS + ethers.js</td>
+            <td data-lang="es">Sin frameworks pesados. SIWE auth.</td>
+            <td class="wp-lang-hidden" data-lang="en">No heavy frameworks. SIWE auth.</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Backend API</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Backend API</strong></td>
+            <td>Python FastAPI</td>
+            <td data-lang="es">JWT tokens, endpoints REST</td>
+            <td class="wp-lang-hidden" data-lang="en">JWT tokens, REST endpoints</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Leer posiciones LP</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Read LP positions</strong></td>
+            <td>Uniswap v3 SDK + RPC</td>
+            <td data-lang="es">Solo lectura. Sin claves privadas.</td>
+            <td class="wp-lang-hidden" data-lang="en">Read-only. No private keys.</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Ejecución hedge</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Hedge execution</strong></td>
+            <td>Hyperliquid Python SDK</td>
+            <td data-lang="es">API HL con permisos limitados</td>
+            <td class="wp-lang-hidden" data-lang="en">HL API with limited permissions</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Base de datos</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Database</strong></td>
+            <td>PostgreSQL (managed)</td>
+            <td data-lang="es">Eventos, posiciones, usuarios</td>
+            <td class="wp-lang-hidden" data-lang="en">Events, positions, users</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Infraestructura</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Infrastructure</strong></td>
+            <td>DigitalOcean + Docker</td>
+            <td data-lang="es">4 droplets, CI/CD automatizado</td>
+            <td class="wp-lang-hidden" data-lang="en">4 droplets, automated CI/CD</td>
+          </tr>
+          <tr>
+            <td data-lang="es"><strong>Alertas</strong></td>
+            <td class="wp-lang-hidden" data-lang="en"><strong>Alerts</strong></td>
+            <td>Telegram Bot API</td>
+            <td data-lang="es">Señales whale + estado del bot</td>
+            <td class="wp-lang-hidden" data-lang="en">Whale signals + bot status</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="wp-callout wp-callout--info">
+        <div class="wp-callout-label">🔒 Modelo de seguridad</div>
+        <p data-lang="es">VIZNIAGO nunca tiene custodia de fondos LP. El wallet del usuario se conecta via SIWE para autenticación. La clave de API de Hyperliquid se almacena encriptada y solo se usa para abrir/cerrar la posición de cobertura con el ratio configurado.</p>
+        <p class="wp-lang-hidden" data-lang="en">VIZNIAGO never has custody of LP funds. The user's wallet connects via SIWE for authentication. The Hyperliquid API key is stored encrypted and only used to open/close the hedge position with the configured ratio.</p>
+      </div>
+
+      <!-- ── 8. Roadmap ──────────────────────────────────────────── -->
+      <h2 id="s8">
+        <span class="wp-section-num">08</span>
+        Roadmap
+      </h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th data-lang="es">Fase</th><th class="wp-lang-hidden" data-lang="en">Phase</th>
+            <th data-lang="es">Descripción</th><th class="wp-lang-hidden" data-lang="en">Description</th>
+            <th data-lang="es">Estado</th><th class="wp-lang-hidden" data-lang="en">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1</strong></td>
+            <td data-lang="es">LP + Hedge Backtester</td>
+            <td class="wp-lang-hidden" data-lang="en">LP + Hedge Backtester</td>
+            <td class="td-green" data-lang="es">✓ Completado</td>
+            <td class="td-green wp-lang-hidden" data-lang="en">✓ Complete</td>
+          </tr>
+          <tr>
+            <td><strong>2</strong></td>
+            <td data-lang="es">LP Defensor — Dashboard en vivo</td>
+            <td class="wp-lang-hidden" data-lang="en">LP Defensor — Live dashboard</td>
+            <td class="td-green" data-lang="es">✓ Completado</td>
+            <td class="td-green wp-lang-hidden" data-lang="en">✓ Complete</td>
+          </tr>
+          <tr>
+            <td><strong>3</strong></td>
+            <td data-lang="es">Whale Tracker — Señales en tiempo real</td>
+            <td class="wp-lang-hidden" data-lang="en">Whale Tracker — Real-time signals</td>
+            <td class="td-green" data-lang="es">✓ Completado</td>
+            <td class="td-green wp-lang-hidden" data-lang="en">✓ Complete</td>
+          </tr>
+          <tr>
+            <td><strong>4</strong></td>
+            <td data-lang="es">Copy Trading — Seguimiento automático</td>
+            <td class="wp-lang-hidden" data-lang="en">Copy Trading — Auto-follow</td>
+            <td class="td-cyan" data-lang="es">⟳ En progreso — Q2 2026</td>
+            <td class="td-cyan wp-lang-hidden" data-lang="en">⟳ In progress — Q2 2026</td>
+          </tr>
+          <tr>
+            <td><strong>5</strong></td>
+            <td data-lang="es">Expansión multi-chain (Arbitrum, Base)</td>
+            <td class="wp-lang-hidden" data-lang="en">Multi-chain expansion (Arbitrum, Base)</td>
+            <td class="td-amber" data-lang="es">◦ Próximamente</td>
+            <td class="td-amber wp-lang-hidden" data-lang="en">◦ Upcoming</td>
+          </tr>
+          <tr>
+            <td><strong>6</strong></td>
+            <td data-lang="es">VIZN Token &amp; Gobernanza DAO</td>
+            <td class="wp-lang-hidden" data-lang="en">VIZN Token &amp; DAO Governance</td>
+            <td class="td-amber" data-lang="es">◦ En investigación</td>
+            <td class="td-amber wp-lang-hidden" data-lang="en">◦ Under research</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ── 9. Lo que no somos ──────────────────────────────────── -->
+      <h2 id="s9">
+        <span class="wp-section-num">09</span>
+        <span data-lang="es">Lo Que No Somos (Aún)</span>
+        <span class="wp-lang-hidden" data-lang="en">What We Are Not (Yet)</span>
+      </h2>
+
+      <p data-lang="es">
+        La transparencia es un valor fundacional de VIZNIAGO. Creemos que un usuario bien informado
+        es un mejor usuario. Por eso listamos explícitamente lo que aún no somos:
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        Transparency is a foundational value of VIZNIAGO. We believe that a well-informed user is
+        a better user. That's why we explicitly list what we are not yet:
+      </p>
+
+      <ul>
+        <li data-lang="es"><strong>No somos un protocolo ni una blockchain propia.</strong> VIZNIAGO opera sobre Ethereum y Hyperliquid. No tenemos infraestructura de consenso propia.</li>
+        <li class="wp-lang-hidden" data-lang="en"><strong>We are not a protocol or blockchain.</strong> VIZNIAGO operates on Ethereum and Hyperliquid. We have no proprietary consensus infrastructure.</li>
+
+        <li data-lang="es"><strong>No hemos decidido si habrá un token VIZN.</strong> La posibilidad de un token de utilidad existe como idea en investigación (Fase 6). No hay fecha, no hay tokenomics definidos, no hay promesas.</li>
+        <li class="wp-lang-hidden" data-lang="en"><strong>We have not decided whether there will be a VIZN token.</strong> The possibility of a utility token exists as a research idea (Phase 6). No date, no defined tokenomics, no promises.</li>
+
+        <li data-lang="es"><strong>No estamos auditados.</strong> El código no ha pasado por una auditoría de seguridad formal. Recomendamos comenzar en paper mode y escalar gradualmente.</li>
+        <li class="wp-lang-hidden" data-lang="en"><strong>We are not audited.</strong> The code has not undergone a formal security audit. We recommend starting in paper mode and scaling gradually.</li>
+
+        <li data-lang="es"><strong>La estrategia BTC no está validada.</strong> El backtester muestra que el costo de cobertura supera la protección en BTC/USDT. No recomendamos usarla.</li>
+        <li class="wp-lang-hidden" data-lang="en"><strong>The BTC strategy is not validated.</strong> The backtester shows that hedging cost exceeds protection for BTC/USDT. We don't recommend using it.</li>
+
+        <li data-lang="es"><strong>No garantizamos rentabilidad.</strong> Los mercados son inciertos. El backtester valida la estrategia en datos históricos; el rendimiento futuro puede diferir.</li>
+        <li class="wp-lang-hidden" data-lang="en"><strong>We do not guarantee profitability.</strong> Markets are uncertain. The backtester validates the strategy on historical data; future performance may differ.</li>
+      </ul>
+
+      <div class="wp-callout wp-callout--warn">
+        <div class="wp-callout-label">⚠ Aviso de riesgo</div>
+        <p data-lang="es">DeFi implica riesgos de smart contract, liquidez, oracle y mercado. Nunca uses capital que no puedas permitirte perder. VIZNIAGO es una herramienta de gestión, no un asesor financiero.</p>
+        <p class="wp-lang-hidden" data-lang="en">DeFi involves smart contract, liquidity, oracle, and market risks. Never use capital you cannot afford to lose. VIZNIAGO is a management tool, not a financial advisor.</p>
+      </div>
+
+      <!-- ── 10. Contacto ────────────────────────────────────────── -->
+      <h2 id="s10">
+        <span class="wp-section-num">10</span>
+        <span data-lang="es">Contacto &amp; Comunidad</span>
+        <span class="wp-lang-hidden" data-lang="en">Contact &amp; Community</span>
+      </h2>
+
+      <p data-lang="es">
+        VIZNIAGO es un proyecto en construcción activa. Nos interesa conectar con LPs,
+        investigadores DeFi, y cualquiera que haya sentido el dolor de la pérdida impermanente.
+      </p>
+      <p class="wp-lang-hidden" data-lang="en">
+        VIZNIAGO is an actively evolving project. We're interested in connecting with LPs,
+        DeFi researchers, and anyone who has felt the pain of impermanent loss.
+      </p>
+
+      <table>
+        <tbody>
+          <tr>
+            <td><strong>Telegram</strong></td>
+            <td><a href="https://t.me/vizniago_bot" target="_blank" style="color:var(--wp-accent)">@vizniago_bot</a></td>
+          </tr>
+          <tr>
+            <td><strong data-lang="es">Plataforma</strong><strong class="wp-lang-hidden" data-lang="en">Platform</strong></td>
+            <td><a href="../index.html" style="color:var(--wp-accent)">vizniago.io</a></td>
+          </tr>
+          <tr>
+            <td><strong data-lang="es">Versión</strong><strong class="wp-lang-hidden" data-lang="en">Version</strong></td>
+            <td style="font-family:var(--wp-mono);color:var(--wp-muted)">v1.0 · Beta Pública · Abril 2026</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <hr />
+
+      <p style="font-size:0.8rem;color:var(--wp-muted);text-align:center;font-family:var(--wp-mono)" data-lang="es">
+        Este documento es informativo y no constituye asesoría financiera ni de inversión.<br/>
+        La estrategia debe validarse con el backtester antes de cualquier despliegue en vivo.
+      </p>
+      <p style="font-size:0.8rem;color:var(--wp-muted);text-align:center;font-family:var(--wp-mono)" class="wp-lang-hidden" data-lang="en">
+        This document is informational and does not constitute financial or investment advice.<br/>
+        The strategy should be validated with the backtester before any live deployment.
+      </p>
+
+    </main>
+  </div>
+
+  <!-- ============================================================
+       FOOTER
+  ============================================================ -->
+  <div class="wp-wrap">
+    <footer class="wp-footer">
+      <div>VIZNIAGO DeFi · Whitepaper v1.0 · Abril 2026</div>
+      <div style="margin-top:0.4rem">
+        <a href="../index.html">Backtester</a>
+        <a href="../dashboard/index.html">LP Defensor</a>
+        <a href="../whale/index.html">Whale Tracker</a>
+        <a href="https://t.me/vizniago_bot" target="_blank">Telegram</a>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ============================================================
+       SCRIPTS
+  ============================================================ -->
+  <script>
+    // Language toggle
+    let wpLang = 'es';
+    function setWpLang(lang) {
+      wpLang = lang;
+      // Update all data-lang elements
+      document.querySelectorAll('[data-lang]').forEach(el => {
+        const elLang = el.getAttribute('data-lang');
+        el.classList.toggle('wp-lang-hidden', elLang !== lang);
+      });
+      // Update nav lang buttons
+      ['es','en'].forEach(l => {
+        const navBtn = document.getElementById('nav-lang-' + l);
+        const wpBtn  = document.getElementById('wp-lang-' + l);
+        if (navBtn) navBtn.classList.toggle('active', l === lang);
+        if (wpBtn)  wpBtn.classList.toggle('active',  l === lang);
+      });
+      document.documentElement.lang = lang;
+    }
+
+    // Mobile nav
+    function toggleMobileNav() {
+      document.getElementById('navbar-links').classList.toggle('open');
+      document.getElementById('navbar-hamburger').classList.toggle('open');
+    }
+    document.addEventListener('click', function(e) {
+      const nav = document.querySelector('.navbar');
+      if (nav && !nav.contains(e.target)) {
+        document.getElementById('navbar-links')?.classList.remove('open');
+        document.getElementById('navbar-hamburger')?.classList.remove('open');
+      }
+    });
+
+    // Init language from nav global if available
+    document.addEventListener('DOMContentLoaded', () => setWpLang('es'));
+  </script>
+
+</body>
+</html>

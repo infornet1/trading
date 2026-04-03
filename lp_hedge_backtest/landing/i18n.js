@@ -21,7 +21,7 @@ const TRANSLATIONS = {
     'nav.title':                 'LP + Perps Hedge Backtester',
     'nav.dashboard':             '📈 Panel en Vivo',
     'nav.docs':                  'Docs',
-    'nav.defi.dashboard':        'Dashboard',
+    'nav.defi.dashboard':        'LP Defensor',
     'nav.defi.dashboard.sub':    'Bots LP en vivo',
     'nav.soon':                  'Próximamente',
 
@@ -143,7 +143,7 @@ const TRANSLATIONS = {
     'cta.btn':                'Notifícame',
 
     // ── Landing: footer ───────────────────────────────────────────
-    'footer.text':       'LP + Perps Hedge Backtester — VIZNIAGO FURY © 2026',
+    'footer.text':       'DeFi LP Platform — VIZNIAGO © 2026',
     'footer.strategies': 'Estrategias',
     'footer.metrics':    'Métricas',
     'footer.docs':       'Docs',
@@ -293,7 +293,7 @@ const TRANSLATIONS = {
     'nav.title':                 'LP + Perps Hedge Backtester',
     'nav.dashboard':             '📈 Live Dashboard',
     'nav.docs':                  'Docs',
-    'nav.defi.dashboard':        'Dashboard',
+    'nav.defi.dashboard':        'LP Defensor',
     'nav.defi.dashboard.sub':    'Live LP hedge bots',
     'nav.soon':                  'Coming soon',
 
@@ -415,7 +415,7 @@ const TRANSLATIONS = {
     'cta.btn':                'Notify Me',
 
     // ── Landing: footer ───────────────────────────────────────────
-    'footer.text':       'LP + Perps Hedge Backtester — VIZNIAGO FURY © 2026',
+    'footer.text':       'DeFi LP Platform — VIZNIAGO © 2026',
     'footer.strategies': 'Strategies',
     'footer.metrics':    'Metrics',
     'footer.docs':       'Docs',
