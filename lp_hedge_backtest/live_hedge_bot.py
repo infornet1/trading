@@ -81,7 +81,7 @@ BOUNDS_REFRESH_H    = int(os.getenv("BOUNDS_REFRESH_HOURS",   "4"))
 
 # Entry
 TRIGGER_OFFSET      = float(os.getenv("TRIGGER_OFFSET_PCT",    "0.5")) / 100.0
-UPPER_BUFFER        = float(os.getenv("UPPER_BUFFER_PCT",       "2.0")) / 100.0
+UPPER_BUFFER        = TRIGGER_OFFSET   # mirrors lower-trigger buffer — one consistent user-controlled value
 
 # Sizing
 HEDGE_RATIO         = float(os.getenv("HEDGE_RATIO",           "50.0"))

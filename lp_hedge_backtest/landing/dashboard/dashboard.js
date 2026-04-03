@@ -1914,8 +1914,12 @@ function buildProtectionDrawer(pos) {
     const pair  = `${pos.token0Info.symbol}/${pos.token1Info.symbol}`;
     const range = `${formatPrice(pos.priceLower)} – ${formatPrice(pos.priceUpper)}`;
 
-    bodyHtml = `
-      ${isBTC ? `<p class="prot-btc-warning">⚠&nbsp; ${t('prot.btc.warning')}</p>` : ''}
+    bodyHtml = isBTC ? `
+      <div class="prot-btc-soon">
+        <div class="prot-btc-soon-icon">₿</div>
+        <p class="prot-btc-soon-title">${t('prot.btc.soon.title')}</p>
+        <p class="prot-btc-soon-msg">${t('prot.btc.soon.msg')}</p>
+      </div>` : `
       <div class="prot-form" id="prot-form-${tokenId}">
 
         <!-- Header: pair + range -->
@@ -1953,15 +1957,17 @@ function buildProtectionDrawer(pos) {
           </span>
         </div>
 
-        <!-- Buffer de Breakout (trigger offset slider) -->
+        <!-- Buffer de Confirmación (trigger offset slider — applies to BOTH triggers) -->
         <div class="tp-slider-row">
           <div class="tp-slider-header">
-            <span class="tp-slider-label">Buffer de Breakout
+            <span class="tp-slider-label">Buffer de Confirmación
               <span class="tp-info-anchor" tabindex="0" aria-label="Qué es esto">❓
                 <span class="tp-info-popover">
                   <strong>¿Cuándo dispara el bot?</strong><br><br>
-                  Cuando el precio cae este % por debajo del <em>piso</em> de tu rango LP, el bot abre la cobertura SHORT automáticamente.<br><br>
-                  <span style="color:#00d4ff">Ej: Piso $2,030 · -0.5% → SHORT se abre en $2,020</span><br><br>
+                  Este % se aplica a <em>ambos</em> disparadores:<br><br>
+                  <strong>↑ Desde arriba:</strong> precio cae este % por debajo del <em>techo</em> del rango → SHORT abierto dentro del rango.<br><br>
+                  <strong>↓ Ruptura inferior:</strong> precio cae este % por debajo del <em>piso</em> del rango → SHORT de protección IL.<br><br>
+                  <span style="color:#00d4ff">Ej: Techo $2,100 · 2% → disparo en $2,058 &nbsp;|&nbsp; Piso $1,900 · 2% → disparo en $1,862</span><br><br>
                   ⚠️ <strong>No es el Stop Loss</strong> — el SL es un campo separado.
                 </span>
               </span>
@@ -2090,8 +2096,8 @@ function buildProtectionDrawer(pos) {
         </button>
       </div>`;
 
-    // Kick off async HL balance fetch and capital estimate after render
-    setTimeout(() => initTradingPanel(tokenId, pos), 0);
+    // Kick off async HL balance fetch and capital estimate after render (ETH pools only)
+    if (!isBTC) setTimeout(() => initTradingPanel(tokenId, pos), 0);
   }
 
   const isActive = bot?.active;

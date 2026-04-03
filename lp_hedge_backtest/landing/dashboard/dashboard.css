@@ -1266,6 +1266,28 @@
   padding: 8px 12px;
   margin-bottom: 12px;
 }
+.prot-btc-soon {
+  text-align: center;
+  padding: 24px 16px;
+  background: rgba(251,191,36,0.04);
+  border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 8px;
+}
+.prot-btc-soon-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+.prot-btc-soon-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fbbf24;
+  margin: 0 0 6px;
+}
+.prot-btc-soon-msg {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0;
+}
 
 /* Form fields */
 .prot-form { display: flex; flex-direction: column; gap: 10px; }

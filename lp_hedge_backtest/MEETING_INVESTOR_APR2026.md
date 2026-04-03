@@ -85,7 +85,10 @@
 | Extend hedge slider to 200% | Medium | Frontend fix (dashboard.js line 1995). Add warning label above 100%: "Modo Ofensivo — directional bet, not pure protection". |
 | "Modo Ofensivo" UX design | Low | Consider toggle or separate mode label rather than just extending slider silently. |
 | BTC pool support | Medium | Investor opened a WBTC/USDC LP — not displayed, not supported. Two parts: (1) dashboard reads WBTC positions (display only, no bot); (2) optional BTC short hedge — user opt-in with explicit warning "against default strategy recommendation". Some users may want directional short on BTC. Golden rule from Jaime is no BTC shorts — but platform should let advanced users override with informed consent. |
-| Follow-up with investor | High | Outcome of today's meeting TBD — did he approve support capital? |
+| Telegram maintenance alert | Tier1 / Low | When admin toggles maintenance ON/OFF → send Telegram notification to VIZNAGO bot. Bot state updates so it replies to users with maintenance notice instead of normal commands. Workaround for maintenance testing — not critical yet. |
+| VIZBOT AI maintenance awareness | Tier1 / Low | When maintenance flag ON → VIZBOT dynamically prepends maintenance context to system prompt per request ("site under maintenance, bots suspended"). Currently KB is static/cached — needs dynamic maintenance check per request. Workaround for testing — not critical yet. |
+| dApp Log (user-facing audit trail) | Roadmap | Raw event log moved to Admin dashboard (alpha). Future: dedicated dApp Log menu page — plain language, filterable, user-friendly ("Bot protected your LP at $2,086, saved $59"). Do NOT show raw DB events to end users (Uniswap/Binance don't either). |
+| Follow-up with investor | High | Outcome: POSITIVE — investor likely to support ✅. Confirm capital commitment and next steps. |
 
 ---
 
