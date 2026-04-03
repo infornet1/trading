@@ -96,7 +96,7 @@ async function signIn() {
     if (!nonceRes.ok) throw new Error('Error al obtener nonce.');
     const { nonce } = await nonceRes.json();
 
-    const sig = await signer.signMessage(`Sign in to VIZNAGO FURY\nNonce: ${nonce}`);
+    const sig = await signer.signMessage(`Sign in to VIZNIAGO FURY\nNonce: ${nonce}`);
 
     const verRes = await fetch(`${API_BASE}/auth/verify`, {
       method: 'POST',
@@ -311,22 +311,28 @@ function poolHealth(p, currentPrice) {
   }
 
   if (currentPrice && (p.pair.startsWith('ETH') || p.pair.startsWith('WETH'))) {
-    const pct_to_lower = (currentPrice - p.lower_bound) / currentPrice;
-    const pct_to_upper = (p.upper_bound - currentPrice) / currentPrice;
+    // Use actual trigger prices (not raw bounds) — trigger_pct is stored negative e.g. -0.5
+    const trigPct       = p.trigger_pct ?? -0.5;
+    const lowerTrigPx   = p.lower_bound * (1 + trigPct / 100);
+    const upperTrigPx   = p.upper_bound * (1 - trigPct / 100);
+    const pct_to_lower  = (currentPrice - lowerTrigPx) / currentPrice;
+    const pct_to_upper  = (upperTrigPx  - currentPrice) / currentPrice;
 
-    if (currentPrice < p.lower_bound) {
+    if (currentPrice <= lowerTrigPx) {
       return lastType === 'hedge_opened'
-        ? { level: 'yellow', reason: 'Fuera de rango (abajo) — short cubriendo' }
-        : { level: 'red',    reason: 'Fuera de rango (abajo) — SIN cobertura' };
+        ? { level: 'yellow', reason: 'Trigger bajista alcanzado — short activo' }
+        : { level: 'red',    reason: 'Trigger bajista alcanzado — SIN cobertura activa' };
     }
-    if (currentPrice > p.upper_bound) {
-      return { level: 'yellow', reason: 'Fuera de rango (arriba) — en espera' };
+    if (currentPrice >= upperTrigPx) {
+      return lastType === 'hedge_opened'
+        ? { level: 'yellow', reason: 'Trigger alcista alcanzado — short activo' }
+        : { level: 'yellow', reason: 'Trigger alcista — SHORT pendiente de abrir' };
     }
     if (pct_to_lower < NEAR_EDGE_PCT) {
-      return { level: 'yellow', reason: `Cerca del límite inferior (${(pct_to_lower*100).toFixed(1)}%)` };
+      return { level: 'yellow', reason: `Cerca del trigger bajista (${(pct_to_lower*100).toFixed(1)}%)` };
     }
     if (pct_to_upper < NEAR_EDGE_PCT) {
-      return { level: 'yellow', reason: `Cerca del límite superior (${(pct_to_upper*100).toFixed(1)}%)` };
+      return { level: 'yellow', reason: `Cerca del trigger alcista (${(pct_to_upper*100).toFixed(1)}%)` };
     }
   }
 
@@ -335,6 +341,15 @@ function poolHealth(p, currentPrice) {
   }
 
   return { level: 'green', reason: 'En rango — fees activos' };
+}
+
+// Helper: compute both trigger prices for a pool config
+function poolTriggers(p) {
+  const trigPct = p.trigger_pct ?? -0.5;
+  return {
+    lower: p.lower_bound * (1 + trigPct / 100),
+    upper: p.upper_bound * (1 - trigPct / 100),
+  };
 }
 
 // ── Whale card HTML ────────────────────────────────────────────────────────
@@ -513,6 +528,30 @@ function poolCard(p, ethPrice, isHistorical = false) {
       <div class="range-bar-cursor" style="left:${cursorPct}%"></div>
     </div>
   </div>
+
+  ${(() => {
+    const { lower: lTrig, upper: uTrig } = poolTriggers(p);
+    const trigRow = `
+  <div class="pool-row">
+    <span class="pool-label">Triggers ↓↑</span>
+    <span class="pool-val" style="font-size:.72rem">
+      <span style="color:#f87171">$${fmtNum(lTrig)}</span>
+      <span style="color:var(--muted)"> · </span>
+      <span style="color:#fbbf24">$${fmtNum(uTrig)}</span>
+    </span>
+  </div>`;
+    if (!ethPrice || !(p.pair.startsWith('ETH') || p.pair.startsWith('WETH'))) return trigRow;
+    const distL   = ((ethPrice - lTrig) / ethPrice) * 100;
+    const distU   = ((uTrig - ethPrice)  / ethPrice) * 100;
+    const nearest = Math.abs(distL) <= Math.abs(distU) ? distL : distU;
+    const dir     = Math.abs(distL) <= Math.abs(distU) ? '↓' : '↑';
+    const cls     = Math.abs(nearest) < 2 ? 'red' : Math.abs(nearest) < 5 ? 'yellow' : 'green';
+    return trigRow + `
+  <div class="pool-row">
+    <span class="pool-label">Distancia trigger</span>
+    <span class="pool-val pool-val--${cls}">${dir} ${Math.abs(nearest).toFixed(1)}%</span>
+  </div>`;
+  })()}
 
   <div class="pool-row">
     <span class="pool-label">Salud</span>
@@ -909,6 +948,17 @@ function renderRiskStrip(pools) {
       ? `<span class="${pnlVal >= 0 ? 'risk-pnl-pos' : 'risk-pnl-neg'}">${pnlVal >= 0 ? '+' : ''}$${fmtNum(Math.abs(pnlVal))}</span>`
       : '';
     const hbHtml  = p.last_heartbeat ? heartbeatBadgeHtml(p.last_heartbeat) : '';
+    // Distance to nearest trigger in risk strip
+    let distHtml = '';
+    if (state.ethPrice && (p.pair.startsWith('ETH') || p.pair.startsWith('WETH'))) {
+      const { lower: lTrig, upper: uTrig } = poolTriggers(p);
+      const distL   = ((state.ethPrice - lTrig) / state.ethPrice) * 100;
+      const distU   = ((uTrig - state.ethPrice)  / state.ethPrice) * 100;
+      const nearest = Math.abs(distL) <= Math.abs(distU) ? distL : distU;
+      const dir     = Math.abs(distL) <= Math.abs(distU) ? '↓' : '↑';
+      const cls     = Math.abs(nearest) < 2 ? 'risk-pnl-neg' : Math.abs(nearest) < 5 ? '' : '';
+      distHtml = `<span class="risk-sep">·</span><span class="${cls}" title="Distancia al trigger">${dir}${Math.abs(nearest).toFixed(1)}%</span>`;
+    }
     return `
       <div class="risk-item" onclick="searchWalletDirect('${p.user_address}')" title="Click para ver detalle">
         <span class="risk-dot ${dotCls}"></span>
@@ -918,6 +968,7 @@ function renderRiskStrip(pools) {
         <span class="risk-sep">·</span>
         <span class="risk-entry">Entry ${price}</span>
         ${pnlHtml ? `<span class="risk-sep">·</span>${pnlHtml}` : ''}
+        ${distHtml}
         ${hbHtml}
       </div>`;
   }).join('');
