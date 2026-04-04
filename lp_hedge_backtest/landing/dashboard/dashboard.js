@@ -2190,6 +2190,19 @@ function buildProtectionDrawer(pos) {
           <div class="tp-range">Range ${range}</div>
         </div>
 
+        <!-- HL Credentials -->
+        <div class="prot-field">
+          <label class="prot-label prot-label--warning">${t('prot.wallet.label')}</label>
+          <input type="text" class="prot-input prot-input-full"
+                 id="prot-wallet-${tokenId}" value="${hlWallet}"
+                 placeholder="${t('prot.wallet.placeholder')}" />
+        </div>
+        <div class="prot-field" style="margin-bottom:4px">
+          <label class="prot-label prot-label--danger">${t('prot.apikey.label')}</label>
+          <input type="password" class="prot-input prot-input-full"
+                 id="prot-apikey-${tokenId}" placeholder="${apiKeyPH}" autocomplete="off" />
+        </div>
+
         <!-- HL Balance (M2-4) -->
         <div class="prot-hl-balance-bar" id="prot-hl-bal-${tokenId}">
           <span class="prot-hl-bal-label">HL Balance</span>
@@ -2351,19 +2364,6 @@ function buildProtectionDrawer(pos) {
           <input type="checkbox" id="prot-rearm-${tokenId}" ${rearmVal ? 'checked' : ''} />
           <label class="tp-check-label" for="prot-rearm-${tokenId}">Auto-rearm</label>
           <span class="tp-check-hint">Tras SL, el bot vuelve a buscar breakouts</span>
-        </div>
-
-        <!-- HL Credentials -->
-        <div class="prot-field">
-          <label class="prot-label prot-label--warning">${t('prot.wallet.label')}</label>
-          <input type="text" class="prot-input prot-input-full"
-                 id="prot-wallet-${tokenId}" value="${hlWallet}"
-                 placeholder="${t('prot.wallet.placeholder')}" />
-        </div>
-        <div class="prot-field" style="margin-bottom:4px">
-          <label class="prot-label prot-label--danger">${t('prot.apikey.label')}</label>
-          <input type="password" class="prot-input prot-input-full"
-                 id="prot-apikey-${tokenId}" placeholder="${apiKeyPH}" autocomplete="off" />
         </div>
 
         <button class="btn btn-primary btn-sm prot-btn-full"
