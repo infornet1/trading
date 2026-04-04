@@ -2202,6 +2202,7 @@ function buildProtectionDrawer(pos) {
           <input type="password" class="prot-input prot-input-full"
                  id="prot-apikey-${tokenId}" placeholder="${apiKeyPH}" autocomplete="off" />
         </div>
+        ${!hlWallet ? `<p style="font-size:0.6rem;color:var(--color-text-muted);margin:0 0 8px">${t('prot.wallet.hint')}</p>` : ''}
 
         <!-- HL Balance (M2-4) -->
         <div class="prot-hl-balance-bar" id="prot-hl-bal-${tokenId}">
