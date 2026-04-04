@@ -136,22 +136,31 @@ by bot code. This means they execute even if the bot process is down.
 
 ### TIER 1 — High visual impact, close gap fast (frontend only)
 
-| ID | Item | Effort | Why |
-|---|---|---|---|
-| M2-1 | Fee projections on position card (daily/weekly/monthly/annual) | Low | Most compelling investor metric — shows yield potential at a glance |
-| M2-2 | APR + Fee APR in position card header | Low | They see value immediately, no scrolling needed |
-| M2-3 | Distance to trigger % + show BOTH upper and lower triggers in active bot card | Low | "How close is the bot to firing?" — both directions; they show upper+lower |
-| M2-4 | HL balance shown inside protection config modal | Low | Direct investor meeting 1 feedback, they already have it |
+| ID | Item | Effort | Why | Status |
+|---|---|---|---|---|
+| M2-1 | Fee projections on position card (daily/weekly/monthly/annual) | Low | Most compelling investor metric — shows yield potential at a glance | 🔲 |
+| M2-2 | APR + Fee APR in position card header | Low | They see value immediately, no scrolling needed | 🔲 |
+| M2-3 | Distance to trigger % + show BOTH upper and lower triggers in active bot card | Low | "How close is the bot to firing?" — both directions; they show upper+lower | 🔲 |
+| M2-4 | HL balance shown inside protection config modal | Low | Direct investor meeting 1 feedback, they already have it | ✅ Done |
 
 ### TIER 2 — UX parity + important improvements
 
-| ID | Item | Effort | Why |
-|---|---|---|---|
-| M2-5 | IL vs Fees P&L split on position card | Medium | Honest breakdown — fees are good news, IL is the cost |
-| M2-6 | Buffer Capital pill buttons (Sin/+10/+20/+30/+50%) | Low | Cleaner than slider, shows options at a glance |
-| M2-7 | Backtesting link/embed inside LP Defensor | Low | Bring it closer to the product, not a separate page |
-| M2-8 | Orphan order cleanup audit | Medium | Resilience — verify TPs cancel on SL and vice versa |
-| M2-12 | Frontend restart/maintenance guard | Low | UX resilience — auto-detect API unavailability, show non-dismissible "Reconnecting…" overlay + disable all interactive elements (buttons/forms) during maintenance flag or outage. Reuses existing `/status/maintenance` poll. Two layers: (1) maintenance flag disables UI, (2) 2x consecutive health check fails triggers overlay. Frontend only, zero backend change, zero restart needed. |
+| ID | Item | Effort | Why | Status |
+|---|---|---|---|---|
+| M2-5 | IL vs Fees P&L split on position card | Medium | Honest breakdown — fees are good news, IL is the cost | 🔲 |
+| M2-6 | Buffer Capital pill buttons (Sin/+10/+20/+30/+50%) | Low | Cleaner than slider, shows options at a glance | 🔲 |
+| M2-7 | Backtesting link/embed inside LP Defensor | Low | Bring it closer to the product, not a separate page | 🔲 |
+| M2-8 | Orphan order cleanup audit | Medium | Resilience — verify TPs cancel on SL and vice versa | 🔲 |
+| M2-12 | Frontend restart/maintenance guard | Low | UX resilience — auto-detect API unavailability, show non-dismissible "Reconnecting…" overlay + disable all interactive elements (buttons/forms) during maintenance flag or outage. Reuses existing `/status/maintenance` poll. Two layers: (1) maintenance flag disables UI, (2) 2x consecutive health check fails triggers overlay. Frontend only, zero backend change, zero restart needed. | 🔲 |
+
+### Live Session Improvements (2026-04-04 — during investor meeting)
+
+| Item | Description | Status |
+|---|---|---|
+| HL Wallet + API Key reordered to top of form | Moved credentials to position 2 (right after header, before HL Balance bar) — investor feedback "nice" | ✅ Done |
+| Wallet hint for new users | Shows "Ingresa tu wallet para ver el balance" below API key when no wallet pre-filled | ✅ Done |
+| Defensor Bajista desc precision | "SHORT solo en caídas" → "SHORT solo cuando el precio rompe por debajo del rango" | ✅ Done |
+| Defensor Bajista disabled — Próximamente badge | Silent bug discovered: both modes identical in bot code (from_above trigger always active). Bajista disabled with amber pill until M2-13 ships. Alcista auto-selected as only active mode. | ✅ Done |
 
 ### TIER 3 — Architecture resilience (deferred — post investor meeting)
 
@@ -199,4 +208,4 @@ by bot code. This means they execute even if the bot process is down.
 
 ---
 
-*Last updated: 2026-04-03*
+*Last updated: 2026-04-04*
