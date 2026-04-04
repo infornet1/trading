@@ -20,14 +20,24 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # ── Hyperliquid helper ──────────────────────────────────────────────────────
 
 async def _fetch_hl_balance(wallet_addr: str) -> float | None:
-    """Lightweight HL balance fetch — account_value only, no fills/orders."""
+    """Lightweight HL balance fetch — perp + spot USDC (unified account)."""
     def _sync():
         try:
             from hyperliquid.info import Info
             from hyperliquid.utils import constants
-            info  = Info(constants.MAINNET_API_URL, skip_ws=True)
-            state = info.user_state(wallet_addr)
-            return float(state["marginSummary"]["accountValue"])
+            info     = Info(constants.MAINNET_API_URL, skip_ws=True)
+            state    = info.user_state(wallet_addr)
+            perp_val = float(state["marginSummary"]["accountValue"])
+            spot_usdc = 0.0
+            try:
+                spot = info.spot_user_state(wallet_addr)
+                for b in spot.get("balances", []):
+                    if b["coin"] == "USDC":
+                        spot_usdc = float(b["total"])
+                        break
+            except Exception:
+                pass
+            return perp_val + spot_usdc
         except Exception:
             return None
 

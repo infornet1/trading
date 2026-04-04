@@ -2440,6 +2440,14 @@ window.onWalletSelectChange = function (tokenId) {
     input.focus();
     if (apkeyEl) apkeyEl.placeholder = t('prot.apikey.placeholder');
   }
+  // Re-fetch balance for the newly selected wallet and update margin box
+  const selectedWallet = sel.value || null;
+  _hlBalanceCache = null;
+  const pos = state.positions?.find(p => String(p.tokenId) === String(tokenId));
+  if (pos) fetchHLBalance(selectedWallet).then(data => {
+    if (data) _hlBalanceCache = data;
+    _updateMarginBox(tokenId, pos);
+  });
 };
 
 // ── Activate bot ──────────────────────────────────────────────────────────
@@ -2557,14 +2565,15 @@ function calcXMaxEth(liquidity, tickLower, tickUpper) {
 let _hlBalanceCache = null;
 let _hlBalanceFetching = false;
 
-async function fetchHLBalance() {
-  if (_hlBalanceFetching) return _hlBalanceCache;
-  if (_hlBalanceCache !== null) return _hlBalanceCache;
+async function fetchHLBalance(walletAddr) {
+  if (!walletAddr && _hlBalanceFetching) return _hlBalanceCache;
+  if (!walletAddr && _hlBalanceCache !== null) return _hlBalanceCache;
   if (!saas.jwt) return null;
   _hlBalanceFetching = true;
   try {
-    const data = await apiCall('GET', '/bots/hl-balance');
-    _hlBalanceCache = data;
+    const url  = walletAddr ? `/bots/hl-balance?wallet=${encodeURIComponent(walletAddr)}` : '/bots/hl-balance';
+    const data = await apiCall('GET', url);
+    if (!walletAddr) _hlBalanceCache = data;
     return data;
   } catch (_) {
     return null;

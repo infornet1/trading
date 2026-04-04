@@ -322,32 +322,49 @@ async def delete_bot(
 @router.get("/hl-balance")
 async def hl_balance(
     address: str = Depends(get_current_address),
+    wallet: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Returns the live Hyperliquid margin balance for the authenticated user's
-    HL wallet address (sourced from any of their bot configs).
-    Used by the trading panel margin calculator.
+    Returns the live Hyperliquid margin balance (perp + spot USDC).
+    Optional ?wallet=0x... param fetches a specific HL wallet directly.
+    Without it, falls back to the user's most recently created config wallet.
     """
-    result = await db.execute(
-        select(BotConfig)
-        .where(BotConfig.user_address == address)
-        .where(BotConfig.hl_wallet_addr.isnot(None))
-        .limit(1)
-    )
-    cfg = result.scalar_one_or_none()
-    if not cfg or not cfg.hl_wallet_addr:
-        return {"account_value": None, "total_margin_used": None, "error": "no_hl_wallet"}
+    hl_wallet_addr = wallet
+
+    if not hl_wallet_addr:
+        result = await db.execute(
+            select(BotConfig)
+            .where(BotConfig.user_address == address)
+            .where(BotConfig.hl_wallet_addr.isnot(None))
+            .order_by(BotConfig.id.desc())
+            .limit(1)
+        )
+        cfg = result.scalar_one_or_none()
+        if not cfg or not cfg.hl_wallet_addr:
+            return {"account_value": None, "total_margin_used": None, "error": "no_hl_wallet"}
+        hl_wallet_addr = cfg.hl_wallet_addr
 
     def _sync():
         try:
             from hyperliquid.info import Info
             from hyperliquid.utils import constants
             info  = Info(constants.MAINNET_API_URL, skip_ws=True)
-            state = info.user_state(cfg.hl_wallet_addr)
+            state = info.user_state(hl_wallet_addr)
             ms    = state.get("marginSummary", {})
+            perp_val = float(ms.get("accountValue") or 0)
+            # Unified accounts: spot USDC also backs perp positions
+            spot_usdc = 0.0
+            try:
+                spot = info.spot_user_state(hl_wallet_addr)
+                for b in spot.get("balances", []):
+                    if b["coin"] == "USDC":
+                        spot_usdc = float(b["total"])
+                        break
+            except Exception:
+                pass
             return {
-                "account_value":     float(ms.get("accountValue")     or 0),
+                "account_value":     perp_val + spot_usdc,
                 "total_margin_used": float(ms.get("totalMarginUsed")  or 0),
                 "error": None,
             }
