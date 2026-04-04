@@ -151,6 +151,7 @@ by bot code. This means they execute even if the bot process is down.
 | M2-6 | Buffer Capital pill buttons (Sin/+10/+20/+30/+50%) | Low | Cleaner than slider, shows options at a glance |
 | M2-7 | Backtesting link/embed inside LP Defensor | Low | Bring it closer to the product, not a separate page |
 | M2-8 | Orphan order cleanup audit | Medium | Resilience — verify TPs cancel on SL and vice versa |
+| M2-12 | Frontend restart/maintenance guard | Low | UX resilience — auto-detect API unavailability, show non-dismissible "Reconnecting…" overlay + disable all interactive elements (buttons/forms) during maintenance flag or outage. Reuses existing `/status/maintenance` poll. Two layers: (1) maintenance flag disables UI, (2) 2x consecutive health check fails triggers overlay. Frontend only, zero backend change, zero restart needed. |
 
 ### TIER 3 — Architecture resilience (important but not visual)
 
