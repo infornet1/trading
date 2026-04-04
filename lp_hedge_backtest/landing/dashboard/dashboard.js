@@ -2613,31 +2613,44 @@ async function fetchHLBalance(walletAddr) {
 
 // Called once after the trading panel is injected into DOM
 async function initTradingPanel(tokenId, pos) {
-  // Inject wallet dropdown if known HL wallets exist (runs after saas.bots is populated)
-  const walletInput = document.getElementById(`prot-wallet-${tokenId}`);
-  if (walletInput && !document.getElementById(`prot-wallet-select-${tokenId}`)) {
-    const knownWallets = [...new Set(
-      Object.values(saas.bots)
-        .map(b => b.hl_wallet_addr)
-        .filter(w => w && w.length > 0)
-    )];
-    if (knownWallets.length > 0) {
-      const currentVal = walletInput.value;
-      const preselect  = currentVal || knownWallets[0];
-      const options    = knownWallets.map(w =>
-        `<option value="${w}" ${w === preselect ? 'selected' : ''}>${w.slice(0,8)}…${w.slice(-6)}</option>`
-      ).join('');
+  const t = window.t || (k => k);
+  // Inject or refresh wallet dropdown from current saas.bots
+  const walletInput  = document.getElementById(`prot-wallet-${tokenId}`);
+  const existingSel  = document.getElementById(`prot-wallet-select-${tokenId}`);
+  const knownWallets = [...new Set(
+    Object.values(saas.bots)
+      .map(b => b.hl_wallet_addr)
+      .filter(w => w && w.length > 0)
+  )];
+
+  if (walletInput && knownWallets.length > 0) {
+    const currentVal = existingSel ? existingSel.value : walletInput.value;
+    const preselect  = currentVal || knownWallets[0];
+    const options    = knownWallets.map(w =>
+      `<option value="${w}" ${w === preselect ? 'selected' : ''}>${w.slice(0,8)}…${w.slice(-6)}</option>`
+    ).join('');
+    const optionsHtml = `${options}<option value="">＋ ${t('prot.wallet.new')}</option>`;
+
+    if (existingSel) {
+      // Dropdown already in DOM — just refresh options, preserve current selection
+      existingSel.innerHTML = optionsHtml;
+      existingSel.value = knownWallets.includes(currentVal) ? currentVal : preselect;
+      walletInput.value = existingSel.value;
+      const removeBtn = document.getElementById(`prot-wallet-remove-${tokenId}`);
+      if (removeBtn) removeBtn.style.display = existingSel.value ? '' : 'none';
+    } else {
+      // First render — build dropdown and inject into DOM
       const sel = document.createElement('select');
       sel.className = 'prot-input prot-wallet-select';
       sel.id        = `prot-wallet-select-${tokenId}`;
-      sel.innerHTML = `${options}<option value="">＋ ${t('prot.wallet.new')}</option>`;
+      sel.innerHTML = optionsHtml;
       sel.onchange  = () => window.onWalletSelectChange(tokenId);
 
       const removeBtn = document.createElement('button');
-      removeBtn.type      = 'button';
-      removeBtn.id        = `prot-wallet-remove-${tokenId}`;
-      removeBtn.className = 'prot-wallet-remove-btn';
-      removeBtn.title     = 'Eliminar wallet HL';
+      removeBtn.type        = 'button';
+      removeBtn.id          = `prot-wallet-remove-${tokenId}`;
+      removeBtn.className   = 'prot-wallet-remove-btn';
+      removeBtn.title       = 'Eliminar wallet HL';
       removeBtn.textContent = '🗑️';
       removeBtn.style.display = preselect ? '' : 'none';
       removeBtn.onclick = () => window.removeHLWallet(tokenId, sel);
@@ -2647,7 +2660,7 @@ async function initTradingPanel(tokenId, pos) {
       row.appendChild(sel);
       row.appendChild(removeBtn);
       walletInput.parentNode.insertBefore(row, walletInput);
-      walletInput.value        = preselect;
+      walletInput.value         = preselect;
       walletInput.style.display = 'none';
     }
   }
