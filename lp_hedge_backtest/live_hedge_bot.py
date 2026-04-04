@@ -422,6 +422,13 @@ class LiveHedgeBot:
             self.exchange.update_leverage(leverage, "ETH")
             order = self.exchange.market_open("ETH", False, size, slippage=0.01)
 
+            if order is None:
+                print(f"❌ market_open returned None — HL agent wallet not approved or API error", flush=True)
+                log_event("error", price=price, details={
+                    "msg": "market_open returned None — verify HL agent wallet is approved for this account"
+                })
+                return
+
             if order["status"] == "ok":
                 self._margin_fail_count    = 0   # reset on successful open
                 self._margin_backoff_until = 0.0

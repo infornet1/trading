@@ -19,6 +19,22 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 # ── Hyperliquid helper ──────────────────────────────────────────────────────
 
+async def _fetch_hl_balance(wallet_addr: str) -> float | None:
+    """Lightweight HL balance fetch — account_value only, no fills/orders."""
+    def _sync():
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+            info  = Info(constants.MAINNET_API_URL, skip_ws=True)
+            state = info.user_state(wallet_addr)
+            return float(state["marginSummary"]["accountValue"])
+        except Exception:
+            return None
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _sync)
+
+
 async def _fetch_hl_data(wallet_addr: str) -> dict:
     """Query Hyperliquid Info API in a thread (blocking SDK calls)."""
     def _sync():
@@ -240,7 +256,27 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                 "volume_usd":  round(config_volume, 2),
                 "hedge_ratio": float(cfg.hedge_ratio) if cfg.hedge_ratio is not None else 50.0,
                 "x_max_eth":   x_max_eth,
+                "hl_account_value": None,  # filled below
             })
+
+        # ── HL balance fetch (running bots only, parallel) ──────────────
+        unique_hl_wallets = list({
+            p["hl_wallet_addr"]
+            for p in pools
+            if p["running"] and p["hl_wallet_addr"]
+        })
+        if unique_hl_wallets:
+            balances = await asyncio.gather(
+                *[_fetch_hl_balance(w) for w in unique_hl_wallets],
+                return_exceptions=True,
+            )
+            balance_map = {
+                w: (b if not isinstance(b, Exception) else None)
+                for w, b in zip(unique_hl_wallets, balances)
+            }
+            for p in pools:
+                if p["hl_wallet_addr"] in balance_map:
+                    p["hl_account_value"] = balance_map[p["hl_wallet_addr"]]
 
         # ── User acquisition stats ──────────────────────────────────────
         total_registered = (await db.execute(

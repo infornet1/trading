@@ -425,6 +425,7 @@ function whaleCard(p, isHistorical = false) {
     </div>
   </div>
   <div class="pool-wallet">${p.user_address}</div>
+  ${p.hl_wallet_addr ? `<div class="pool-wallet" style="color:var(--amber);font-size:.62rem" title="HL protection wallet">HL: ${p.hl_wallet_addr}</div>` : ''}
 
   <button class="detail-toggle" onclick="toggleDetail(${p.config_id})">
     ${isExpanded ? '▲ Ocultar historial' : '▼ Ver historial de señales'}
@@ -599,6 +600,13 @@ function poolCard(p, ethPrice, isHistorical = false) {
     <span style="color:var(--muted);font-size:.7rem">${p.user_plan.toUpperCase()}</span>
   </div>
   <div class="pool-wallet">${p.user_address}</div>
+  ${p.hl_wallet_addr ? `<div class="pool-wallet" style="color:var(--amber);font-size:.62rem" title="HL protection wallet">HL: ${p.hl_wallet_addr}</div>` : ''}
+  ${p.hl_wallet_addr ? `<div class="pool-row" style="margin-top:.25rem">
+    <span class="pool-label">HL Balance</span>
+    <span class="pool-val ${p.hl_account_value == null ? '' : p.hl_account_value <= 0 ? 'pool-val--red' : p.hl_account_value < 20 ? 'pool-val--yellow' : 'pool-val--green'}">${
+      p.hl_account_value == null ? '—' : '$' + p.hl_account_value.toFixed(2)
+    }</span>
+  </div>` : ''}
 
   <button class="detail-toggle" onclick="toggleDetail(${p.config_id})">
     ${isExpanded ? '▲ Ocultar detalle' : '▼ Ver detalle HL + historial'}
