@@ -2240,6 +2240,41 @@
   flex-shrink: 0;
   font-family: monospace;
 }
+.evt-dimmed { opacity: 0.55; }
+.evt-session-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.evt-session-header:hover { background: rgba(255,255,255,0.06); }
+.evt-session-chevron {
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  width: 10px;
+}
+.evt-session-label {
+  font-size: 0.65rem;
+  color: var(--amber, #f59e0b);
+  flex: 1;
+}
+.evt-session-count {
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  font-family: monospace;
+}
+.evt-session-body {
+  padding-left: 8px;
+  border-left: 2px solid rgba(245,158,11,0.2);
+  margin-bottom: 4px;
+}
 
 /* ── M2-3: Distance to trigger row ──────────────────────────── */
 .hedge-distance-row {

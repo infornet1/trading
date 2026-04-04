@@ -1309,7 +1309,7 @@ async function loadPositionEvents(tokenId) {
   if (!el || !bot || !saas.jwt) return;
 
   try {
-    const events = await apiCall('GET', `/bots/${bot.id}/events?limit=5`);
+    const events = await apiCall('GET', `/bots/${bot.id}/events?limit=50`);
     if (!Array.isArray(events) || !events.length) {
       el.innerHTML = `
         <div class="pos-events-header"><span>Eventos del Bot</span></div>
@@ -1317,6 +1317,7 @@ async function loadPositionEvents(tokenId) {
       el.style.display = '';
       return;
     }
+
     const typeMap = {
       hedge_opened:          { icon: '🔴', label: 'SHORT Abierto',      cls: 'evt-short'   },
       stopped:               { icon: '🟢', label: 'SHORT Cerrado',      cls: 'evt-close'   },
@@ -1330,7 +1331,7 @@ async function loadPositionEvents(tokenId) {
       error:                 { icon: '⚠️',  label: 'Error',             cls: 'evt-error'   },
     };
 
-    const rows = events.map(ev => {
+    const buildEventRow = (ev, dimmed) => {
       const m     = typeMap[ev.event_type] || { icon: '●', label: ev.event_type.replace(/_/g,' '), cls: 'evt-info' };
       const ts    = ev.ts.endsWith('Z') ? ev.ts : ev.ts + 'Z';
       const time  = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1340,25 +1341,71 @@ async function loadPositionEvents(tokenId) {
       const pnl   = ev.pnl != null
         ? `<span class="evt-pnl ${ev.pnl >= 0 ? 'evt-pnl-pos' : 'evt-pnl-neg'}">${ev.pnl >= 0 ? '+' : ''}$${Number(ev.pnl).toFixed(2)}</span>`
         : '';
-      return `<div class="pos-event-row">
+      return `<div class="pos-event-row${dimmed ? ' evt-dimmed' : ''}">
         <span class="evt-icon">${m.icon}</span>
         <span class="evt-label ${m.cls}">${m.label}</span>
         ${price}${pnl}
         <span class="evt-time">${time}</span>
       </div>`;
-    }).join('');
+    };
+
+    // Split events into sessions — each "started" event begins a new session.
+    // Events arrive newest-first; we reverse to process chronologically then re-reverse.
+    const chronological = [...events].reverse();
+    const sessions = [];
+    let current = null;
+    for (const ev of chronological) {
+      if (ev.event_type === 'started' || current === null) {
+        current = { startedAt: ev.ts, events: [] };
+        sessions.push(current);
+      }
+      current.events.push(ev);
+    }
+    sessions.reverse(); // latest session first
+
+    let html = '';
+    sessions.forEach((sess, idx) => {
+      const isLatest  = idx === 0;
+      const sessId    = `evt-sess-${tokenId}-${idx}`;
+      const ts        = sess.startedAt.endsWith('Z') ? sess.startedAt : sess.startedAt + 'Z';
+      const dateLabel = new Date(ts).toLocaleDateString('es', { day: '2-digit', month: 'short' });
+      const timeLabel = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const count     = sess.events.length;
+      const evRows    = sess.events.map(ev => buildEventRow(ev, !isLatest)).join('');
+
+      if (isLatest) {
+        html += `<div class="pos-events-list">${evRows}</div>`;
+      } else {
+        html += `
+          <div class="evt-session-header" onclick="toggleEvtSession('${sessId}')">
+            <span class="evt-session-chevron" id="${sessId}-chev">▶</span>
+            <span class="evt-session-label">Sesión anterior &middot; ${dateLabel} ${timeLabel}</span>
+            <span class="evt-session-count">${count} evento${count !== 1 ? 's' : ''}</span>
+          </div>
+          <div class="evt-session-body hidden" id="${sessId}">${evRows}</div>`;
+      }
+    });
 
     el.innerHTML = `
       <div class="pos-events-header">
         <span>Eventos del Bot</span>
-        <span class="pos-events-count">${events.length} recientes</span>
+        <span class="pos-events-count">${sessions[0]?.events.length ?? 0} en sesión</span>
       </div>
-      <div class="pos-events-list">${rows}</div>`;
+      ${html}`;
     el.style.display = '';
   } catch (e) {
     // Silently skip — non-critical
   }
 }
+
+window.toggleEvtSession = function (sessId) {
+  const body  = document.getElementById(sessId);
+  const chev  = document.getElementById(`${sessId}-chev`);
+  if (!body) return;
+  const opening = body.classList.contains('hidden');
+  body.classList.toggle('hidden', !opening);
+  if (chev) chev.textContent = opening ? '▼' : '▶';
+};
 
 function buildPositionCard(pos) {
   const { tokenId, token0Info, token1Info, fee, priceLower, priceUpper, priceCurrent,
