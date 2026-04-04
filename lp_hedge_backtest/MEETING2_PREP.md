@@ -160,6 +160,7 @@ by bot code. This means they execute even if the bot process is down.
 | M2-9 | SL/TP as native HL trigger orders | High | Survive bot process crash — their biggest architecture upgrade. Requires: place SL+TP on HL after open, track order IDs, update native SL on every trailing stop move (cancel+replace), restart recovery from HL state. Fee cost same as today. **Deferred — needs stable open+close cycle first.** | 🔲 Post-meeting |
 | M2-10 | Auto-reactivation after insufficient balance | Medium | VIZNIAGO has AUTO_REARM but may not handle balance case | 🔲 Post-meeting |
 | M2-11 | Pre-trigger as % before range edge (replace buffer) | Medium | Cleaner UX than current TRIGGER_OFFSET_PCT | 🔲 Post-meeting |
+| M2-13 | Mode enforcement in bot code (Bajista vs Alcista) | Low-Medium | Silent bug: `live_hedge_bot.py` never reads the `mode` field from DB — both modes behave identically today (both triggers always active). Fix: read `BOT_MODE` env var injected by bot_manager at launch; if `aragan`, skip `from_above` trigger entirely. Bajista = `below_range` only. Alcista = both triggers. Low effort code change, requires bot restart per config. | 🔲 Post-meeting |
 
 ### TIER D — VIZNIAGO Differentiators to present at meeting
 
