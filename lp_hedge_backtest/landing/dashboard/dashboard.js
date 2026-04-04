@@ -2440,6 +2440,10 @@ window.onWalletSelectChange = function (tokenId) {
     input.focus();
     if (apkeyEl) apkeyEl.placeholder = t('prot.apikey.placeholder');
   }
+  // Show/hide remove button based on whether a saved wallet is selected
+  const removeBtn = document.getElementById(`prot-wallet-remove-${tokenId}`);
+  if (removeBtn) removeBtn.style.display = sel.value ? '' : 'none';
+
   // Re-fetch balance for the newly selected wallet and update margin box
   const selectedWallet = sel.value || null;
   _hlBalanceCache = null;
@@ -2448,6 +2452,32 @@ window.onWalletSelectChange = function (tokenId) {
     if (data) _hlBalanceCache = data;
     _updateMarginBox(tokenId, pos);
   });
+};
+
+window.removeHLWallet = async function (tokenId, sel) {
+  const wallet = sel.value;
+  if (!wallet) return;
+  const short = wallet.slice(0,8) + '…' + wallet.slice(-6);
+  if (!confirm(`¿Eliminar wallet HL ${short} de tus configuraciones?\n\nSi tienes bots activos con esta wallet, detenerlos primero.`)) return;
+  try {
+    await apiCall('DELETE', `/bots/hl-wallet?wallet=${encodeURIComponent(wallet)}`);
+    // Remove option from dropdown
+    const opt = [...sel.options].find(o => o.value === wallet);
+    if (opt) opt.remove();
+    // If no saved wallets left, show new address input
+    const hasSaved = [...sel.options].some(o => o.value);
+    if (!hasSaved) {
+      const row    = sel.parentNode;
+      const input  = document.getElementById(`prot-wallet-${tokenId}`);
+      if (input) { input.value = ''; input.style.display = ''; }
+      row.replaceWith(input);
+    } else {
+      sel.value = sel.options[0].value;
+      window.onWalletSelectChange(tokenId);
+    }
+  } catch (e) {
+    alert(`Error al eliminar wallet: ${e.message}`);
+  }
 };
 
 // ── Activate bot ──────────────────────────────────────────────────────────
@@ -2599,11 +2629,25 @@ async function initTradingPanel(tokenId, pos) {
         `<option value="${w}" ${w === preselect ? 'selected' : ''}>${w.slice(0,8)}…${w.slice(-6)}</option>`
       ).join('');
       const sel = document.createElement('select');
-      sel.className = 'prot-input prot-input-full prot-wallet-select';
+      sel.className = 'prot-input prot-wallet-select';
       sel.id        = `prot-wallet-select-${tokenId}`;
       sel.innerHTML = `${options}<option value="">＋ ${t('prot.wallet.new')}</option>`;
       sel.onchange  = () => window.onWalletSelectChange(tokenId);
-      walletInput.parentNode.insertBefore(sel, walletInput);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type      = 'button';
+      removeBtn.id        = `prot-wallet-remove-${tokenId}`;
+      removeBtn.className = 'prot-wallet-remove-btn';
+      removeBtn.title     = 'Eliminar wallet HL';
+      removeBtn.textContent = '🗑️';
+      removeBtn.style.display = preselect ? '' : 'none';
+      removeBtn.onclick = () => window.removeHLWallet(tokenId, sel);
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:6px;align-items:center;width:100%';
+      row.appendChild(sel);
+      row.appendChild(removeBtn);
+      walletInput.parentNode.insertBefore(row, walletInput);
       walletInput.value        = preselect;
       walletInput.style.display = 'none';
     }

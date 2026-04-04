@@ -319,6 +319,41 @@ async def delete_bot(
     await db.commit()
 
 
+@router.delete("/hl-wallet")
+async def remove_hl_wallet(
+    wallet: str,
+    address: str = Depends(get_current_address),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Clears hl_wallet_addr + hl_api_key from all non-running configs
+    belonging to the authenticated user that use the given wallet address.
+    Running configs are skipped (stop the bot first).
+    """
+    from api.bot_manager import manager
+    result = await db.execute(
+        select(BotConfig)
+        .where(BotConfig.user_address == address)
+        .where(BotConfig.hl_wallet_addr == wallet)
+    )
+    configs = result.scalars().all()
+    if not configs:
+        raise HTTPException(status_code=404, detail="Wallet not found in your configs")
+
+    skipped = []
+    cleared = 0
+    for cfg in configs:
+        if manager.is_running(cfg.id):
+            skipped.append(cfg.id)
+            continue
+        cfg.hl_wallet_addr = None
+        cfg.hl_api_key     = None
+        cleared += 1
+
+    await db.commit()
+    return {"cleared": cleared, "skipped": skipped}
+
+
 @router.get("/hl-balance")
 async def hl_balance(
     address: str = Depends(get_current_address),

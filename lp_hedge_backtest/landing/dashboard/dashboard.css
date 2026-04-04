@@ -2332,3 +2332,17 @@
 .pc-proj-val--annual {
   color: var(--color-neon-green);
 }
+
+/* ── Remove HL wallet button ─────────────────────────────────────────────── */
+.prot-wallet-remove-btn {
+  background: none;
+  border: 1px solid var(--color-border, #374151);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: .85rem;
+  color: #ef4444;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.prot-wallet-remove-btn:hover { background: rgba(239,68,68,.1); }
