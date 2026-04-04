@@ -153,13 +153,13 @@ by bot code. This means they execute even if the bot process is down.
 | M2-8 | Orphan order cleanup audit | Medium | Resilience — verify TPs cancel on SL and vice versa |
 | M2-12 | Frontend restart/maintenance guard | Low | UX resilience — auto-detect API unavailability, show non-dismissible "Reconnecting…" overlay + disable all interactive elements (buttons/forms) during maintenance flag or outage. Reuses existing `/status/maintenance` poll. Two layers: (1) maintenance flag disables UI, (2) 2x consecutive health check fails triggers overlay. Frontend only, zero backend change, zero restart needed. |
 
-### TIER 3 — Architecture resilience (important but not visual)
+### TIER 3 — Architecture resilience (deferred — post investor meeting)
 
-| ID | Item | Effort | Why |
-|---|---|---|---|
-| M2-9 | SL/TP as native HL trigger orders | High | Survive bot process crash — their biggest architecture upgrade |
-| M2-10 | Auto-reactivation after insufficient balance | Medium | VIZNIAGO has AUTO_REARM but may not handle balance case |
-| M2-11 | Pre-trigger as % before range edge (replace buffer) | Medium | Cleaner UX than current TRIGGER_OFFSET_PCT |
+| ID | Item | Effort | Why | Status |
+|---|---|---|---|---|
+| M2-9 | SL/TP as native HL trigger orders | High | Survive bot process crash — their biggest architecture upgrade. Requires: place SL+TP on HL after open, track order IDs, update native SL on every trailing stop move (cancel+replace), restart recovery from HL state. Fee cost same as today. **Deferred — needs stable open+close cycle first.** | 🔲 Post-meeting |
+| M2-10 | Auto-reactivation after insufficient balance | Medium | VIZNIAGO has AUTO_REARM but may not handle balance case | 🔲 Post-meeting |
+| M2-11 | Pre-trigger as % before range edge (replace buffer) | Medium | Cleaner UX than current TRIGGER_OFFSET_PCT | 🔲 Post-meeting |
 
 ### TIER D — VIZNIAGO Differentiators to present at meeting
 
