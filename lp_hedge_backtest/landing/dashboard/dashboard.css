@@ -1555,6 +1555,19 @@
   color: var(--color-neon-cyan);
 }
 .prot-mode-opt--disabled { opacity: 0.35; cursor: not-allowed; }
+.prot-mode-soon {
+  display: inline-block;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #1a1a2e;
+  background: var(--amber, #f59e0b);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 5px;
+  vertical-align: middle;
+  text-transform: uppercase;
+}
 
 /* Inputs */
 .prot-input-group { display: flex; align-items: stretch; }

@@ -2214,18 +2214,16 @@ function buildProtectionDrawer(pos) {
         <div class="prot-field" style="margin-bottom:10px">
           <label class="prot-label">${t('prot.mode.label')}</label>
           <div class="prot-mode-toggle">
-            <label class="prot-mode-opt ${modeVal === 'aragan' ? 'prot-mode-opt--active' : ''}">
-              <input type="radio" name="prot-mode-${tokenId}" value="aragan"
-                     ${modeVal === 'aragan' ? 'checked' : ''}
-                     onchange="onModeChange('${tokenId}', this)" />
+            <label class="prot-mode-opt prot-mode-opt--disabled">
+              <input type="radio" name="prot-mode-${tokenId}" value="aragan" disabled />
               <span class="prot-mode-text">
-                <span class="prot-mode-name">${t('prot.mode.aragan')}</span>
+                <span class="prot-mode-name">${t('prot.mode.aragan')} <span class="prot-mode-soon">${t('prot.mode.soon')}</span></span>
                 <span class="prot-mode-desc">${t('prot.mode.aragan.desc')}</span>
               </span>
             </label>
-            <label class="prot-mode-opt ${!isBTC && modeVal === 'avaro' ? 'prot-mode-opt--active' : ''} ${isBTC ? 'prot-mode-opt--disabled' : ''}">
+            <label class="prot-mode-opt ${isBTC ? 'prot-mode-opt--disabled' : 'prot-mode-opt--active'}">
               <input type="radio" name="prot-mode-${tokenId}" value="avaro"
-                     ${!isBTC && modeVal === 'avaro' ? 'checked' : ''}
+                     ${!isBTC ? 'checked' : ''}
                      ${isBTC ? 'disabled' : ''}
                      onchange="onModeChange('${tokenId}', this)" />
               <span class="prot-mode-text">
