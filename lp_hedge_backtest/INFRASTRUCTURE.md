@@ -1,7 +1,7 @@
-# VIZNAGO.finance — Production Infrastructure Plan
+# VIZNIAGO.finance — Production Infrastructure Plan
 
 > Executive overview for Digital Ocean deployment once membership and treasury wallets are live.
-> Last updated: 2026-04-01
+> Last updated: 2026-04-05
 
 ---
 
@@ -90,8 +90,13 @@ Push to main branch
 - `DO_API_TOKEN`
 - `ANTHROPIC_API_KEY`
 - `DB_URL`
-- `ADMIN_WALLETS`
+- `ADMIN_WALLETS` — comma-separated super-admin wallet addresses (case-insensitive)
 - `HL_API_KEY` (per user, stored encrypted in DB)
+
+**Active super-admin wallets (as of 2026-04-05):**
+- `0xeF0DDF18382538F31dcfa0AF40B47eE8c5A2cf2f` ← owner wallet
+
+> ⚠ `0xe84f181541072c14a6a28224a33b078a44cc343c` removed 2026-04-05.
 
 **Branch strategy:**
 - `main` → production
