@@ -1,4 +1,4 @@
-# VIZNAGO.finance — DevOps & Zero-Downtime Infrastructure
+# VIZNIAGO.finance — DevOps & Zero-Downtime Infrastructure
 
 > Zero-downtime deployment strategy for 24/7 crypto bot SaaS.
 > Critical requirement: crypto markets never sleep — no maintenance windows.

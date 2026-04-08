@@ -32,21 +32,21 @@ Price keeps falling → SHORT keeps covering
 
 ## Three Bot Modes
 
-### VIZNAGO Defensor Bajista (Hedge Only — Recommended for LP holders)
+### VIZNIAGO Defensor Bajista (Hedge Only — Recommended for LP holders)
 - SHORT when price drops below lower bound OR crosses upper bound downward
 - Bear hedge with bullish bias — on upside, SL exits quickly and LP keeps all gains
 - For passive investors who want capital protection
 - **Best performer in backtests** (+361% vs +340% LP Only)
 - Requires a Uniswap v3 LP position (NFT)
 
-### VIZNAGO Defensor Alcista (Hedge + Trading)
+### VIZNIAGO Defensor Alcista (Hedge + Trading)
 - SHORT when price drops below lower bound
 - LONG when price breaks above upper bound (with trailing stop)
 - For active traders who want to maximize returns
 - Requires parameter tuning per market conditions
 - Requires a Uniswap v3 LP position (NFT)
 
-### VIZNAGO FURY (Standalone RSI Perps — No LP Required)
+### VIZNIAGO FURY (Standalone RSI Perps — No LP Required)
 - Pure perpetuals trading on Hyperliquid — **does NOT require a Uniswap LP position**
 - 6-gate signal stack on 15-minute candles with 1-hour MTF confirmation:
   - Gate 1: EMA-8 vs EMA-21 trend direction
@@ -250,9 +250,9 @@ Long trigger: $95,978 (+0.5% above upper)
 
 | Term | Definition |
 |------|-----------|
-| **VIZNAGO Defensor Bajista** | LP hedge bot — short-only when price drops below range or re-enters from above |
-| **VIZNAGO Defensor Alcista** | LP hedge + long trading mode (short below, long above range) |
-| **VIZNAGO FURY** | Standalone RSI perps bot — no LP required, 6-gate signal stack on 15m candles |
+| **VIZNIAGO Defensor Bajista** | LP hedge bot — short-only when price drops below range or re-enters from above |
+| **VIZNIAGO Defensor Alcista** | LP hedge + long trading mode (short below, long above range) |
+| **VIZNIAGO FURY** | Standalone RSI perps bot — no LP required, 6-gate signal stack on 15m candles |
 | **IL** | Impermanent Loss — value lost vs holding when price moves |
 | **Concentrated LP** | Uniswap v3 — provide liquidity in a specific price range |
 | **Trailing Stop** | Stop loss that moves up with price, closes on X% drop from max |

@@ -1,4 +1,4 @@
-# Viznago Email Setup — viznago.finance
+# Vizniago Email Setup — viznago.finance
 
 ## Overview
 
@@ -7,7 +7,7 @@ Custom `@viznago.finance` email addresses for the team using:
 - **Brevo (ex-Sendinblue)** — outbound SMTP relay (free tier: 300 emails/day)
 - **Gmail "Send As"** — compose and reply from `@viznago.finance` inside Gmail
 
-No mail server to maintain. Each team member keeps their personal Gmail but sends/receives as Viznago.
+No mail server to maintain. Each team member keeps their personal Gmail but sends/receives as Vizniago.
 
 ---
 
@@ -48,7 +48,7 @@ No mail server to maintain. Each team member keeps their personal Gmail but send
 1. Open Gmail → **Settings (⚙) → See all settings → Accounts and Import**
 2. Under **"Send mail as"** → click **Add another email address**
 3. Fill in:
-   - Name: `Viznago Fury` (or your name)
+   - Name: `Vizniago Fury` (or your name)
    - Email: `admin@viznago.finance` (your address)
    - Uncheck "Treat as alias"
 4. Click **Next Step** → enter SMTP relay:

@@ -1,4 +1,4 @@
-# VIZNAGO iOS App — Build Plan
+# VIZNIAGO iOS App — Build Plan
 > v1.0 — 2026-03-29
 > Phase 1: Capacitor wrapper · Phase 2: React Native rebuild
 
@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-The VIZNAGO iOS app brings the full platform to iPhone:
+The VIZNIAGO iOS app brings the full platform to iPhone:
 real-time bot monitoring, whale signals, FURY trades, and the VIZBOT assistant
 — all accessible without opening a browser.
 
@@ -53,7 +53,7 @@ the browser cannot reach.
 | macOS machine with Xcode 15+ | Required for iOS build + simulator |
 | Apple Developer Account | $99/yr — needed for App Store & push certs |
 | Node.js 20+ | For Capacitor CLI |
-| Existing VIZNAGO dashboard | Already exists at `landing/dashboard/` |
+| Existing VIZNIAGO dashboard | Already exists at `landing/dashboard/` |
 
 ### 2.3 Step-by-step setup
 
@@ -74,7 +74,7 @@ npm install @capacitor/splash-screen
 #### Step 2 — Initialize
 
 ```bash
-npx cap init "VIZNAGO" "com.viznago.fury" --web-dir="."
+npx cap init "VIZNIAGO" "com.viznago.fury" --web-dir="."
 ```
 
 This creates `capacitor.config.json` at `landing/`:
@@ -82,7 +82,7 @@ This creates `capacitor.config.json` at `landing/`:
 ```json
 {
   "appId": "com.viznago.fury",
-  "appName": "VIZNAGO",
+  "appName": "VIZNIAGO",
   "webDir": ".",
   "server": {
     "androidScheme": "https"
@@ -119,8 +119,8 @@ In Xcode:
 - Set **Team** → your Apple Developer account
 - Set **Bundle ID** → `com.viznago.fury`
 - Set **Deployment Target** → iOS 16.0
-- Replace the default app icon with the VIZNAGO unicorn logo
-- Set **Display Name** → `VIZNAGO`
+- Replace the default app icon with the VIZNIAGO unicorn logo
+- Set **Display Name** → `VIZNIAGO`
 
 #### Step 5 — Point the API to production URL
 
@@ -130,8 +130,8 @@ app this must be an absolute URL. Create `landing/capacitor-env.js`:
 ```javascript
 // Injected by Capacitor build — overrides API_BASE for native app
 if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-  window.__VIZNAGO_API_BASE__ = 'https://yourdomain.com/trading/lp-hedge/api';
-  window.__VIZNAGO_WS_BASE__  = 'wss://yourdomain.com/trading/lp-hedge/api';
+  window.__VIZNIAGO_API_BASE__ = 'https://yourdomain.com/trading/lp-hedge/api';
+  window.__VIZNIAGO_WS_BASE__  = 'wss://yourdomain.com/trading/lp-hedge/api';
 }
 ```
 
@@ -141,10 +141,10 @@ In `dashboard.js` change line 123:
 const API_BASE = '/trading/lp-hedge/api';
 
 // After
-const API_BASE = window.__VIZNAGO_API_BASE__ || '/trading/lp-hedge/api';
+const API_BASE = window.__VIZNIAGO_API_BASE__ || '/trading/lp-hedge/api';
 ```
 
-And patch WebSocket construction similarly to use `__VIZNAGO_WS_BASE__`.
+And patch WebSocket construction similarly to use `__VIZNIAGO_WS_BASE__`.
 
 #### Step 6 — Move JWT from localStorage to iOS Keychain
 
@@ -297,7 +297,7 @@ npx cap run ios
 1. In Xcode → **Product → Archive**
 2. **Distribute App → App Store Connect**
 3. In App Store Connect:
-   - Create new app: `VIZNAGO`
+   - Create new app: `VIZNIAGO`
    - Category: **Finance**
    - Age rating: 17+ (financial trading)
    - Screenshots: 6.7" (iPhone 16 Pro Max) + 5.5" (iPhone 8 Plus) required
@@ -396,7 +396,7 @@ Use `httpx` from `bot_manager.py` when writing critical events.
 
 | Field | Content |
 |-------|---------|
-| **Name** | VIZNAGO — DeFi LP Bot |
+| **Name** | VIZNIAGO — DeFi LP Bot |
 | **Subtitle** | Hedge Uniswap v3 · Track Whales |
 | **Category** | Finance |
 | **Secondary** | Utilities |

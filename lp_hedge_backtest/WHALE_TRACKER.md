@@ -1,4 +1,4 @@
-# VIZNAGO WHALE — Hyperliquid Whale Tracker
+# VIZNIAGO WHALE — Hyperliquid Whale Tracker
 > Feature documentation — v1.1 (2026-03-29)
 > Status: **Complete · Live in Dashboard + Admin Panel**
 > Next layer: see [WHALE_INTELLIGENCE_AGENT.md](WHALE_INTELLIGENCE_AGENT.md)
@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-VIZNAGO WHALE is a standalone bot mode that monitors Hyperliquid's top leaderboard traders
+VIZNIAGO WHALE is a standalone bot mode that monitors Hyperliquid's top leaderboard traders
 and user-specified addresses for large position changes. It detects whale entries, exits,
 side flips, and size increases in near real-time, emitting structured signals that appear
 live in the dashboard.

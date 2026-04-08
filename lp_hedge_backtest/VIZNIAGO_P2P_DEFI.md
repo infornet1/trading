@@ -1,4 +1,4 @@
-# Viznago DeFi P2P — Specification & Implementation Plan
+# Vizniago DeFi P2P — Specification & Implementation Plan
 **Version:** 4.0 | **Date:** 2026-03-23 | **Status:** Planning
 **Concept:** Fiat ↔ Crypto OTC marketplace with smart contract escrow (Binance P2P model, fully DeFi)
 
@@ -12,11 +12,11 @@ A **peer-to-peer fiat↔crypto trading marketplace** where:
 - **Buyers** initiate a trade, send fiat off-chain (Zelle, Wise, bank transfer)
 - **Smart contract releases** crypto to buyer once seller confirms receipt
 - **AI agent (L1)** triages disputes instantly — auto-resolves ~60% of cases
-- **Viznago arbiters (L2)** resolve edge cases via multisig — AI pre-analysis included
+- **Vizniago arbiters (L2)** resolve edge cases via multisig — AI pre-analysis included
 
 > Binance P2P replaces Binance custody with a smart contract. The fiat leg is always off-chain — unavoidable in any fiat↔crypto system — but the crypto custody is fully trustless.
 
-### What Viznago Adds on Top of Binance P2P
+### What Vizniago Adds on Top of Binance P2P
 
 - Wallet-native identity (EIP-191 auth — no email/password, no KYC required)
 - On-chain reputation (trade history immutable, sybil-resistant via wallet age)
@@ -39,7 +39,7 @@ A **peer-to-peer fiat↔crypto trading marketplace** where:
    └── Platform fee: 0.5% = $1.00 → buyer receives 195.10 USDC net
 
 3. Smart contract locks 196.08 USDC in escrow
-   └── Seller's wallet signs lockFunds() tx → funds move to ViznagoEscrow.sol
+   └── Seller's wallet signs lockFunds() tx → funds move to VizniagoEscrow.sol
 
 4. Buyer sees payment instructions (seller's Wise ID / Zelle phone)
    └── Trade room opens (real-time chat via WebSocket)
@@ -98,8 +98,8 @@ A **peer-to-peer fiat↔crypto trading marketplace** where:
 │  MariaDB             │  │  Arbitrum One        │  │  AI Dispute Agent        │
 │  (off-chain state)   │  │  (on-chain escrow)   │  │  (Claude Opus 4.6)       │
 │                      │  │                      │  │                          │
-│  ads, trades,        │  │  ViznagoEscrow.sol   │  │  Vision: screenshot      │
-│  messages,           │  │  ViznagoReputation   │  │  analysis                │
+│  ads, trades,        │  │  VizniagoEscrow.sol   │  │  Vision: screenshot      │
+│  messages,           │  │  VizniagoReputation   │  │  analysis                │
 │  disputes,           │  │  .sol                │  │  NLP: chat history       │
 │  ai_analyses         │  │                      │  │  Output: structured      │
 │                      │  │                      │  │  verdict + reasoning     │
@@ -110,7 +110,7 @@ A **peer-to-peer fiat↔crypto trading marketplace** where:
 
 ## 4. Smart Contracts (Arbitrum One)
 
-### 4.1 ViznagoEscrow.sol
+### 4.1 VizniagoEscrow.sol
 
 The most critical contract. Holds seller's crypto during a trade.
 
@@ -158,7 +158,7 @@ function arbitrate(uint256 tradeId, address winner) external onlyArbiter;
 ```
 
 **Security:**
-- `onlyArbiter` = Viznago Gnosis Safe multisig (3-of-5) initially
+- `onlyArbiter` = Vizniago Gnosis Safe multisig (3-of-5) initially
 - No admin can move funds without `arbitrate()` — never an owner backdoor
 - Emergency pause (OpenZeppelin Pausable) for critical exploits only
 - Reentrancy guard on all state-changing functions
@@ -166,7 +166,7 @@ function arbitrate(uint256 tradeId, address winner) external onlyArbiter;
 
 ---
 
-### 4.2 ViznagoReputation.sol
+### 4.2 VizniagoReputation.sol
 
 Immutable on-chain trade record. Cannot be gamed — only the escrow contract writes to it.
 
@@ -181,7 +181,7 @@ struct TraderStats {
     uint256 lastTradeAt;
 }
 
-// only callable by ViznagoEscrow
+// only callable by VizniagoEscrow
 function recordCompletion(address seller, address buyer, uint256 fiatAmount) external onlyEscrow;
 function recordDispute(address loser, address winner) external onlyEscrow;
 
@@ -203,7 +203,7 @@ Trade: $200 fiat → 196.08 USDC
   Seller posts ad (maker)  → 0% fee
 
   Buyer receives:   195.10 USDC
-  Viznago treasury:   0.98 USDC  ← deducted inside release() on-chain
+  Vizniago treasury:   0.98 USDC  ← deducted inside release() on-chain
 ```
 
 Fee is **collected automatically inside `release()`** — trustless, cannot be bypassed.
@@ -369,7 +369,7 @@ L1 — AI Agent (Claude Opus 4.6)    ~resolves 50–60% of disputes
       └── confidence < 90% → human arbiter queue
                 │
                 ▼
-L2 — Human Arbiter (Viznago multisig 3-of-5)
+L2 — Human Arbiter (Vizniago multisig 3-of-5)
   ├── Sees AI pre-analysis (verdict, reasoning, red flags)
   ├── Reduces arbiter time by ~65%
   └── Executes escrow.arbitrate(winner) on-chain
@@ -523,7 +523,7 @@ REPUTATION
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  VIZNAGO P2P                                       [Connect Wallet]  │
+│  VIZNIAGO P2P                                       [Connect Wallet]  │
 │                                                                      │
 │  [Buy USDC]  [Sell USDC]       Filter: [USD ▾] [All Methods ▾]     │
 │                                                                      │
@@ -577,7 +577,7 @@ When a dispute is opened, both parties see the AI triage result within 2 minutes
 ┌────────────────────────────────────────────────────────────────────┐
 │  Dispute — Trade VZP-A3K9PX                                        │
 │                                                                    │
-│  ┌── AI Triage Result (Viznago Arbiter Bot) ──────────────────┐   │
+│  ┌── AI Triage Result (Vizniago Arbiter Bot) ──────────────────┐   │
 │  │  Verdict:     RECOMMEND RELEASE TO BUYER                   │   │
 │  │  Confidence:  87%  → Escalating to human review            │   │
 │  │  Reasoning:   Screenshot shows $200.00 via Wise on         │   │
@@ -617,8 +617,8 @@ When a dispute is opened, both parties see the AI triage result within 2 minutes
 
 | Task | Output |
 |------|--------|
-| `ViznagoEscrow.sol` + Foundry fuzz tests | Deployed on Arbitrum Sepolia testnet |
-| `ViznagoReputation.sol` | Linked to escrow, testnet |
+| `VizniagoEscrow.sol` + Foundry fuzz tests | Deployed on Arbitrum Sepolia testnet |
+| `VizniagoReputation.sol` | Linked to escrow, testnet |
 | Fee logic inside `release()` (feeBps per trade) | On-chain fee collection |
 | MariaDB schema (ads, trades, messages, disputes) | Migrations ready |
 | `/p2p/ads` GET + POST endpoints | Ads list + create working |
@@ -653,10 +653,10 @@ When a dispute is opened, both parties see the AI triage result within 2 minutes
 
 | Task | Output |
 |------|--------|
-| Smart contract audit (`ViznagoEscrow.sol` priority) | Audit report + remediations |
+| Smart contract audit (`VizniagoEscrow.sol` priority) | Audit report + remediations |
 | Mainnet deploy on Arbitrum One | Live escrow contract |
 | AI agent red-team testing (adversarial screenshots) | Robustness baseline |
-| Seed liquidity: Viznago team posts first sell ads | First real trades |
+| Seed liquidity: Vizniago team posts first sell ads | First real trades |
 | Market maker program: incentivize high-volume sellers | GMV growth |
 
 ---
@@ -682,11 +682,11 @@ When a dispute is opened, both parties see the AI triage result within 2 minutes
 lp_hedge_backtest/
 ├── contracts/                          ← NEW
 │   ├── src/
-│   │   ├── ViznagoEscrow.sol           ← escrow + fee deduction
-│   │   └── ViznagoReputation.sol       ← immutable on-chain trade record
+│   │   ├── VizniagoEscrow.sol           ← escrow + fee deduction
+│   │   └── VizniagoReputation.sol       ← immutable on-chain trade record
 │   ├── test/
-│   │   ├── ViznagoEscrow.t.sol         ← fuzz + invariant tests
-│   │   └── ViznagoReputation.t.sol
+│   │   ├── VizniagoEscrow.t.sol         ← fuzz + invariant tests
+│   │   └── VizniagoReputation.t.sol
 │   ├── script/
 │   │   └── Deploy.s.sol
 │   └── foundry.toml
@@ -714,13 +714,13 @@ lp_hedge_backtest/
 
 ---
 
-## 13. Viznago Fury Bot Automation Architecture
+## 13. Vizniago Fury Bot Automation Architecture
 
 All LP hedge bot lifecycle is managed automatically through the API — no manual `.env` files, no standalone systemd services per pool.
 
 ### Design Principle
 
-> Any user who connects an LP pool to Viznago must get protection immediately and permanently, without any manual operator step.
+> Any user who connects an LP pool to Vizniago must get protection immediately and permanently, without any manual operator step.
 
 ### How It Works
 
@@ -786,7 +786,7 @@ On `active=True`, BotManager starts the bot immediately. On API restart, `_auto_
 
 ---
 
-## 14. What Reuses Existing Viznago Infrastructure
+## 14. What Reuses Existing Vizniago Infrastructure
 
 | Existing Piece | Reused As-Is |
 |----------------|-------------|

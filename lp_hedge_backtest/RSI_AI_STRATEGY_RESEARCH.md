@@ -1,4 +1,4 @@
-# RSI + AI Strategy Research — VIZNAGO FURY
+# RSI + AI Strategy Research — VIZNIAGO FURY
 **Date:** March 24, 2026 — Updated March 27, 2026
 **Status:** Implementation Complete — Pending Backtest Validation
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document captures research on AI-enhanced RSI trading strategies for BTC/USDC and ETH/USDC pairs, an audit of the existing `adx_strategy_v2` bot, practitioner best practices sourced from X (March 2025–2026), the VIZNAGO FURY standalone perps spec, and the roadmap for integrating a new RSI/AI module into VIZNAGO FURY.
+This document captures research on AI-enhanced RSI trading strategies for BTC/USDC and ETH/USDC pairs, an audit of the existing `adx_strategy_v2` bot, practitioner best practices sourced from X (March 2025–2026), the VIZNIAGO FURY standalone perps spec, and the roadmap for integrating a new RSI/AI module into VIZNIAGO FURY.
 
 ---
 
@@ -101,7 +101,7 @@ Static RSI (fixed 30/70 thresholds) is a **declining edge**:
 > This overfitting gap is the norm, not the exception for DRL.
 
 - GPU required, 6-12 months of tuning minimum
-- ❌ **Not recommended for VIZNAGO until simpler methods are validated first**
+- ❌ **Not recommended for VIZNIAGO until simpler methods are validated first**
 
 **References:**
 - [DQN Selects RSI Strategies for BTC (Tandfonline 2025)](https://www.tandfonline.com/doi/full/10.1080/23322039.2025.2594873)
@@ -409,12 +409,12 @@ The existing `adx_strategy_v2` bot was audited on March 24, 2026.
 
 ---
 
-## 10. Integration Plan for VIZNAGO FURY
+## 10. Integration Plan for VIZNIAGO FURY
 
 ### Bot Architecture Overview
 
 ```
-VIZNAGO bot modes:
+VIZNIAGO bot modes:
 ├── Defensor Bajista  (aragan) — LP hedge only            [LIVE]
 ├── Defensor Alcista  (avaro)  — LP hedge + long breakout [LIVE]
 └── RSI Trader        (fury)   — Standalone Hyperliquid   [BUILT — pending backtest gate]
@@ -458,7 +458,7 @@ Circuit breaker:     Auto-pause if daily drawdown > 5% or 3 consecutive losses
 **If win rate ≥ 52% → existing strategy is viable with no extra build**
 **If win rate < 52% → proceed to Path B with clean knowledge of what doesn't work**
 
-#### Path B — New RSI/AI Module in VIZNAGO (RSI Trader mode)
+#### Path B — New RSI/AI Module in VIZNIAGO (RSI Trader mode)
 
 **Selected path — implementation complete as of March 27, 2026.**
 
@@ -478,7 +478,7 @@ Circuit breaker:     Auto-pause if daily drawdown > 5% or 3 consecutive losses
 
 ### ADX Regime Integration (Natural Fit)
 
-The ADX framework already in VIZNAGO becomes a **pre-filter** for RSI signals:
+The ADX framework already in VIZNIAGO becomes a **pre-filter** for RSI signals:
 
 | ADX Regime | RSI Strategy Behavior |
 |------------|----------------------|
@@ -514,7 +514,7 @@ Step 5  → [DONE] Built FuryComparator for FURY vs HODL comparison
 Step 6  → [DONE] Built live_fury_bot.py — production subprocess, confirmed-candle rule
 Step 7  → [DONE] API integration: fury mode enum, DB columns, migrations, spawn logic, validation
 Step 8  → [NEXT] Run 90-day backtest on real BTC/ETH data — gate: WR ≥ 52%
-Step 9  → If WR ≥ 52%: paper trade 3-4 weeks via VIZNAGO dashboard
+Step 9  → If WR ≥ 52%: paper trade 3-4 weeks via VIZNIAGO dashboard
            If WR < 52%: tune gates or add XGBoost Variant A (CPU-only)
 Step 10 → Live deploy — gate behind Pro+ membership tier
 ```

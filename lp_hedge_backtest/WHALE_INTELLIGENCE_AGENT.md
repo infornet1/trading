@@ -1,4 +1,4 @@
-# VIZNAGO Whale Intelligence Agent — Architecture & Build Plan
+# VIZNIAGO Whale Intelligence Agent — Architecture & Build Plan
 > Feature documentation — v1.0 (2026-03-29)
 > Status: **Planning · Not yet implemented**
 
@@ -7,7 +7,7 @@
 ## 1. Overview
 
 The Whale Intelligence Agent is a persistent background service that sits on top of the
-existing VIZNAGO WHALE tracker. While the tracker detects *what* whales are doing right now,
+existing VIZNIAGO WHALE tracker. While the tracker detects *what* whales are doing right now,
 the Intelligence Agent answers *why it matters* — by maintaining a 90-day behavioral history
 per wallet, detecting recurrent patterns, and enriching every whale signal with a scored,
 classified, human-readable intelligence brief.
