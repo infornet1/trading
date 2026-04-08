@@ -275,9 +275,9 @@
             <div class="explainer-stat-note" id="estat-lp-note" data-i18n="bot.stat.lp.note">En rango — acumulando comisiones</div>
           </div>
           <div class="explainer-stat-card" id="ecard-hedge">
-            <div class="explainer-stat-label" data-i18n="bot.stat.hedge">P&amp;G Cobertura SHORT</div>
+            <div class="explainer-stat-label" id="estat-hedge-label" data-i18n="bot.stat.hedge.short">P&amp;G Cobertura SHORT</div>
             <div class="explainer-stat-value" id="estat-hedge" style="color:var(--color-text-muted);">$0</div>
-            <div class="explainer-stat-note" id="estat-hedge-note" data-i18n="bot.stat.hedge.note">Bot inactivo — precio en rango</div>
+            <div class="explainer-stat-note" id="estat-hedge-note" data-i18n="bot.stat.hedge.note.idle">Bot inactivo — precio en rango</div>
           </div>
           <div class="explainer-stat-card">
             <div class="explainer-stat-label" data-i18n="bot.stat.net">Resultado Neto</div>
@@ -691,33 +691,42 @@
   <script>
   /* ────────────────────────────────────────────────────────────────────
      ANIMATED CHART
-     Phases: idle (in-range) → trigger (drops) → active (below) → close
+     Full bidirectional loop:
+       idle → short trigger → short active → short close →
+       long trigger → long active → long close → (repeat)
   ──────────────────────────────────────────────────────────────────── */
   (function () {
     const canvas = document.getElementById('bot-chart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    const P_LOWER   = 1800, P_UPPER = 2400;
-    const P_MIN     = 900,  P_MAX   = 2900;
-    const CAPITAL   = 10000;
-    const HEDGE_R   = 0.8;
-    const HIST_MAX  = 130;
+    const P_LOWER  = 1800, P_UPPER = 2400;
+    const P_MIN    = 800,  P_MAX   = 3100;
+    const CAPITAL  = 10000;
+    const HEDGE_R  = 0.8;
+    const HIST_MAX = 130;
 
-    // Each phase: duration (ms), target price, status class, label
+    // 7-phase bidirectional loop
     const PHASES = [
-      { ms: 3200, price: 2100, cls: 'idle',    lbl: '● Monitoring...' },
-      { ms: 1400, price: 1550, cls: 'trigger', lbl: '⚡ Hedge Triggered' },
-      { ms: 3800, price: 1280, cls: 'active',  lbl: '🛡 Hedge Active' },
-      { ms: 2200, price: 2060, cls: 'close',   lbl: '✓ Short Closed' },
+      { ms: 3000, price: 2100, cls: 'idle',         lbl: 'bot.pill.idle' },
+      { ms: 1200, price: 1550, cls: 'trigger',       lbl: 'bot.pill.short.trigger' },
+      { ms: 3500, price: 1280, cls: 'active',        lbl: 'bot.pill.short.active' },
+      { ms: 2000, price: 2060, cls: 'close',         lbl: 'bot.pill.short.close' },
+      { ms: 1200, price: 2580, cls: 'long-trigger',  lbl: 'bot.pill.long.trigger' },
+      { ms: 3500, price: 2860, cls: 'long-active',   lbl: 'bot.pill.long.active' },
+      { ms: 2000, price: 2100, cls: 'long-close',    lbl: 'bot.pill.long.close' },
     ];
 
-    let phaseIdx       = 0;
-    let phaseStart     = 0;
-    let phaseStartP    = PHASES[0].price;
-    let firstFrame     = true;
-    let priceHistory   = [];
+    let phaseIdx    = 0;
+    let phaseStart  = 0;
+    let phaseStartP = PHASES[0].price;
+    let firstFrame  = true;
+    let priceHistory = [];
     let W = 0, H = 0;
+
+    const T = k => (window.t ? window.t(k) : k);
+    const el = id => document.getElementById(id);
+    const fmt = v => '$' + Math.round(v).toLocaleString();
 
     function ease(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
 
@@ -732,8 +741,8 @@
       }
       const t    = elapsed / PHASES[phaseIdx].ms;
       const base = phaseStartP + (PHASES[phaseIdx].price - phaseStartP) * ease(Math.min(t, 1));
-      // Add subtle oscillation in idle / active phases
-      const osc = (phaseIdx === 0 ? 35 : phaseIdx === 2 ? 18 : 0);
+      // Subtle oscillation during idle (0), short-active (2) and long-active (5)
+      const osc = (phaseIdx === 0 ? 35 : phaseIdx === 2 ? 18 : phaseIdx === 5 ? 18 : 0);
       return base + osc * Math.sin(now * 0.0018);
     }
 
@@ -752,7 +761,7 @@
     function draw(now) {
       ctx.clearRect(0, 0, W, H);
 
-      // background
+      // Background
       ctx.fillStyle = '#071428';
       ctx.fillRect(0, 0, W, H);
 
@@ -781,13 +790,14 @@
       ctx.fillStyle = 'rgba(0,255,179,0.35)';
       ctx.fillText('◈ EARNING FEES', 8, (yU + yL) / 2 + 3);
 
-      // Current price + history
+      // Current price
       const price = getPrice(now);
       priceHistory.push(price);
       if (priceHistory.length > HIST_MAX) priceHistory.shift();
 
       const below = price < P_LOWER;
-      const lineColor = below ? '#ffd600' : '#00d4ff';
+      const above = price > P_UPPER;
+      const lineColor = below ? '#ffd600' : above ? '#00ffb3' : '#00d4ff';
 
       if (priceHistory.length > 1) {
         const step   = W / (HIST_MAX - 1);
@@ -815,52 +825,73 @@
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Price label
-        const labelY = dotY + (below ? -10 : 16);
+        // Price label (flip side when near edges)
+        const labelY = dotY + (below ? -10 : above ? 18 : 16);
         ctx.font      = 'bold 11px monospace';
         ctx.fillStyle = lineColor;
         ctx.fillText('$' + Math.round(price).toLocaleString(), W - 72, labelY);
 
-        // Below-range: hedge activation label
+        // Floating hedge label
+        ctx.font = '9px monospace';
         if (below) {
-          ctx.font      = '9px monospace';
-          ctx.fillStyle = 'rgba(255,214,0,0.55)';
-          ctx.fillText('⚡ SHORT ACTIVE', 8, yL + 30);
+          ctx.fillStyle = 'rgba(255,214,0,0.6)';
+          ctx.fillText(T('bot.anim.short.active'), 8, yL + 30);
+        } else if (above) {
+          ctx.fillStyle = 'rgba(0,255,179,0.6)';
+          ctx.fillText(T('bot.anim.long.active'), 8, yU - 18);
         }
       }
 
-      // Update status pill
-      const phase = PHASES[phaseIdx];
-      const pill  = document.getElementById('bot-status-pill');
-      if (pill && pill.textContent !== phase.lbl) {
-        pill.textContent = phase.lbl;
-        pill.className   = 'bot-status-pill bot-status-pill--' + phase.cls;
+      // ── Status pill ────────────────────────────────────────────────
+      const phase   = PHASES[phaseIdx];
+      const pillLbl = T(phase.lbl);
+      const pill    = el('bot-status-pill');
+      if (pill) {
+        const newCls = 'bot-status-pill bot-status-pill--' + phase.cls;
+        if (pill.textContent !== pillLbl) pill.textContent = pillLbl;
+        if (pill.className   !== newCls)  pill.className   = newCls;
       }
 
-      // Update live stat cards
-      const lpVal   = price >= P_LOWER ? CAPITAL : CAPITAL * (price / P_LOWER);
-      const lpLoss  = CAPITAL - lpVal;
-      const hedgeOn = price < P_LOWER;
-      const hedgeG  = hedgeOn ? lpLoss * HEDGE_R : 0;
-      const netVal  = lpVal + hedgeG;
-      const fmt     = v => '$' + Math.round(v).toLocaleString();
+      // ── Stat math ─────────────────────────────────────────────────
+      const lpVal  = below ? CAPITAL * (price / P_LOWER)
+                   : above ? CAPITAL * (P_UPPER / price)
+                   : CAPITAL;
+      const lpLoss = CAPITAL - lpVal;
+      const hedgeG = (below || above) ? lpLoss * HEDGE_R : 0;
+      const netVal = lpVal + hedgeG;
 
-      const el = id => document.getElementById(id);
+      // ── LP card ───────────────────────────────────────────────────
       if (el('estat-lp')) {
-        el('estat-lp').textContent      = fmt(lpVal);
-        el('estat-lp').style.color      = hedgeOn ? '#ffd600' : 'var(--color-neon-green)';
-        el('estat-lp-note').textContent = hedgeOn
-          ? `Fuera de rango — pérdida: -$${Math.round(lpLoss).toLocaleString()}`
-          : 'En rango — acumulando comisiones';
+        el('estat-lp').textContent = fmt(lpVal);
+        el('estat-lp').style.color = below ? '#ffd600'
+                                   : above ? '#00ffb3'
+                                   : 'var(--color-neon-green)';
+        el('estat-lp-note').textContent = below
+          ? T('bot.stat.lp.note.below') + ' -$' + Math.round(lpLoss).toLocaleString()
+          : above
+            ? T('bot.stat.lp.note.above')
+            : T('bot.stat.lp.note.in');
       }
+
+      // ── Hedge card ────────────────────────────────────────────────
       if (el('estat-hedge')) {
-        el('estat-hedge').textContent      = hedgeOn ? '+' + fmt(hedgeG) : '$0';
-        el('estat-hedge').style.color      = hedgeOn ? 'var(--color-neon-green)' : 'var(--color-text-muted)';
-        el('estat-hedge-note').textContent = hedgeOn ? 'SHORT activo — compensando pérdida' : 'Bot inactivo — precio en rango';
+        const hedgeOn = below || above;
+        el('estat-hedge-label').textContent = above
+          ? T('bot.stat.hedge.long')
+          : T('bot.stat.hedge.short');
+        el('estat-hedge').textContent  = hedgeOn ? '+' + fmt(hedgeG) : '$0';
+        el('estat-hedge').style.color  = hedgeOn ? 'var(--color-neon-green)' : 'var(--color-text-muted)';
+        el('estat-hedge-note').textContent = below ? T('bot.stat.hedge.note.short')
+                                           : above ? T('bot.stat.hedge.note.long')
+                                           : T('bot.stat.hedge.note.idle');
       }
+
+      // ── Net card ──────────────────────────────────────────────────
       if (el('estat-net')) {
         el('estat-net').textContent = fmt(netVal);
-        el('estat-net').style.color = netVal >= CAPITAL * 0.96 ? 'var(--color-neon-cyan)' : 'var(--color-neon-green)';
+        el('estat-net').style.color = netVal >= CAPITAL * 0.96
+          ? 'var(--color-neon-cyan)'
+          : 'var(--color-neon-green)';
       }
 
       requestAnimationFrame(draw);
