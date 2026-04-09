@@ -1898,6 +1898,13 @@ async function saasLoadBots() {
         if (!saas.sockets[bot.id]) connectBotWS(bot.id);
       }
     }
+
+    // Fetch HL balance for the active bot so the panel shows it immediately
+    const activeBotWithWallet = bots.find(b => b.active && b.hl_wallet_addr);
+    if (activeBotWithWallet) {
+      fetchHLBalance(activeBotWithWallet.hl_wallet_addr).then(() => renderLiveBots()).catch(() => {});
+    }
+
     // Re-render positions and live bots panel
     if (state.positions.length > 0) renderPositions();
     renderLiveBots();
