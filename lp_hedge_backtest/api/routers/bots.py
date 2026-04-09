@@ -552,18 +552,20 @@ async def get_bot(
 @router.get("/{config_id}/events", response_model=list[BotEventOut])
 async def get_events(
     config_id: int,
-    limit: int = Query(50, le=200),
+    limit: int = Query(200, le=500),
     offset: int = Query(0),
+    hours: Optional[int] = Query(None, description="Return only events from the last N hours (e.g. 72)"),
     address: str = Depends(get_current_address),
     db: AsyncSession = Depends(get_db),
 ):
+    from datetime import timedelta
     await _get_own_config(config_id, address, db)  # ownership check
+    q = select(BotEvent).where(BotEvent.config_id == config_id)
+    if hours is not None:
+        since = datetime.utcnow() - timedelta(hours=hours)
+        q = q.where(BotEvent.ts >= since)
     result = await db.execute(
-        select(BotEvent)
-        .where(BotEvent.config_id == config_id)
-        .order_by(desc(BotEvent.ts))
-        .limit(limit)
-        .offset(offset)
+        q.order_by(desc(BotEvent.ts)).limit(limit).offset(offset)
     )
     return result.scalars().all()
 

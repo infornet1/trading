@@ -1,0 +1,517 @@
+/* ============================================================
+   VIZNIAGO — Wallet Manager Page CSS
+   ============================================================ */
+
+/* ── Page shell ──────────────────────────────────────────── */
+.wm-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: calc(70px + 2rem) 1.5rem 4rem;
+}
+
+/* ── Page header ─────────────────────────────────────────── */
+.wm-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+  padding-top: 1rem;
+}
+.wm-header-left .wm-eyebrow {
+  font-size: 0.72rem;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.15em;
+  color: var(--color-neon-cyan);
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+.wm-header-left h1 {
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  line-height: 1.15;
+}
+.wm-header-left .wm-sub {
+  margin-top: 0.5rem;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+.wm-network-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(26,143,255,0.08);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.78rem;
+  font-family: 'Orbitron', sans-serif;
+  color: var(--color-neon-cyan);
+  white-space: nowrap;
+}
+.wm-network-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00ffb3;
+  box-shadow: 0 0 6px #00ffb3;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Section label ───────────────────────────────────────── */
+.wm-section-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0.9rem;
+}
+
+/* ── Wallet cards grid ───────────────────────────────────── */
+.wm-wallets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.wm-wallet-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--glow-card);
+  position: relative;
+  overflow: hidden;
+}
+.wm-wallet-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  border-radius: 12px 12px 0 0;
+}
+.wm-wallet-card--protection::before {
+  background: linear-gradient(90deg, #7c3aed, var(--color-neon-cyan));
+}
+.wm-wallet-card--lp::before {
+  background: linear-gradient(90deg, var(--color-neon-blue), var(--color-neon-green));
+}
+
+.wm-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.2rem;
+}
+.wm-card-role {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.wm-card-icon {
+  font-size: 1.4rem;
+}
+.wm-card-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.wm-card-sub {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+}
+
+/* Status pill */
+.wm-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.05em;
+}
+.wm-status-pill--ok {
+  background: rgba(0,255,179,0.1);
+  color: #00ffb3;
+  border: 1px solid rgba(0,255,179,0.25);
+}
+.wm-status-pill--warn {
+  background: rgba(245,158,11,0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245,158,11,0.3);
+}
+.wm-status-pill--idle {
+  background: rgba(61,107,140,0.2);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+.wm-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.wm-status-pill--ok .wm-status-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+/* Address row */
+.wm-address-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1.2rem;
+}
+.wm-address-text {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.68rem;
+  color: var(--color-neon-cyan);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.05em;
+}
+.wm-copy-btn, .wm-explorer-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.wm-copy-btn:hover, .wm-explorer-btn:hover {
+  color: var(--color-neon-cyan);
+  background: rgba(0,212,255,0.08);
+}
+
+/* Balances */
+.wm-balances {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.2rem;
+}
+.wm-balance-item {
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+}
+.wm-balance-label {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.3rem;
+}
+.wm-balance-value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.wm-balance-usd {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.15rem;
+}
+.wm-balance-warn {
+  color: #f59e0b;
+}
+
+/* Card footer actions */
+.wm-card-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.wm-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.73rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  text-decoration: none;
+  font-family: 'Inter', sans-serif;
+}
+.wm-btn-sm--primary {
+  background: var(--color-neon-blue);
+  color: #fff;
+}
+.wm-btn-sm--primary:hover {
+  background: var(--color-neon-cyan);
+  box-shadow: 0 0 12px rgba(0,212,255,0.4);
+}
+.wm-btn-sm--outline {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+.wm-btn-sm--outline:hover {
+  border-color: var(--color-neon-blue);
+  color: var(--color-neon-cyan);
+}
+.wm-btn-sm--danger {
+  background: rgba(239,68,68,0.12);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.25);
+}
+.wm-btn-sm--danger:hover {
+  background: rgba(239,68,68,0.22);
+}
+
+/* ── Range Monitor ───────────────────────────────────────── */
+.wm-range-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--glow-card);
+  margin-bottom: 2rem;
+}
+.wm-range-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.wm-range-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.wm-range-meta {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.wm-range-meta-item {
+  text-align: right;
+}
+.wm-range-meta-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+.wm-range-meta-value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* Range bar */
+.wm-range-bar-wrap {
+  margin-bottom: 1.25rem;
+}
+.wm-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.4rem;
+  font-family: 'Orbitron', sans-serif;
+}
+.wm-range-track {
+  position: relative;
+  height: 28px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.wm-range-fill {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: linear-gradient(90deg, rgba(26,143,255,0.2), rgba(0,212,255,0.35));
+  border-right: 2px solid rgba(0,212,255,0.4);
+}
+.wm-range-price-line {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  transform: translateX(-50%);
+}
+.wm-range-price-line--current {
+  background: #00ffb3;
+  box-shadow: 0 0 8px #00ffb3;
+}
+.wm-range-price-tag {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: #00ffb3;
+  color: #040d1a;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.wm-range-oor-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  font-family: 'Orbitron', sans-serif;
+  padding: 0 0.5rem;
+}
+.wm-range-oor-label--left { left: 0; }
+.wm-range-oor-label--right { right: 0; }
+
+.wm-range-sublabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  margin-top: 0.4rem;
+}
+
+/* Range stats */
+.wm-range-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.wm-rstat {
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+.wm-rstat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.3rem;
+}
+.wm-rstat-value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.wm-rstat-value--green { color: #00ffb3; }
+.wm-rstat-value--amber { color: #f59e0b; }
+.wm-rstat-value--blue  { color: var(--color-neon-cyan); }
+
+/* ── Alert banner ────────────────────────────────────────── */
+.wm-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 2rem;
+  font-size: 0.83rem;
+  color: #fcd34d;
+}
+.wm-alert-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.1rem; }
+.wm-alert strong { color: #f59e0b; }
+
+/* ── Activity log ────────────────────────────────────────── */
+.wm-log-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--glow-card);
+}
+.wm-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.wm-log-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.wm-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.wm-log-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.8rem;
+}
+.wm-log-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.wm-log-badge--info    { background: rgba(26,143,255,0.15); color: var(--color-neon-blue); }
+.wm-log-badge--warn    { background: rgba(245,158,11,0.12); color: #f59e0b; }
+.wm-log-badge--ok      { background: rgba(0,255,179,0.1);   color: #00ffb3; }
+.wm-log-badge--error   { background: rgba(239,68,68,0.12);  color: #f87171; }
+.wm-log-msg { color: var(--color-text-primary); }
+.wm-log-time { font-size: 0.65rem; color: var(--color-text-muted); font-family: 'Orbitron', sans-serif; white-space: nowrap; }
+
+/* ── Coming soon overlay ─────────────────────────────────── */
+.wm-coming-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.65rem;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .wm-header { flex-direction: column; }
+  .wm-network-badge { align-self: flex-start; }
+  .wm-range-meta { gap: 1rem; }
+  .wm-range-meta-item { text-align: left; }
+}

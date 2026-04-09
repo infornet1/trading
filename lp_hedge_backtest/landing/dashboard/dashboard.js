@@ -133,7 +133,40 @@ const saas = {
   logs:           {},      // config_id → array of log line strings (max 50)
   tgLinked:       null,    // null=unknown, false=not linked, {hint:"...1234"}=linked
 };
-const LOG_MAX = 50;
+const LOG_MAX    = 200;
+const LOG_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours in ms
+
+// ── localStorage log cache helpers ────────────────────────────────────────
+// Stores raw bot stdout lines across page refreshes with a 72-hour TTL.
+// Format: JSON array of { msg: string, ts: number (epoch ms) }
+
+const _logKey = id => `vf_log_${id}`;
+
+function loadLogCache(configId) {
+  try {
+    const raw = localStorage.getItem(_logKey(configId));
+    if (!raw) return [];
+    const cutoff = Date.now() - LOG_TTL_MS;
+    return JSON.parse(raw).filter(e => e.ts >= cutoff);
+  } catch (_) { return []; }
+}
+
+function _saveLogCache(configId, entries) {
+  try {
+    localStorage.setItem(_logKey(configId), JSON.stringify(entries.slice(-LOG_MAX)));
+  } catch (_) {} // ignore quota errors
+}
+
+function pushLogCache(configId, msg) {
+  const entries = loadLogCache(configId);
+  entries.push({ msg, ts: Date.now() });
+  _saveLogCache(configId, entries);
+}
+
+function clearLogCache(configId) {
+  try { localStorage.removeItem(_logKey(configId)); } catch (_) {}
+}
+// ─────────────────────────────────────────────────────────────────────────
 
 // Track which protection drawers are open (survive re-render)
 const _drawerOpen = new Set();
@@ -1838,13 +1871,24 @@ async function saasLoadBots() {
           if (s?.last_event) saas.statuses[bot.id] = s.last_event;
           renderLiveBots();
         }).catch(() => {});
-        // Seed log terminal with recent DB events so it isn't blank on load
-        apiCall('GET', `/bots/${bot.id}/events?limit=10`).then(events => {
+        // 1. Pre-populate from localStorage cache (raw lines, 72h TTL)
+        const cached = loadLogCache(bot.id);
+        if (cached.length) {
+          saas.logs[bot.id] = cached.map(e => e.msg);
+          renderLiveBots();
+        }
+        // 2. Append structured DB events (last 72h) on top of cache
+        apiCall('GET', `/bots/${bot.id}/events?limit=200&hours=72`).then(events => {
           if (!Array.isArray(events) || !events.length) return;
           if (!saas.logs[bot.id]) saas.logs[bot.id] = [];
+          const now = Date.now();
           // Events come newest-first — reverse to show oldest at top
           [...events].reverse().forEach(ev => {
-            const ts  = new Date(ev.ts).toLocaleTimeString();
+            const d    = new Date(ev.ts);
+            const ageH = (now - d.getTime()) / 3_600_000;
+            const ts   = ageH > 6
+              ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString()
+              : d.toLocaleTimeString();
             const pnl = ev.pnl != null ? ` | P&L: ${ev.pnl >= 0 ? '+' : ''}$${Number(ev.pnl).toFixed(2)}` : '';
             const px  = ev.price_at_event ? ` | $${Number(ev.price_at_event).toLocaleString('en-US',{maximumFractionDigits:2})}` : '';
             saas.logs[bot.id].push(`[${ts}] ${ev.event_type.toUpperCase()}${px}${pnl}`);
@@ -2036,8 +2080,16 @@ function buildLogTerminal(configId) {
     <div class="bot-log-header">
       <span class="bot-log-title">&#9654; LIVE LOG</span>
       <span class="bot-log-dot"></span>
+      <button class="bot-log-clear" onclick="clearBotLog(${configId})" title="Clear log">&#10005;</button>
     </div>
     <div class="bot-log-terminal" id="bot-log-${configId}">${lines}</div>`;
+}
+
+function clearBotLog(configId) {
+  saas.logs[configId] = [];
+  clearLogCache(configId);
+  const el = document.getElementById(`bot-log-${configId}`);
+  if (el) el.innerHTML = '';
 }
 
 // ── WebSocket per bot ─────────────────────────────────────────────────────
@@ -2055,10 +2107,11 @@ function connectBotWS(configId) {
       if (data.event === 'ping') return;
 
       if (data.type === 'log') {
-        // Raw stdout line — append to log buffer and update terminal
+        // Raw stdout line — append to log buffer, persist to cache, update terminal
         if (!saas.logs[configId]) saas.logs[configId] = [];
         saas.logs[configId].push(data.msg);
         if (saas.logs[configId].length > LOG_MAX) saas.logs[configId].shift();
+        pushLogCache(configId, data.msg);
         appendLogLine(configId, data.msg);
       } else {
         // Structured event

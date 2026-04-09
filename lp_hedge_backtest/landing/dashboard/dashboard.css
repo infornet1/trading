@@ -1337,6 +1337,22 @@
   margin-top: 20px;
   margin-bottom: 6px;
 }
+.bot-log-clear {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(0,255,179,0.2);
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  font-size: 0.6rem;
+  padding: 1px 6px;
+  cursor: pointer;
+  line-height: 1.6;
+  transition: color 0.15s, border-color 0.15s;
+}
+.bot-log-clear:hover {
+  color: #f87171;
+  border-color: rgba(248,113,113,0.4);
+}
 .bot-log-title {
   font-family: 'Orbitron', sans-serif;
   font-size: 0.55rem;
