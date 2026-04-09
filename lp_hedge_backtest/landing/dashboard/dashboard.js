@@ -2710,25 +2710,34 @@ function calcXMaxEth(liquidity, tickLower, tickUpper) {
   return L * (1 / sqrtA - 1 / sqrtB);
 }
 
-// Cache for HL balance so we don't hammer the API on every slider move
+// Cache for HL balance so we don't hammer the API on every slider move.
+// _hlBalanceFetchPromise lets concurrent callers share the same in-flight
+// request instead of the second caller getting null from the boolean guard.
 let _hlBalanceCache = null;
-let _hlBalanceFetching = false;
+let _hlBalanceFetchPromise = null;
 
 async function fetchHLBalance(walletAddr) {
-  if (!walletAddr && _hlBalanceFetching) return _hlBalanceCache;
   if (!walletAddr && _hlBalanceCache !== null) return _hlBalanceCache;
+  // If a no-wallet fetch is already in flight, return the same promise so
+  // all callers wait for the same result rather than getting null immediately
+  if (!walletAddr && _hlBalanceFetchPromise) return _hlBalanceFetchPromise;
   if (!saas.jwt) return null;
-  _hlBalanceFetching = true;
-  try {
-    const url  = walletAddr ? `/bots/hl-balance?wallet=${encodeURIComponent(walletAddr)}` : '/bots/hl-balance';
-    const data = await apiCall('GET', url);
-    if (!walletAddr) _hlBalanceCache = data;
-    return data;
-  } catch (_) {
-    return null;
-  } finally {
-    _hlBalanceFetching = false;
-  }
+
+  const promise = (async () => {
+    try {
+      const url  = walletAddr ? `/bots/hl-balance?wallet=${encodeURIComponent(walletAddr)}` : '/bots/hl-balance';
+      const data = await apiCall('GET', url);
+      if (!walletAddr) _hlBalanceCache = data;
+      return data;
+    } catch (_) {
+      return null;
+    } finally {
+      if (!walletAddr) _hlBalanceFetchPromise = null;
+    }
+  })();
+
+  if (!walletAddr) _hlBalanceFetchPromise = promise;
+  return promise;
 }
 
 // Called once after the trading panel is injected into DOM
