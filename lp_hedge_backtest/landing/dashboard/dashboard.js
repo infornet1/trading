@@ -2672,9 +2672,16 @@ window.activateProtection = async function (tokenId) {
     _hlBalanceCache = null; // invalidate balance cache after config change
     await apiCall('POST', `/bots/${configId}/start`);
 
-    // Refresh bot list and re-render
+    // Refresh bot list
     await saasLoadBots();
+
+    // Explicitly await HL balance so the active panel renders with real value,
+    // not — (saasLoadBots fires this async internally but doesn't await it)
+    await fetchHLBalance();
+
+    // Final render with populated cache
     renderPositions();
+    renderLiveBots();
 
     // Connect WebSocket for live updates
     connectBotWS(configId);
