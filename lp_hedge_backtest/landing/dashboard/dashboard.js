@@ -2583,6 +2583,10 @@ window.removeHLWallet = async function (tokenId, sel) {
       sel.value = sel.options[0].value;
       window.onWalletSelectChange(tokenId);
     }
+    // Invalidate balance cache and reload bot cards so they reflect the cleared wallet
+    _hlBalanceCache = null;
+    await saasLoadBots();
+    renderLiveBots();
   } catch (e) {
     alert(`Error al eliminar wallet: ${e.message}`);
   }
