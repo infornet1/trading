@@ -1899,10 +1899,12 @@ async function saasLoadBots() {
       }
     }
 
-    // Fetch HL balance for the active bot so the panel shows it immediately
-    const activeBotWithWallet = bots.find(b => b.active && b.hl_wallet_addr);
-    if (activeBotWithWallet) {
-      fetchHLBalance(activeBotWithWallet.hl_wallet_addr).then(() => renderLiveBots()).catch(() => {});
+    // Fetch HL balance for the active bot so the panel shows it immediately.
+    // Must call WITHOUT walletAddr so fetchHLBalance sets _hlBalanceCache;
+    // the backend falls back to the most-recent config wallet automatically.
+    const hasActiveBotWithWallet = bots.some(b => b.active && b.hl_wallet_addr);
+    if (hasActiveBotWithWallet) {
+      fetchHLBalance().then(() => renderLiveBots()).catch(() => {});
     }
 
     // Re-render positions and live bots panel
