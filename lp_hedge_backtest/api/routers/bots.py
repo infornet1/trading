@@ -306,19 +306,6 @@ async def update_bot(
     return cfg
 
 
-@router.delete("/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_bot(
-    config_id: int,
-    address: str = Depends(get_current_address),
-    db: AsyncSession = Depends(get_db),
-):
-    cfg = await _get_own_config(config_id, address, db)
-    if cfg.active:
-        raise HTTPException(status_code=409, detail="Stop the bot before deleting its config")
-    await db.delete(cfg)
-    await db.commit()
-
-
 @router.delete("/hl-wallet")
 async def remove_hl_wallet(
     wallet: str,
@@ -329,6 +316,8 @@ async def remove_hl_wallet(
     Clears hl_wallet_addr + hl_api_key from all non-running configs
     belonging to the authenticated user that use the given wallet address.
     Running configs are skipped (stop the bot first).
+    Must be defined BEFORE /{config_id} to avoid FastAPI matching /hl-wallet
+    as a config_id int and returning 422.
     """
     from api.bot_manager import manager
     result = await db.execute(
@@ -352,6 +341,19 @@ async def remove_hl_wallet(
 
     await db.commit()
     return {"cleared": cleared, "skipped": skipped}
+
+
+@router.delete("/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_bot(
+    config_id: int,
+    address: str = Depends(get_current_address),
+    db: AsyncSession = Depends(get_db),
+):
+    cfg = await _get_own_config(config_id, address, db)
+    if cfg.active:
+        raise HTTPException(status_code=409, detail="Stop the bot before deleting its config")
+    await db.delete(cfg)
+    await db.commit()
 
 
 @router.get("/hl-balance")
