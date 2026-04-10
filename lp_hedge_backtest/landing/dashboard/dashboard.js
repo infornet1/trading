@@ -282,9 +282,7 @@ window.setTab = function (tab) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('tab-btn--active', btn.id === 'tab-' + tab);
   });
-  const isExplore = tab === 'explore';
-  document.getElementById('explore-panel')?.classList.toggle('hidden', !isExplore);
-  if (!isExplore) renderPositions();
+  renderPositions();
 };
 
 // ── Watch Address (read-only) ─────────────────────────────────────────────

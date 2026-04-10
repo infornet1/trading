@@ -41,6 +41,13 @@
               <span class="nav-dd-sub">Señales en tiempo real</span>
             </div>
           </a>
+          <a href="../explore/index.html" class="nav-dd-item">
+            <span class="nav-dd-icon">🔍</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">Explorar</span>
+              <span class="nav-dd-sub">Busca posiciones LP</span>
+            </div>
+          </a>
           <a href="../wallet/index.html" class="nav-dd-item">
             <span class="nav-dd-icon">🛡️</span>
             <div class="nav-dd-text">
@@ -323,9 +330,6 @@
             <span data-i18n="dash.tab.history">Historial</span>
             <span class="tab-count" id="tab-count-history">0</span>
           </button>
-          <button class="tab-btn tab-btn--explore" id="tab-explore" onclick="setTab('explore')">
-            &#128269; Explorar
-          </button>
         </div>
 
         <!-- Loading state -->
@@ -355,83 +359,6 @@
 
         <!-- Positions grid -->
         <div id="positions-grid" class="positions-grid"></div>
-
-        <!-- ── Explorar Tab Panel ────────────────────────────── -->
-        <div id="explore-panel" class="hidden">
-
-          <!-- Search form -->
-          <div class="explore-search">
-            <div class="watch-mode-pills">
-              <button class="watch-mode-pill watch-mode-pill--active" data-mode="wallet"
-                      onclick="switchExploreMode('wallet')">Por Wallet</button>
-              <button class="watch-mode-pill" data-mode="nft"
-                      onclick="switchExploreMode('nft')">NFT ID</button>
-            </div>
-
-            <div class="watch-form" id="explore-wallet-row">
-              <div class="watch-input-wrapper">
-                <span class="watch-input-prefix">0x</span>
-                <input type="text" id="explore-addr-input" class="watch-input"
-                       placeholder="… dirección de billetera"
-                       autocomplete="off" spellcheck="false" />
-              </div>
-              <select id="explore-chain-select" class="watch-chain-select">
-                <option value="42161">Arbitrum</option>
-                <option value="1">Ethereum</option>
-                <option value="8453">Base</option>
-              </select>
-              <button class="btn btn-outline btn-sm" onclick="exploreSearch()">
-                &#128269;&nbsp;<span>Buscar</span>
-              </button>
-            </div>
-
-            <div class="watch-form hidden" id="explore-nft-row">
-              <div class="watch-input-wrapper">
-                <span class="watch-input-prefix watch-input-prefix--nft">#</span>
-                <input type="text" id="explore-nft-input" class="watch-input"
-                       placeholder="Token ID  ej. 847291"
-                       autocomplete="off" spellcheck="false" inputmode="numeric" />
-              </div>
-              <select id="explore-nft-chain-select" class="watch-chain-select">
-                <option value="42161">Arbitrum</option>
-                <option value="1">Ethereum</option>
-                <option value="8453">Base</option>
-              </select>
-              <button class="btn btn-outline btn-sm" onclick="exploreSearch()">
-                &#128269;&nbsp;<span>Buscar</span>
-              </button>
-            </div>
-
-            <p class="watch-nft-note hidden" id="explore-nft-note">
-              &#8505; Uniswap&nbsp;v3 únicamente &mdash; otros protocolos LP usarán búsqueda por wallet
-            </p>
-          </div>
-
-          <!-- Owner bar -->
-          <div id="explore-owner-bar" class="explore-owner-bar hidden">
-            <span class="explore-owner-label">Posiciones de</span>
-            <span id="explore-owner-addr" class="watch-mode-addr"></span>
-            <span id="explore-owner-nft" class="explore-nft-tag hidden"></span>
-            <button class="explore-clear-btn" onclick="clearExplore()">&#10005; Limpiar</button>
-          </div>
-
-          <!-- Loading -->
-          <div id="explore-loading" class="loading-state hidden">
-            <div class="spinner"></div>
-            <p>Buscando posiciones on-chain…</p>
-          </div>
-
-          <!-- Empty -->
-          <div id="explore-empty" class="empty-state hidden">
-            <div class="empty-icon">&#128269;</div>
-            <h3>Sin posiciones encontradas</h3>
-            <p class="text-muted">Esta wallet no tiene posiciones LP activas en esta red.</p>
-          </div>
-
-          <!-- Results -->
-          <div id="explore-results" class="positions-grid"></div>
-
-        </div>
 
         <!-- ── Live Bots Section (dynamic) ───────────────────── -->
         <div id="live-bots-section"></div>
