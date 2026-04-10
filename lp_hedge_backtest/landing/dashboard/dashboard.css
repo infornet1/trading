@@ -1453,8 +1453,6 @@
 
 /* Copy wallet button on toggle row */
 .prot-wallet-copy {
-  background: none;
-  border: none;
   cursor: pointer;
   font-size: 0.65rem;
   padding: 0 2px;
@@ -1462,6 +1460,7 @@
   opacity: 0.5;
   flex-shrink: 0;
   transition: opacity 0.15s;
+  user-select: none;
 }
 .prot-wallet-copy:hover { opacity: 1; }
 .prot-wallet-copy--copied {

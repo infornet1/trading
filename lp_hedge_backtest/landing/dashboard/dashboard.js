@@ -2495,8 +2495,8 @@ function buildProtectionDrawer(pos) {
   const hlWalletAddr = _configuredWallets[tokenId] || bot?.hl_wallet_addr || '';
   const walletChip = hlWalletAddr
     ? `<span class="prot-wallet-chip" title="${hlWalletAddr}">HL: ${hlWalletAddr.slice(0,6)}…${hlWalletAddr.slice(-4)}</span>`
-      + `<button class="prot-wallet-copy" title="Copy wallet address"
-               onclick="event.stopPropagation();_copyWalletAddr(this,'${hlWalletAddr}')">📋</button>`
+      + `<span class="prot-wallet-copy" title="Copy wallet address"
+               onclick="event.stopPropagation();_copyWalletAddr(this,'${hlWalletAddr}')">📋</span>`
     : '';
   return `
     <div class="pc-protection">
@@ -2538,7 +2538,7 @@ function _updateWalletChip(tokenId, wallet) {
     chip.className   = 'prot-wallet-chip';
     chip.title       = wallet;
     chip.textContent = label;
-    copyBtn = document.createElement('button');
+    copyBtn = document.createElement('span');
     copyBtn.className = 'prot-wallet-copy';
     copyBtn.title     = 'Copy wallet address';
     copyBtn.textContent = '📋';
