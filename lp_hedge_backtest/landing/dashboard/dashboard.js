@@ -2504,7 +2504,7 @@ function buildProtectionDrawer(pos) {
               onclick="toggleProtectionDrawer('${tokenId}')">
         <span class="prot-chevron ${isOpen ? 'prot-chevron--open' : ''}"
               id="prot-chevron-${tokenId}">▶</span>
-        <span class="prot-toggle-label">${isActive ? '' : '⚠ '}${t('prot.drawer.title')}</span>
+        <span class="prot-toggle-label">${isActive ? '' : pos._exploreOnly ? '' : '⚠ '}${t('prot.drawer.title')}</span>
         ${walletChip}
         ${badge}
       </button>
