@@ -661,21 +661,37 @@ function handleChainChanged(chainIdHex) {
 
 // ── Network Switcher ──────────────────────────────────────────────────────
 
-window.switchToChain = async function (chainIdHex) {
+// ── Gas advisory for non-Arbitrum chains ─────────────────────────────────
+
+const GAS_EXPENSIVE_CHAINS = { 1: 'Ethereum', 8453: 'Base' };
+
+window.gasDismiss = function () {
+  document.getElementById('gas-advisory-overlay')?.classList.add('hidden');
+};
+
+function _showGasAdvisory(chainIdHex) {
+  const chainId   = parseInt(chainIdHex, 16);
+  const chainName = GAS_EXPENSIVE_CHAINS[chainId];
+  const overlay   = document.getElementById('gas-advisory-overlay');
+  if (!overlay) { _doSwitchChain(chainIdHex); return; }
+  document.getElementById('gas-chain-name').textContent  = chainName;
+  document.getElementById('gas-chain-name2').textContent = chainName;
+  const proceedBtn = document.getElementById('gas-proceed-btn');
+  proceedBtn.onclick = () => { gasDismiss(); _doSwitchChain(chainIdHex); };
+  overlay.classList.remove('hidden');
+}
+
+async function _doSwitchChain(chainIdHex) {
   const chainId  = parseInt(chainIdHex, 16);
   const chainCfg = CHAINS[chainId];
+  if (!chainCfg) return;
 
-  // Watch mode: probe fallback RPCs and switch directly — no wallet involved
   if (state.watchMode) {
-    if (!chainCfg) return;
     try {
-      const provider   = await makeWatchProvider(chainId);
-      state.chainId    = chainId;
-      state.provider   = provider;
-    } catch (e) {
-      showError(e.message);
-      return;
-    }
+      const provider = await makeWatchProvider(chainId);
+      state.chainId  = chainId;
+      state.provider = provider;
+    } catch (e) { showError(e.message); return; }
     updateWalletBar();
     updateChainPills();
     fetchPositions();
@@ -696,6 +712,16 @@ window.switchToChain = async function (chainIdHex) {
       // 4001 = user rejected — silently ignore
       showError('Failed to switch network: ' + (err.message || err));
     }
+  }
+}
+
+window.switchToChain = function (chainIdHex) {
+  const chainId = parseInt(chainIdHex, 16);
+  // Show gas advisory for Ethereum and Base before switching
+  if (GAS_EXPENSIVE_CHAINS[chainId]) {
+    _showGasAdvisory(chainIdHex);
+  } else {
+    _doSwitchChain(chainIdHex);
   }
 };
 
