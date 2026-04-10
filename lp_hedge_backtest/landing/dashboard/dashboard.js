@@ -669,6 +669,12 @@ window.gasDismiss = function () {
   document.getElementById('gas-advisory-overlay')?.classList.add('hidden');
 };
 
+// Overlay click + "Stay on Arbitrum" button — dismiss and switch to ARB if needed
+window.gasStayOnArb = function () {
+  gasDismiss();
+  if (state.chainId !== 42161) _doSwitchChain('0xa4b1');
+};
+
 function _showGasAdvisory(chainIdHex) {
   const chainId   = parseInt(chainIdHex, 16);
   const chainName = GAS_EXPENSIVE_CHAINS[chainId];
@@ -676,8 +682,20 @@ function _showGasAdvisory(chainIdHex) {
   if (!overlay) { _doSwitchChain(chainIdHex); return; }
   document.getElementById('gas-chain-name').textContent  = chainName;
   document.getElementById('gas-chain-name2').textContent = chainName;
+
+  // "Proceed" — switch to the expensive chain
   const proceedBtn = document.getElementById('gas-proceed-btn');
   proceedBtn.onclick = () => { gasDismiss(); _doSwitchChain(chainIdHex); };
+
+  // "Stay on Arbitrum" — switch to ARB only if not already there
+  const stayBtn = document.querySelector('#gas-advisory-overlay .gas-btn--primary');
+  if (stayBtn) {
+    stayBtn.onclick = () => {
+      gasDismiss();
+      if (state.chainId !== 42161) _doSwitchChain('0xa4b1');
+    };
+  }
+
   overlay.classList.remove('hidden');
 }
 
