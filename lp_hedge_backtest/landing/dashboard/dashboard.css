@@ -1451,6 +1451,24 @@
   flex-shrink: 0;
 }
 
+/* Copy wallet button on toggle row */
+.prot-wallet-copy {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.65rem;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.5;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.prot-wallet-copy:hover { opacity: 1; }
+.prot-wallet-copy--copied {
+  opacity: 1;
+  color: var(--color-neon-green);
+}
+
 /* Active / Inactive badge on toggle row */
 .prot-badge {
   font-family: 'Orbitron', sans-serif;

@@ -2494,7 +2494,9 @@ function buildProtectionDrawer(pos) {
   const isActive = bot?.active;
   const hlWalletAddr = _configuredWallets[tokenId] || bot?.hl_wallet_addr || '';
   const walletChip = hlWalletAddr
-    ? `<span class="prot-wallet-chip" title="${hlWalletAddr}">${hlWalletAddr.slice(0,6)}…${hlWalletAddr.slice(-4)}</span>`
+    ? `<span class="prot-wallet-chip" title="${hlWalletAddr}">HL: ${hlWalletAddr.slice(0,6)}…${hlWalletAddr.slice(-4)}</span>`
+      + `<button class="prot-wallet-copy" title="Copy wallet address"
+               onclick="event.stopPropagation();_copyWalletAddr(this,'${hlWalletAddr}')">📋</button>`
     : '';
   return `
     <div class="pc-protection">
@@ -2517,24 +2519,45 @@ function buildProtectionDrawer(pos) {
 function _updateWalletChip(tokenId, wallet) {
   const toggle = document.querySelector(`.pc-prot-toggle[onclick*="${tokenId}"]`);
   if (!toggle) return;
-  let chip = toggle.querySelector('.prot-wallet-chip');
+  let chip    = toggle.querySelector('.prot-wallet-chip');
+  let copyBtn = toggle.querySelector('.prot-wallet-copy');
   if (!wallet) {
-    if (chip) chip.remove();
+    if (chip)    chip.remove();
+    if (copyBtn) copyBtn.remove();
     return;
   }
-  const label = `${wallet.slice(0,6)}…${wallet.slice(-4)}`;
+  const label = `HL: ${wallet.slice(0,6)}…${wallet.slice(-4)}`;
   if (chip) {
     chip.title       = wallet;
     chip.textContent = label;
+    if (copyBtn) {
+      copyBtn.onclick = (e) => { e.stopPropagation(); _copyWalletAddr(copyBtn, wallet); };
+    }
   } else {
     chip = document.createElement('span');
     chip.className   = 'prot-wallet-chip';
     chip.title       = wallet;
     chip.textContent = label;
+    copyBtn = document.createElement('button');
+    copyBtn.className = 'prot-wallet-copy';
+    copyBtn.title     = 'Copy wallet address';
+    copyBtn.textContent = '📋';
+    copyBtn.onclick   = (e) => { e.stopPropagation(); _copyWalletAddr(copyBtn, wallet); };
     // Insert between label and badge
     const labelEl = toggle.querySelector('.prot-toggle-label');
-    if (labelEl) labelEl.after(chip);
+    if (labelEl) { labelEl.after(copyBtn); labelEl.after(chip); }
   }
+}
+
+function _copyWalletAddr(btn, wallet) {
+  navigator.clipboard.writeText(wallet).then(() => {
+    btn.textContent = '✓';
+    btn.classList.add('prot-wallet-copy--copied');
+    setTimeout(() => {
+      btn.textContent = '📋';
+      btn.classList.remove('prot-wallet-copy--copied');
+    }, 1500);
+  }).catch(() => {});
 }
 
 // ── Drawer toggle ─────────────────────────────────────────────────────────
