@@ -663,7 +663,7 @@ function handleChainChanged(chainIdHex) {
 
 // ── Gas advisory for non-Arbitrum chains ─────────────────────────────────
 
-const GAS_EXPENSIVE_CHAINS = { 1: 'Ethereum', 8453: 'Base' };
+const GAS_EXPENSIVE_CHAINS = { 1: 'Ethereum' }; // Base (~0.005 gwei) is comparable to Arbitrum — no advisory needed
 
 window.gasDismiss = function () {
   document.getElementById('gas-advisory-overlay')?.classList.add('hidden');
