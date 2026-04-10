@@ -38,7 +38,7 @@ const CHAINS = {
       'https://rpc.ankr.com/base',                // Ankr
       'https://base.llamarpc.com',                // llamarpc fallback
     ],
-    nfpmAddr:    '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f4',
+    nfpmAddr:    '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1',
     factoryAddr: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
   },
 };
