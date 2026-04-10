@@ -13,11 +13,12 @@ const CHAIN_LABELS = {
 };
 
 // ── State ──────────────────────────────────────────────────
-let _jwt     = localStorage.getItem('vf_jwt') || null;
-let _address = null;   // connected wallet address (checksummed)
-let _bots    = [];     // BotConfigOut[]
-let _balances = {};    // tokenId → { value, error }
-let _editOpen = {};    // tokenId → 'edit' | 'link' | 'remove' | null
+let _jwt      = localStorage.getItem('vf_jwt') || null;
+let _address  = null;   // connected wallet address (checksummed)
+let _bots     = [];     // BotConfigOut[]
+let _balances = {};     // tokenId → { value, error }
+let _statuses = {};     // botId → { running: bool }  (only fetched for active bots)
+let _editOpen = {};     // tokenId → 'edit' | 'link' | 'remove' | null
 
 // ── API helper ─────────────────────────────────────────────
 async function apiFetch(path, opts = {}) {
@@ -39,10 +40,11 @@ async function apiFetch(path, opts = {}) {
 
 // ── Auth ───────────────────────────────────────────────────
 function _clearSession() {
-  _jwt     = null;
-  _address = null;
-  _bots    = [];
+  _jwt      = null;
+  _address  = null;
+  _bots     = [];
   _balances = {};
+  _statuses = {};
   _editOpen = {};
   localStorage.removeItem('vf_jwt');
 }
@@ -111,11 +113,14 @@ async function _loadBots() {
     } catch (_) {}
   }
 
-  // Fetch HL balances in parallel for bots that have a wallet
-  const wallets = [...new Set(
-    _bots.map(b => b.hl_wallet_addr).filter(Boolean)
-  )];
-  await Promise.all(wallets.map(w => _fetchHLBalance(w)));
+  // Fetch HL balances + statuses in parallel
+  const wallets    = [...new Set(_bots.map(b => b.hl_wallet_addr).filter(Boolean))];
+  const activeBots = _bots.filter(b => b.active);
+
+  await Promise.all([
+    ...wallets.map(w => _fetchHLBalance(w)),
+    ...activeBots.map(b => _fetchBotStatus(b.id)),
+  ]);
 }
 
 async function _fetchHLBalance(wallet) {
@@ -134,6 +139,17 @@ async function _fetchHLBalance(wallet) {
         _balances[b.nft_token_id] = { error: err.message };
       }
     });
+  }
+}
+
+async function _fetchBotStatus(botId) {
+  try {
+    const res  = await apiFetch(`/bots/${botId}/status`);
+    const data = await res.json();
+    _statuses[botId] = { running: data.running === true };
+  } catch (_) {
+    // On error, assume running (safe default — keeps lock in place)
+    _statuses[botId] = { running: true };
   }
 }
 
@@ -228,12 +244,21 @@ function _buildCard(bot) {
     balHtml = _renderBalanceLine(bal);
   }
 
-  // Card top strip color: running = green, inactive = blue
-  const stripClass = isActive ? 'wm2-card--active' : 'wm2-card--idle';
+  // Determine actual running state for active bots
+  const statusData = isActive ? (_statuses[bot.id] ?? null) : null;
+  const isCrashed  = isActive && statusData !== null && statusData.running === false;
+  const isRunning  = isActive && !isCrashed;
+
+  // Card top strip color
+  const stripClass = isCrashed ? 'wm2-card--crashed'
+                   : isActive  ? 'wm2-card--active'
+                   :             'wm2-card--idle';
 
   // Status badge
   let statusBadge = '';
-  if (isActive) {
+  if (isCrashed) {
+    statusBadge = `<span class="wm2-badge wm2-badge--crashed">🔴 BOT CAÍDO</span>`;
+  } else if (isRunning) {
     statusBadge = `<span class="wm2-badge wm2-badge--running">🟢 RUNNING</span>`;
   }
 
@@ -285,7 +310,10 @@ function _buildCard(bot) {
   // Footer actions
   let footer = '';
   if (isActive) {
-    footer = `<div class="wm2-lock-hint">🔒 Stop the bot in LP Defensor to edit</div>`;
+    const lockMsg = isCrashed
+      ? '🔒 Bot is flagged active but not running — stop it in LP Defensor to edit'
+      : '🔒 Stop the bot in LP Defensor to edit';
+    footer = `<div class="wm2-lock-hint">${lockMsg}</div>`;
   } else if (editState) {
     footer = ''; // form handles its own buttons
   } else if (hasHL) {

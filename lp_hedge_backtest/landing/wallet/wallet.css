@@ -682,6 +682,9 @@
 .wm2-card--idle::before {
   background: linear-gradient(90deg, #1a8fff, var(--color-neon-cyan));
 }
+.wm2-card--crashed::before {
+  background: linear-gradient(90deg, #ef4444, #f59e0b);
+}
 
 /* Card header */
 .wm2-card-header {
@@ -716,6 +719,11 @@
   background: rgba(0,255,179,0.12);
   color: #00ffb3;
   border: 1px solid rgba(0,255,179,0.3);
+}
+.wm2-badge--crashed {
+  background: rgba(239,68,68,0.12);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.3);
 }
 
 /* Detail rows */
