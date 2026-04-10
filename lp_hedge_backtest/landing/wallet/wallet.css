@@ -515,3 +515,397 @@
   .wm-range-meta { gap: 1rem; }
   .wm-range-meta-item { text-align: left; }
 }
+
+/* ============================================================
+   WALLET MANAGER v2 — Live auth + LP↔HL relationship cards
+   ============================================================ */
+
+/* ── Global error banner ─────────────────────────────────── */
+.wm2-global-error {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.35);
+  border-radius: 8px;
+  color: #f87171;
+  padding: 0.75rem 1rem;
+  font-size: 0.83rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Loading state ───────────────────────────────────────── */
+.wm2-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  padding: 3rem 0;
+}
+.wm2-spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-neon-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Auth gate ───────────────────────────────────────────── */
+.wm2-auth-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 4rem 1rem;
+  text-align: center;
+}
+.wm2-auth-icon { font-size: 2.5rem; }
+.wm2-auth-msg {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  max-width: 360px;
+}
+
+/* ── Toolbar (signed-in state) ───────────────────────────── */
+.wm2-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.75rem;
+}
+.wm2-signed-in-as {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.04em;
+}
+.wm2-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #00ffb3;
+  box-shadow: 0 0 6px #00ffb3;
+  animation: pulse-dot 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.wm2-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+}
+.wm2-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.wm2-btn--primary {
+  background: var(--color-neon-blue);
+  color: #fff;
+}
+.wm2-btn--primary:hover:not(:disabled) {
+  background: var(--color-neon-cyan);
+  box-shadow: 0 0 14px rgba(0,212,255,0.4);
+}
+.wm2-btn--outline {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+.wm2-btn--outline:hover:not(:disabled) {
+  border-color: var(--color-neon-blue);
+  color: var(--color-neon-cyan);
+}
+.wm2-btn--ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+}
+.wm2-btn--ghost:hover:not(:disabled) { color: var(--color-text-primary); }
+.wm2-btn--danger {
+  background: rgba(239,68,68,0.12);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.28);
+}
+.wm2-btn--danger:hover:not(:disabled) { background: rgba(239,68,68,0.22); }
+
+/* ── Empty state ─────────────────────────────────────────── */
+.wm2-empty {
+  text-align: center;
+  padding: 3.5rem 1rem;
+  color: var(--color-text-muted);
+}
+.wm2-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.wm2-empty-msg { font-size: 0.95rem; color: var(--color-text-secondary); }
+.wm2-empty-sub { font-size: 0.82rem; margin-top: 0.4rem; }
+.wm2-empty-sub a { color: var(--color-neon-cyan); text-decoration: none; }
+.wm2-empty-sub a:hover { text-decoration: underline; }
+
+/* ── Cards grid ──────────────────────────────────────────── */
+.wm2-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1.25rem;
+}
+
+/* ── LP↔HL Card ──────────────────────────────────────────── */
+.wm2-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.35rem 1.5rem;
+  box-shadow: var(--glow-card);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.wm2-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  border-radius: 12px 12px 0 0;
+}
+.wm2-card--active::before {
+  background: linear-gradient(90deg, #00ffb3, #1a8fff);
+}
+.wm2-card--idle::before {
+  background: linear-gradient(90deg, #1a8fff, var(--color-neon-cyan));
+}
+
+/* Card header */
+.wm2-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.wm2-card-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-primary);
+}
+
+/* Status badge */
+.wm2-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.67rem;
+  font-weight: 700;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.wm2-badge--running {
+  background: rgba(0,255,179,0.12);
+  color: #00ffb3;
+  border: 1px solid rgba(0,255,179,0.3);
+}
+
+/* Detail rows */
+.wm2-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.83rem;
+  min-height: 1.6rem;
+}
+.wm2-detail-label {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+.wm2-detail-val {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Arrow */
+.wm2-arrow-row {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0;
+}
+
+/* No HL warning */
+.wm2-no-hl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(245,158,11,0.07);
+  border: 1px solid rgba(245,158,11,0.22);
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.8rem;
+  color: #f59e0b;
+}
+.wm2-no-hl-icon { font-size: 0.85rem; flex-shrink: 0; }
+
+/* Monospace address */
+.wm2-mono {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  color: var(--color-neon-cyan);
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wm2-muted { color: var(--color-text-muted); }
+
+/* Copy icon */
+.wm2-copy-icon {
+  cursor: pointer;
+  font-size: 0.78rem;
+  opacity: 0.5;
+  transition: opacity 0.15s, color 0.15s;
+  user-select: none;
+  flex-shrink: 0;
+}
+.wm2-copy-icon:hover { opacity: 1; }
+
+/* HL Balance colors */
+.wm2-bal-green { color: #00ffb3; font-weight: 700; font-family: 'Orbitron', sans-serif; font-size: 0.82rem; }
+.wm2-bal-amber { color: #f59e0b; font-weight: 700; font-family: 'Orbitron', sans-serif; font-size: 0.82rem; }
+.wm2-bal-red   { color: #f87171; font-weight: 700; font-family: 'Orbitron', sans-serif; font-size: 0.82rem; }
+
+/* Card actions footer */
+.wm2-card-actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  margin-top: 0.2rem;
+}
+
+/* Lock hint */
+.wm2-lock-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0;
+}
+
+/* Card error */
+.wm2-card-error {
+  font-size: 0.78rem;
+  color: #f87171;
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+/* ── Inline form ─────────────────────────────────────────── */
+.wm2-inline-form {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.2rem;
+}
+.wm2-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.wm2-form-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+.wm2-input-wrap {
+  position: relative;
+}
+.wm2-input {
+  width: 100%;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  padding: 0.55rem 2.2rem 0.55rem 0.75rem;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.wm2-input:focus { border-color: var(--color-neon-blue); }
+.wm2-input::placeholder { color: var(--color-text-muted); opacity: 0.7; }
+.wm2-eye {
+  position: absolute;
+  right: 0.55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 0.85rem;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+  user-select: none;
+}
+.wm2-eye:hover { opacity: 1; }
+.wm2-form-hint {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+.wm2-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+/* ── Remove confirm strip ────────────────────────────────── */
+.wm2-remove-confirm {
+  background: rgba(239,68,68,0.07);
+  border: 1px solid rgba(239,68,68,0.22);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.2rem;
+}
+.wm2-remove-msg {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+.wm2-remove-msg strong { color: #f87171; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .wm2-cards-grid { grid-template-columns: 1fr; }
+  .wm2-toolbar { flex-wrap: wrap; gap: 0.5rem; }
+}
+
+/* ── Utility ─────────────────────────────────────────────── */
+.hidden { display: none !important; }

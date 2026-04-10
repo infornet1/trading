@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VIZNIAGO — Wallet Manager</title>
   <link rel="icon" href="../assets/vizniago-logo.jpeg" type="image/jpeg" />
-  <meta name="description" content="Monitor and manage LP and protection wallets for the VIZNIAGO hedge bot on Arbitrum." />
+  <meta name="description" content="Manage LP ↔ HL protection wallet relationships for VIZNIAGO hedge bots." />
   <link rel="stylesheet" href="../global.css" />
   <link rel="stylesheet" href="wallet.css" />
 </head>
@@ -67,8 +67,8 @@
 
     <div class="navbar-right">
       <div class="lang-toggle">
-        <button class="lang-btn active" onclick="">EN</button>
-        <button class="lang-btn" onclick="">ES</button>
+        <button class="lang-btn active">EN</button>
+        <button class="lang-btn">ES</button>
       </div>
       <span class="navbar-badge">v1.0 BETA</span>
       <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu" onclick="toggleMobileNav()">
@@ -89,272 +89,27 @@
         <div class="wm-eyebrow">Wallet Management</div>
         <h1>
           <span class="text-gradient">Wallet</span>
-          <span> Guardian</span>
+          <span> Manager</span>
         </h1>
-        <p class="wm-sub">Monitor balances, LP range health, and hedge protection status in real-time.</p>
-      </div>
-      <div class="wm-network-badge">
-        <span class="wm-network-dot"></span>
-        Arbitrum One
+        <p class="wm-sub">Single source of truth for all LP ↔ HL wallet relationships. Full CRUD for HL wallet address and API private key.</p>
       </div>
     </div>
 
-    <!-- Alert: gas warning -->
-    <div class="wm-alert" id="alert-gas">
-      <span class="wm-alert-icon">⚠️</span>
-      <div>
-        <strong>Action required:</strong> Protection wallet has no ETH for gas.
-        Add at least <strong>0.005 ETH</strong> to <code>0xeF0D...f2f</code> before starting the hedge bot,
-        or hedge trades will fail to execute.
-      </div>
-    </div>
+    <!-- Global error banner -->
+    <div class="wm2-global-error hidden" id="wm-global-error"></div>
 
-    <!-- Wallet cards -->
-    <div class="wm-section-label">Wallet Status</div>
-    <div class="wm-wallets-grid">
-
-      <!-- Protection Wallet -->
-      <div class="wm-wallet-card wm-wallet-card--protection">
-        <div class="wm-card-header">
-          <div class="wm-card-role">
-            <span class="wm-card-icon">🛡️</span>
-            <div>
-              <div class="wm-card-title">Protection Wallet</div>
-              <div class="wm-card-sub">Hedge &amp; short capital</div>
-            </div>
-          </div>
-          <span class="wm-status-pill wm-status-pill--warn">
-            <span class="wm-status-dot"></span>
-            No ETH gas
-          </span>
-        </div>
-
-        <div class="wm-address-row">
-          <span class="wm-address-text" id="addr-protection">0xeF0DDF18382538F31dcfa0AF40B47eE8c5A2cf2f</span>
-          <button class="wm-copy-btn" onclick="copyAddress('addr-protection')" title="Copy address">⧉</button>
-          <a class="wm-explorer-btn"
-             href="https://arbiscan.io/address/0xeF0DDF18382538F31dcfa0AF40B47eE8c5A2cf2f"
-             target="_blank" rel="noopener" title="View on Arbiscan">↗</a>
-        </div>
-
-        <div class="wm-balances">
-          <div class="wm-balance-item">
-            <div class="wm-balance-label">ETH</div>
-            <div class="wm-balance-value wm-balance-warn">~0</div>
-            <div class="wm-balance-usd wm-balance-warn">Gas needed</div>
-          </div>
-          <div class="wm-balance-item">
-            <div class="wm-balance-label">USDC</div>
-            <div class="wm-balance-value">80.00</div>
-            <div class="wm-balance-usd">~$80.00</div>
-          </div>
-          <div class="wm-balance-item">
-            <div class="wm-balance-label">WBTC</div>
-            <div class="wm-balance-value">0.000327</div>
-            <div class="wm-balance-usd">~$27.20</div>
-          </div>
-          <div class="wm-balance-item">
-            <div class="wm-balance-label">UNI-V3 NFT</div>
-            <div class="wm-balance-value">1</div>
-            <div class="wm-balance-usd wm-balance-warn">⚠ Investigate</div>
-          </div>
-        </div>
-
-        <div class="wm-card-actions">
-          <a href="https://arbiscan.io/address/0xeF0DDF18382538F31dcfa0AF40B47eE8c5A2cf2f"
-             target="_blank" rel="noopener" class="wm-btn-sm wm-btn-sm--outline">
-            ↗ Arbiscan
-          </a>
-          <button class="wm-btn-sm wm-btn-sm--outline" onclick="refreshBalance('protection')">
-            ⟳ Refresh
-          </button>
-          <span class="wm-coming-soon">⚙ Auto-hedge <em>soon</em></span>
-        </div>
-      </div>
-
-      <!-- LP Wallet -->
-      <div class="wm-wallet-card wm-wallet-card--lp">
-        <div class="wm-card-header">
-          <div class="wm-card-role">
-            <span class="wm-card-icon">💧</span>
-            <div>
-              <div class="wm-card-title">LP Wallet</div>
-              <div class="wm-card-sub">Liquidity position capital</div>
-            </div>
-          </div>
-          <span class="wm-status-pill wm-status-pill--idle">
-            <span class="wm-status-dot"></span>
-            No position
-          </span>
-        </div>
-
-        <div class="wm-address-row">
-          <span class="wm-address-text" id="addr-lp">0xB901326FBd97dc737F5A9D289ECDA1806705Bf7D</span>
-          <button class="wm-copy-btn" onclick="copyAddress('addr-lp')" title="Copy address">⧉</button>
-          <a class="wm-explorer-btn"
-             href="https://arbiscan.io/address/0xB901326FBd97dc737F5A9D289ECDA1806705Bf7D"
-             target="_blank" rel="noopener" title="View on Arbiscan">↗</a>
-        </div>
-
-        <div class="wm-balances">
-          <div class="wm-balance-item">
-            <div class="wm-balance-label">ETH</div>
-            <div class="wm-balance-value">0.00903</div>
-            <div class="wm-balance-usd">~$20.00</div>
-          </div>
-          <div class="wm-balance-item">
-            <div class="wm-balance-label">USDC</div>
-            <div class="wm-balance-value">100.00</div>
-            <div class="wm-balance-usd">~$100.00</div>
-          </div>
-          <div class="wm-balance-item">
-            <div class="wm-balance-label">LP Capital</div>
-            <div class="wm-balance-value">~$33</div>
-            <div class="wm-balance-usd">Planned deploy</div>
-          </div>
-          <div class="wm-balance-item">
-            <div class="wm-balance-label">Reserve</div>
-            <div class="wm-balance-value">~$87</div>
-            <div class="wm-balance-usd">Post-deploy</div>
-          </div>
-        </div>
-
-        <div class="wm-card-actions">
-          <a href="https://arbiscan.io/address/0xB901326FBd97dc737F5A9D289ECDA1806705Bf7D"
-             target="_blank" rel="noopener" class="wm-btn-sm wm-btn-sm--outline">
-            ↗ Arbiscan
-          </a>
-          <button class="wm-btn-sm wm-btn-sm--outline" onclick="refreshBalance('lp')">
-            ⟳ Refresh
-          </button>
-          <a href="https://app.uniswap.org/add/ETH/0xaf88d065e77c8cC2239327C5EDb3A432268e5831/500"
-             target="_blank" rel="noopener" class="wm-btn-sm wm-btn-sm--primary">
-            + Open LP
-          </a>
-        </div>
-      </div>
-
-    </div><!-- /wm-wallets-grid -->
-
-    <!-- LP Range Monitor -->
-    <div class="wm-section-label">LP Range Monitor — ETH/USDC 0.05% (Arbitrum)</div>
-    <div class="wm-range-card">
-      <div class="wm-range-header">
-        <div class="wm-range-title">Position Range</div>
-        <div class="wm-range-meta">
-          <div class="wm-range-meta-item">
-            <div class="wm-range-meta-label">Current ETH</div>
-            <div class="wm-range-meta-value text-neon" id="eth-price">$2,214</div>
-          </div>
-          <div class="wm-range-meta-item">
-            <div class="wm-range-meta-label">Range Status</div>
-            <div class="wm-range-meta-value" id="range-status-label">— Not open</div>
-          </div>
-          <div class="wm-range-meta-item">
-            <div class="wm-range-meta-label">Fees Earned</div>
-            <div class="wm-range-meta-value" id="fees-earned">$0.00</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Visual range bar -->
-      <div class="wm-range-bar-wrap">
-        <div class="wm-range-labels">
-          <span>$1,900</span>
-          <span id="range-lower-label">Lower: $2,073.56</span>
-          <span id="range-upper-label">Upper: $2,347.29</span>
-          <span>$2,600</span>
-        </div>
-        <div class="wm-range-track" id="range-track">
-          <!-- Out-of-range left zone label -->
-          <span class="wm-range-oor-label wm-range-oor-label--left">OOR ←</span>
-          <!-- Active range fill -->
-          <div class="wm-range-fill" id="range-fill"
-               style="left: 24.84%; width: 37.87%;"></div>
-          <!-- Current price marker -->
-          <div class="wm-range-price-line wm-range-price-line--current" id="price-line"
-               style="left: 44.91%;"></div>
-          <div class="wm-range-price-tag" id="price-tag"
-               style="left: 44.91%;">$2,214</div>
-          <!-- Out-of-range right zone label -->
-          <span class="wm-range-oor-label wm-range-oor-label--right">→ OOR</span>
-        </div>
-        <div class="wm-range-sublabels">
-          <span>$1,900</span>
-          <span>51% within range</span>
-          <span>$2,600</span>
-        </div>
-      </div>
-
-      <!-- Range stats -->
-      <div class="wm-range-stats">
-        <div class="wm-rstat">
-          <div class="wm-rstat-label">Lower Bound</div>
-          <div class="wm-rstat-value wm-rstat-value--blue">$2,073.56</div>
-        </div>
-        <div class="wm-rstat">
-          <div class="wm-rstat-label">Upper Bound</div>
-          <div class="wm-rstat-value wm-rstat-value--blue">$2,347.29</div>
-        </div>
-        <div class="wm-rstat">
-          <div class="wm-rstat-label">Range Width</div>
-          <div class="wm-rstat-value">13.3%</div>
-        </div>
-        <div class="wm-rstat">
-          <div class="wm-rstat-label">OOR Below at</div>
-          <div class="wm-rstat-value wm-rstat-value--amber">-6.4% ($2,073)</div>
-        </div>
-        <div class="wm-rstat">
-          <div class="wm-rstat-label">OOR Above at</div>
-          <div class="wm-rstat-value wm-rstat-value--amber">+6.0% ($2,347)</div>
-        </div>
-        <div class="wm-rstat">
-          <div class="wm-rstat-label">Position Status</div>
-          <div class="wm-rstat-value wm-rstat-value--amber">Not opened yet</div>
-        </div>
-        <div class="wm-rstat">
-          <div class="wm-rstat-label">Pool Fee Tier</div>
-          <div class="wm-rstat-value">0.05%</div>
-        </div>
-        <div class="wm-rstat">
-          <div class="wm-rstat-label">Planned Size</div>
-          <div class="wm-rstat-value wm-rstat-value--green">~$33</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Activity Log -->
-    <div class="wm-section-label">Activity Log</div>
-    <div class="wm-log-card">
-      <div class="wm-log-header">
-        <div class="wm-log-title">Recent Events</div>
-        <span class="wm-coming-soon">Live feed — coming soon</span>
-      </div>
-      <div class="wm-log-list" id="log-list">
-        <div class="wm-log-item">
-          <span class="wm-log-badge wm-log-badge--warn">WARN</span>
-          <span class="wm-log-msg">Protection wallet has no ETH — hedge bot cannot execute trades</span>
-          <span class="wm-log-time">2026-04-09</span>
-        </div>
-        <div class="wm-log-item">
-          <span class="wm-log-badge wm-log-badge--warn">WARN</span>
-          <span class="wm-log-msg">UNI-V3 NFT detected in protection wallet — verify existing position</span>
-          <span class="wm-log-time">2026-04-09</span>
-        </div>
-        <div class="wm-log-item">
-          <span class="wm-log-badge wm-log-badge--info">INFO</span>
-          <span class="wm-log-msg">Wallet snapshot taken — LP: $120 · Protection: $107 · Arbitrum One</span>
-          <span class="wm-log-time">2026-04-09</span>
-        </div>
-        <div class="wm-log-item">
-          <span class="wm-log-badge wm-log-badge--info">INFO</span>
-          <span class="wm-log-msg">Target range set: $2,073.56 – $2,347.29 (Uniswap default, 13.3% width)</span>
-          <span class="wm-log-time">2026-04-09</span>
-        </div>
+    <!-- Dynamic root — auth gate or bot cards -->
+    <div id="wm-root">
+      <div class="wm2-loading">
+        <span class="wm2-spinner"></span>
+        Loading…
       </div>
     </div>
 
   </main>
+
+  <!-- ethers.js v6 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
 
   <script>
     // ── Mobile nav ──────────────────────────────────────────────
@@ -369,52 +124,14 @@
     document.querySelectorAll('.nav-dd-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
-        const wrap = btn.closest('.nav-dd-wrap');
-        wrap.classList.toggle('open');
+        btn.closest('.nav-dd-wrap').classList.toggle('open');
       });
     });
     document.addEventListener('click', () => {
       document.querySelectorAll('.nav-dd-wrap.open').forEach(w => w.classList.remove('open'));
     });
-
-    // ── Copy address ───────────────────────────────────────────
-    function copyAddress(id) {
-      const el = document.getElementById(id);
-      if (!el) return;
-      navigator.clipboard.writeText(el.textContent.trim()).then(() => {
-        const orig = el.style.color;
-        el.style.color = '#00ffb3';
-        setTimeout(() => { el.style.color = orig; }, 800);
-      });
-    }
-
-    // ── Placeholder refresh ────────────────────────────────────
-    function refreshBalance(wallet) {
-      const btn = event.target;
-      btn.textContent = '⟳ Loading…';
-      btn.disabled = true;
-      setTimeout(() => {
-        btn.textContent = '⟳ Refresh';
-        btn.disabled = false;
-        addLog('INFO', `Balance refreshed — ${wallet} wallet (live fetch not yet wired)`);
-      }, 1200);
-    }
-
-    // ── Log helper ─────────────────────────────────────────────
-    function addLog(type, msg) {
-      const list = document.getElementById('log-list');
-      const typeClass = { INFO: 'info', WARN: 'warn', OK: 'ok', ERR: 'error' }[type] || 'info';
-      const now = new Date().toISOString().slice(0, 10);
-      const item = document.createElement('div');
-      item.className = 'wm-log-item';
-      item.innerHTML = `
-        <span class="wm-log-badge wm-log-badge--${typeClass}">${type}</span>
-        <span class="wm-log-msg">${msg}</span>
-        <span class="wm-log-time">${now}</span>
-      `;
-      list.prepend(item);
-    }
   </script>
+  <script src="wallet.js"></script>
 
 </body>
 </html>
