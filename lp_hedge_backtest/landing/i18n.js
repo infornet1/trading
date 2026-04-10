@@ -250,7 +250,7 @@ const TRANSLATIONS = {
     'dash.footer.backtest':    'Backtester',
 
     // ── Dashboard: protection drawer ──────────────────────────────
-    'prot.drawer.title':          'Activar Protección',
+    'prot.drawer.title':          'Protección',
     'prot.drawer.signin.hint':    'Firma un mensaje con tu billetera para activar la protección del bot.',
     'prot.mode.label':            'Modo',
     'prot.mode.aragan':           'Defensor Bajista',
@@ -542,7 +542,7 @@ const TRANSLATIONS = {
     'dash.footer.backtest':    'Backtester',
 
     // ── Dashboard: protection drawer ──────────────────────────────
-    'prot.drawer.title':          'Enable Protection',
+    'prot.drawer.title':          'Protection',
     'prot.drawer.signin.hint':    'Sign a message with your wallet to enable bot protection.',
     'prot.mode.label':            'Mode',
     'prot.mode.aragan':           'Defensor Bajista',

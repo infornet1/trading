@@ -171,6 +171,11 @@ function clearLogCache(configId) {
 // Track which protection drawers are open (survive re-render)
 const _drawerOpen = new Set();
 
+// Track the wallet address associated with each position (tokenId → address).
+// Populated from bot config on load AND updated when user selects a wallet in
+// the dropdown — so the header chip shows even when bot.hl_wallet_addr is null.
+const _configuredWallets = {};
+
 // ── Price Math ────────────────────────────────────────────────────────────
 
 /**
@@ -1862,6 +1867,7 @@ async function saasLoadBots() {
     saas.bots = {};
     for (const bot of bots) {
       saas.bots[bot.nft_token_id] = bot;
+      if (bot.hl_wallet_addr) _configuredWallets[bot.nft_token_id] = bot.hl_wallet_addr;
     }
     // Pre-populate last event status from API, then open WebSocket
     for (const bot of bots) {
@@ -2486,6 +2492,10 @@ function buildProtectionDrawer(pos) {
   }
 
   const isActive = bot?.active;
+  const hlWalletAddr = _configuredWallets[tokenId] || bot?.hl_wallet_addr || '';
+  const walletChip = hlWalletAddr
+    ? `<span class="prot-wallet-chip" title="${hlWalletAddr}">${hlWalletAddr.slice(0,6)}…${hlWalletAddr.slice(-4)}</span>`
+    : '';
   return `
     <div class="pc-protection">
       <button class="pc-prot-toggle ${isActive ? 'pc-prot-toggle--active' : ''}"
@@ -2493,12 +2503,38 @@ function buildProtectionDrawer(pos) {
         <span class="prot-chevron ${isOpen ? 'prot-chevron--open' : ''}"
               id="prot-chevron-${tokenId}">▶</span>
         <span class="prot-toggle-label">${isActive ? '' : '⚠ '}${t('prot.drawer.title')}</span>
+        ${walletChip}
         ${badge}
       </button>
       <div class="pc-prot-body ${isOpen ? '' : 'hidden'}" id="prot-body-${tokenId}">
         ${bodyHtml}
       </div>
     </div>`;
+}
+
+// ── Wallet chip live update ───────────────────────────────────────────────
+// Updates the address chip on the toggle header without a full re-render.
+function _updateWalletChip(tokenId, wallet) {
+  const toggle = document.querySelector(`.pc-prot-toggle[onclick*="${tokenId}"]`);
+  if (!toggle) return;
+  let chip = toggle.querySelector('.prot-wallet-chip');
+  if (!wallet) {
+    if (chip) chip.remove();
+    return;
+  }
+  const label = `${wallet.slice(0,6)}…${wallet.slice(-4)}`;
+  if (chip) {
+    chip.title       = wallet;
+    chip.textContent = label;
+  } else {
+    chip = document.createElement('span');
+    chip.className   = 'prot-wallet-chip';
+    chip.title       = wallet;
+    chip.textContent = label;
+    // Insert between label and badge
+    const labelEl = toggle.querySelector('.prot-toggle-label');
+    if (labelEl) labelEl.after(chip);
+  }
 }
 
 // ── Drawer toggle ─────────────────────────────────────────────────────────
@@ -2541,6 +2577,9 @@ window.onWalletSelectChange = function (tokenId) {
     input.value = sel.value;
     input.style.display = 'none';
     if (apkeyEl) apkeyEl.placeholder = t('prot.apikey.keepcurrent');
+    // Update chip on the toggle header immediately
+    _configuredWallets[tokenId] = sel.value;
+    _updateWalletChip(tokenId, sel.value);
   } else {
     // "＋ Nueva dirección" selected — show text input for manual entry
     input.value = '';
@@ -2585,6 +2624,8 @@ window.removeHLWallet = async function (tokenId, sel) {
     }
     // Invalidate balance cache and reload bot cards so they reflect the cleared wallet
     _hlBalanceCache = null;
+    delete _configuredWallets[tokenId];
+    _updateWalletChip(tokenId, null);
     await saasLoadBots();
     renderLiveBots();
   } catch (e) {
@@ -2675,6 +2716,12 @@ window.activateProtection = async function (tokenId) {
     // Start the bot
     _hlBalanceCache = null; // invalidate balance cache after config change
     await apiCall('POST', `/bots/${configId}/start`);
+
+    // Update wallet chip immediately with the just-activated wallet
+    if (hlWallet) {
+      _configuredWallets[tokenId] = hlWallet;
+      _updateWalletChip(tokenId, hlWallet);
+    }
 
     // Refresh bot list
     await saasLoadBots();
@@ -2791,6 +2838,11 @@ async function initTradingPanel(tokenId, pos) {
       walletInput.parentNode.insertBefore(row, walletInput);
       walletInput.value         = preselect;
       walletInput.style.display = 'none';
+    }
+    // Update toggle header chip with the preselected wallet
+    if (preselect) {
+      _configuredWallets[tokenId] = preselect;
+      _updateWalletChip(tokenId, preselect);
     }
   }
 

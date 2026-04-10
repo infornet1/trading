@@ -1438,6 +1438,19 @@
 .prot-chevron--open { transform: rotate(90deg); }
 .prot-toggle-label { flex: 1; }
 
+/* Wallet address chip on toggle row */
+.prot-wallet-chip {
+  font-family: 'Courier New', monospace;
+  font-size: 0.55rem;
+  color: var(--color-text-muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  padding: 1px 6px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
 /* Active / Inactive badge on toggle row */
 .prot-badge {
   font-family: 'Orbitron', sans-serif;
@@ -2331,6 +2344,7 @@
   border: 1px solid rgba(52,211,153,0.25);
   border-radius: 6px;
   padding: 7px 12px;
+  margin-top: 10px;
   margin-bottom: 10px;
 }
 .prot-hl-bal-label {
