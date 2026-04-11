@@ -62,7 +62,13 @@ The risk is highest for Web3 wallet extensions (Rabby, MetaMask) because they fi
 **Description:** When the JWT is wiped (extension update, account switch, expiry), the dashboard silently reverts to guest mode. The user sees no bot cards and no explanation. They may think the platform is down or the bot crashed.  
 **Expected behavior:** Show a persistent amber banner: *"Your session ended. Sign in again to see your bots."* with a sign-in button. Do NOT just show the empty state silently.  
 **Affected files:** `dashboard.js` — `disconnectWallet()`, `showSessionExpiredBanner()` (already exists for 401 expiry, extend to cover `disconnectWallet()` path)  
-**Effort:** Small (1–2h)
+**Effort:** Small (1–2h)  
+**Fix applied:**
+- `dashboard.js` — `disconnectWallet()` now accepts `{ showBanner: false }` option. Before clearing state, checks if a session was active (`saas.jwt` or `localStorage vf_jwt`). If `showBanner: true` and `hadSession`, calls `showSessionExpiredBanner()`.
+- `dashboard.js` — `handleAccountsChanged` debounce now calls `disconnectWallet({ showBanner: true })` so Rabby/MetaMask involuntary disconnects show the banner.
+- Voluntary "Disconnect" button calls `disconnectWallet()` with no argument — no banner shown (user knows they disconnected).
+- `index.html` — Updated banner text to English: *"Your session ended — your bots are still running. Sign in again to see your dashboard."*  
+**Status:** ✅ Fixed
 
 ---
 
@@ -149,7 +155,7 @@ HL Wallet  (0xeF0DDF…)    ← Holds hedge capital, executes shorts on Hyperliq
 | ID | Issue | Effort | Priority |
 |----|-------|--------|----------|
 | UX-003 | ~~Duplicate bot guard on same NFT~~ | 1.5h | ✅ Fixed |
-| UX-001 | "Session lost" banner instead of silent empty state | 1.5h | 🔴 High — user confusion |
+| UX-001 | ~~"Session lost" banner instead of silent empty state~~ | 1.5h | ✅ Fixed |
 | UX-002 | Live log empty 2 min after bot start | 30 min | 🟡 Medium |
 | UX-004 | Debounce may not cover slow extension restarts | 1h | 🟡 Medium |
 | UX-005 | Wrong wallet hint when LP positions exist but no bots | 2–3h | 🟡 Medium |

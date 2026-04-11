@@ -251,8 +251,12 @@ window.connectWallet = async function () {
   }
 };
 
-window.disconnectWallet = function () {
+window.disconnectWallet = function ({ showBanner = false } = {}) {
   clearInterval(state.refreshTimer);
+  // If the session was active and this is an involuntary disconnect (Rabby event,
+  // not a user-initiated click), show the "session lost" banner instead of
+  // silently reverting to guest mode with no explanation.
+  const hadSession = !!(saas.jwt || localStorage.getItem('vf_jwt'));
   state.address   = null;
   state.chainId   = null;
   state.provider  = null;
@@ -272,6 +276,9 @@ window.disconnectWallet = function () {
   _drawerOpen.clear();
   updateNuclearBtn();
   renderRefreshControl();
+  if (showBanner && hadSession) {
+    showSessionExpiredBanner();
+  }
   renderConnectPrompt();
 };
 
@@ -642,7 +649,7 @@ function handleAccountsChanged(accounts) {
     // resolving to the new account. Debounce 300 ms — if an account arrives
     // within that window it was a transient switch, not a real disconnect.
     setTimeout(() => {
-      if (!window._pendingAccount) disconnectWallet();
+      if (!window._pendingAccount) disconnectWallet({ showBanner: true });
       window._pendingAccount = false;
     }, 300);
     return;
