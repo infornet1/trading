@@ -76,13 +76,10 @@ The risk is highest for Web3 wallet extensions (Rabby, MetaMask) because they fi
 **Priority:** 🟡 Medium  
 **Description:** `saasLoadBots()` fetches events immediately after `POST /bots/{id}/start`. The `started` event is written ~2–3 s later by the subprocess. The log panel shows empty until the WebSocket connects (~1–2 min) or the page is refreshed.  
 **Expected behavior:** After starting a bot, auto-reload events after a short delay (e.g. 3 s) to catch the `started` event. Or poll once at T+5s as a safety net.  
-**Proposed fix:**
-```javascript
-// In start_bot flow, after POST /bots/17/start succeeds:
-setTimeout(() => apiCall('GET', `/bots/${botId}/events?limit=10`).then(populateLog), 3000);
-```
-**Affected files:** `dashboard.js` — bot start handler  
-**Effort:** Small (30 min)
+**Fix applied:** `dashboard.js` — in `activateProtection`, after `connectBotWS(configId)` a `setTimeout(..., 3000)` fires one `GET /bots/{id}/events?limit=10` call. Results are de-duped (`.includes(line)` check) and appended to `saas.logs[configId]`, then `renderLiveBots()` is called to repaint the log panel with the `started` entry.  
+**Affected files:** `dashboard.js` — `activateProtection` function  
+**Effort:** Small (30 min)  
+**Status:** ✅ Fixed
 
 ---
 
@@ -156,7 +153,7 @@ HL Wallet  (0xeF0DDF…)    ← Holds hedge capital, executes shorts on Hyperliq
 |----|-------|--------|----------|
 | UX-003 | ~~Duplicate bot guard on same NFT~~ | 1.5h | ✅ Fixed |
 | UX-001 | ~~"Session lost" banner instead of silent empty state~~ | 1.5h | ✅ Fixed |
-| UX-002 | Live log empty 2 min after bot start | 30 min | 🟡 Medium |
+| UX-002 | ~~Live log empty 2 min after bot start~~ | 30 min | ✅ Fixed |
 | UX-004 | Debounce may not cover slow extension restarts | 1h | 🟡 Medium |
 | UX-005 | Wrong wallet hint when LP positions exist but no bots | 2–3h | 🟡 Medium |
 | UX-006 | WS exponential backoff + reconnecting pill | 2–3h | 🟡 Medium |

@@ -2827,6 +2827,26 @@ window.activateProtection = async function (tokenId) {
     // Connect WebSocket for live updates
     connectBotWS(configId);
 
+    // UX-002: The 'started' event is written by the subprocess ~2-3 s after
+    // POST /start returns. Re-fetch events once at T+3 s so the log panel
+    // shows the startup line instead of being empty for ~2 min until WS fires.
+    setTimeout(() => {
+      apiCall('GET', `/bots/${configId}/events?limit=10`).then(events => {
+        if (!Array.isArray(events) || !events.length) return;
+        if (!saas.logs[configId]) saas.logs[configId] = [];
+        const now = Date.now();
+        [...events].reverse().forEach(ev => {
+          const d  = new Date(ev.ts);
+          const ts = d.toLocaleTimeString();
+          const pnl = ev.pnl != null ? ` | P&L: ${ev.pnl >= 0 ? '+' : ''}$${Number(ev.pnl).toFixed(2)}` : '';
+          const px  = ev.price_at_event ? ` | $${Number(ev.price_at_event).toLocaleString('en-US',{maximumFractionDigits:2})}` : '';
+          const line = `[${ts}] ${ev.event_type.toUpperCase()}${px}${pnl}`;
+          if (!saas.logs[configId].includes(line)) saas.logs[configId].push(line);
+        });
+        renderLiveBots();
+      }).catch(() => {});
+    }, 3000);
+
   } catch (err) {
     if (err.status === 409) {
       // Show inline error inside the protection drawer so the user knows why
