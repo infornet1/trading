@@ -1818,7 +1818,9 @@ async function apiCall(method, path, body) {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || res.statusText);
+    const e = new Error(err.detail || res.statusText);
+    e.status = res.status;
+    throw e;
   }
   if (res.status === 204) return null;
   return res.json();
@@ -2819,7 +2821,24 @@ window.activateProtection = async function (tokenId) {
     connectBotWS(configId);
 
   } catch (err) {
-    showError('Activation failed: ' + (err.message || err));
+    if (err.status === 409) {
+      // Show inline error inside the protection drawer so the user knows why
+      const drawerInner = document.querySelector(`#prot-drawer-${tokenId} .prot-drawer-inner`);
+      if (drawerInner) {
+        let inlineErr = drawerInner.querySelector('.prot-inline-error');
+        if (!inlineErr) {
+          inlineErr = document.createElement('div');
+          inlineErr.className = 'prot-inline-error';
+          inlineErr.style.cssText = 'background:#3b1a1a;border:1px solid #ef4444;color:#fca5a5;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:10px;';
+          drawerInner.prepend(inlineErr);
+        }
+        inlineErr.textContent = err.message;
+      } else {
+        showError(err.message);
+      }
+    } else {
+      showError('Activation failed: ' + (err.message || err));
+    }
     if (btn) {
       btn.disabled  = false;
       btn.innerHTML = `🛡&nbsp; ${(window.t || (k=>k))('prot.btn.activate')}`;

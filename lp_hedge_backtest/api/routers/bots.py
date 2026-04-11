@@ -214,6 +214,19 @@ async def create_bot(
 ):
     _enforce_golden_rules(body.pair, body.mode, body.fury_symbol)
 
+    # Duplicate-hedge guard: reject if any active bot_config already watches this NFT
+    existing = await db.execute(
+        select(BotConfig)
+        .where(BotConfig.nft_token_id == body.nft_token_id)
+        .where(BotConfig.active == True)
+        .limit(1)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=409,
+            detail=f"NFT #{body.nft_token_id} is already being actively hedged by another bot.",
+        )
+
     # Ensure user row exists
     result = await db.execute(select(User).where(User.address == address))
     if not result.scalar_one_or_none():

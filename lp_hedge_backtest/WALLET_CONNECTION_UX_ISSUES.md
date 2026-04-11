@@ -87,7 +87,13 @@ setTimeout(() => apiCall('GET', `/bots/${botId}/events?limit=10`).then(populateL
 - Backend (`POST /bots`): check if any `bot_config` with `nft_token_id = X` and `active = true` already exists (regardless of `user_address`). If so, reject with `409 Conflict: NFT #X is already being actively hedged by another bot.`
 - Frontend: surface the 409 as an inline error in the protection drawer.  
 **Affected files:** `api/routers/bots.py` — `create_bot` endpoint  
-**Effort:** Small (1h backend + 30 min frontend)
+**Effort:** Small (1h backend + 30 min frontend)  
+**Fix applied:**
+- `api/routers/bots.py` — `create_bot`: queries for any active `BotConfig` with same `nft_token_id` before inserting; returns HTTP 409 with detail message.
+- `landing/dashboard/dashboard.js` — `apiCall`: attaches `e.status = res.status` to thrown errors so callers can branch on HTTP status code.
+- `landing/dashboard/dashboard.js` — `activateProtection` catch block: on `err.status === 409`, injects a red inline error banner inside the protection drawer (`prot-inline-error`) instead of the generic toast. Button re-enables so user can act.
+- Tested: `POST /bots` with NFT 5413901 (bot 17 active) → `HTTP 409 {"detail":"NFT #5413901 is already being actively hedged by another bot."}` ✅  
+**Status:** ✅ Fixed
 
 ---
 
@@ -142,7 +148,7 @@ HL Wallet  (0xeF0DDF…)    ← Holds hedge capital, executes shorts on Hyperliq
 
 | ID | Issue | Effort | Priority |
 |----|-------|--------|----------|
-| UX-003 | Duplicate bot guard on same NFT | 1.5h | 🔴 High — financial risk |
+| UX-003 | ~~Duplicate bot guard on same NFT~~ | 1.5h | ✅ Fixed |
 | UX-001 | "Session lost" banner instead of silent empty state | 1.5h | 🔴 High — user confusion |
 | UX-002 | Live log empty 2 min after bot start | 30 min | 🟡 Medium |
 | UX-004 | Debounce may not cover slow extension restarts | 1h | 🟡 Medium |
