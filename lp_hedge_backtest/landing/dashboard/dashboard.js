@@ -128,6 +128,7 @@ const saas = {
   jwt:            localStorage.getItem('vf_jwt') || null,
   sessionExpired: false,   // true when a prior JWT expired — bot may still be running
   bots:           {},      // nft_token_id (string) → BotConfigOut
+  botsLoaded:     false,   // true after first successful GET /bots response
   sockets:        {},      // config_id (number) → WebSocket
   statuses:       {},      // config_id → last event payload
   logs:           {},      // config_id → array of log line strings (max 50)
@@ -268,10 +269,11 @@ window.disconnectWallet = function ({ showBanner = false } = {}) {
   for (const ws of Object.values(saas.sockets)) {
     try { ws.close(); } catch (_) {}
   }
-  saas.sockets  = {};
-  saas.bots     = {};
-  saas.statuses = {};
-  saas.jwt      = null;
+  saas.sockets    = {};
+  saas.bots       = {};
+  saas.botsLoaded = false;
+  saas.statuses   = {};
+  saas.jwt        = null;
   localStorage.removeItem('vf_jwt');
   _drawerOpen.clear();
   updateNuclearBtn();
@@ -1942,7 +1944,8 @@ async function saasLoadBots() {
   try {
     const bots = await apiCall('GET', '/bots');
     if (!Array.isArray(bots)) return;
-    saas.bots = {};
+    saas.bots       = {};
+    saas.botsLoaded = true;
     for (const bot of bots) {
       saas.bots[bot.nft_token_id] = bot;
       if (bot.hl_wallet_addr) _configuredWallets[bot.nft_token_id] = bot.hl_wallet_addr;
@@ -2012,7 +2015,17 @@ function renderLiveBots() {
   const activeBots = Object.values(saas.bots).filter(b => b.active);
 
   if (!activeBots.length) {
-    section.innerHTML = '';
+    // UX-005: If the API returned an empty bot list but this wallet has LP positions,
+    // show a hint that the user might be on the wrong wallet or needs to set up a bot.
+    if (saas.botsLoaded && saas.jwt && state.positions.length > 0) {
+      section.innerHTML = `
+        <div style="background:#1e2a1e;border:1px solid #4ade80;color:#bbf7d0;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:10px;line-height:1.5;">
+          <strong>No bots configured yet.</strong><br>
+          Your LP positions don't have any protection bots. Create one using the protection drawer on each position, or check that you're connected with the correct wallet.
+        </div>`;
+    } else {
+      section.innerHTML = '';
+    }
     return;
   }
 

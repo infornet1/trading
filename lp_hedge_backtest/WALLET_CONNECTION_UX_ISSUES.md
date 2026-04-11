@@ -118,8 +118,13 @@ The risk is highest for Web3 wallet extensions (Rabby, MetaMask) because they fi
 **Priority:** 🟡 Medium  
 **Description:** Users with multiple wallets in Rabby may sign in with the wrong address. If that wallet has no bots, they see an empty state with no hint that they might be on the wrong account.  
 **Expected behavior:** If `GET /bots` returns an empty array AND the wallet has LP positions detected on-chain (via `fetchPositions()`), show a hint: *"Your LP positions don't have any bots yet. Create one in the protection drawer, or check if you're connected with the right wallet."*  
-**Affected files:** `dashboard.js` — `saasLoadBots()` empty-array branch  
-**Effort:** Medium (2–3h, requires correlating on-chain positions with DB bots)
+**Fix applied:**
+- `saas.botsLoaded` flag added to `saas` state object (default `false`). Set to `true` in `saasLoadBots` after the first successful `GET /bots` response. Reset to `false` in `disconnectWallet`.
+- `renderLiveBots()` — empty-state branch now checks: `saas.botsLoaded && saas.jwt && state.positions.length > 0`. If true, renders a green-tinted info box: *"No bots configured yet. Your LP positions don't have any protection bots. Create one using the protection drawer on each position, or check that you're connected with the correct wallet."*
+- No extra API calls needed — positions are already in `state.positions` from `fetchPositions()`.  
+**Affected files:** `dashboard.js` — `saas` init, `saasLoadBots()`, `disconnectWallet()`, `renderLiveBots()`  
+**Effort:** Medium (2–3h, requires correlating on-chain positions with DB bots)  
+**Status:** ✅ Fixed
 
 ---
 
@@ -159,5 +164,5 @@ HL Wallet  (0xeF0DDF…)    ← Holds hedge capital, executes shorts on Hyperliq
 | UX-001 | ~~"Session lost" banner instead of silent empty state~~ | 1.5h | ✅ Fixed |
 | UX-002 | ~~Live log empty 2 min after bot start~~ | 30 min | ✅ Fixed |
 | UX-004 | ~~Debounce may not cover slow extension restarts~~ | 1h | ✅ Fixed |
-| UX-005 | Wrong wallet hint when LP positions exist but no bots | 2–3h | 🟡 Medium |
+| UX-005 | ~~Wrong wallet hint when LP positions exist but no bots~~ | 2–3h | ✅ Fixed |
 | UX-006 | WS exponential backoff + reconnecting pill | 2–3h | 🟡 Medium |
