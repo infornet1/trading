@@ -1992,7 +1992,22 @@ async function saasLoadBots() {
     // the backend falls back to the most-recent config wallet automatically.
     const hasActiveBotWithWallet = bots.some(b => b.active && b.hl_wallet_addr);
     if (hasActiveBotWithWallet) {
-      fetchHLBalance().then(() => renderLiveBots()).catch(() => {});
+      fetchHLBalance().then(bal => {
+        renderLiveBots();
+        // Patch balance spans in protection drawers without a full re-render
+        // (re-render would reset form state if user has a drawer open).
+        if (bal?.account_value != null) {
+          const balStr = '$' + Number(bal.account_value).toFixed(2);
+          for (const bot of Object.values(saas.bots)) {
+            // Active-state span (id added in buildProtectionDrawer)
+            const elActive = document.getElementById(`prot-hl-bal-val-active-${bot.id}`);
+            if (elActive) elActive.textContent = balStr;
+            // Inactive/form-state span (id="prot-hl-bal-val-${nft_token_id}")
+            const elForm = document.getElementById(`prot-hl-bal-val-${bot.nft_token_id}`);
+            if (elForm) elForm.textContent = balStr;
+          }
+        }
+      }).catch(() => {});
     }
 
     // Re-render positions and live bots panel
@@ -2341,7 +2356,7 @@ function buildProtectionDrawer(pos) {
     bodyHtml = `
       <div class="prot-hl-balance-bar">
         <span class="prot-hl-bal-label">HL Balance</span>
-        <span class="prot-hl-bal-value">${hlBalActive != null ? '$' + Number(hlBalActive).toFixed(2) : '—'}</span>
+        <span class="prot-hl-bal-value" id="prot-hl-bal-val-active-${bot.id}">${hlBalActive != null ? '$' + Number(hlBalActive).toFixed(2) : '—'}</span>
       </div>
       <div class="prot-status-row" id="prot-status-${bot.id}">${statusInner}</div>
       <div class="prot-active-info">
