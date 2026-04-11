@@ -104,9 +104,13 @@ The risk is highest for Web3 wallet extensions (Rabby, MetaMask) because they fi
 **Priority:** 🟡 Medium  
 **Description:** The 300 ms debounce (INC-001 fix) works when `accountsChanged([account])` arrives within 300 ms of the empty-array event. Rabby extension restarts can take longer than 300 ms to fully reload, meaning the debounce may not always suppress the disconnect.  
 **Expected behavior:** On page load, if `vf_jwt` exists in `localStorage` but `saas.jwt` is null (page just refreshed), do not call `disconnectWallet()` from `accountsChanged` until at least one `eth_accounts` check has been performed by `init()`.  
-**Proposed fix:** Add a `_initComplete` flag that is set after `init()` finishes its `eth_accounts` check. Only trigger `disconnectWallet()` from `accountsChanged([])` after `_initComplete = true`.  
+**Fix applied:**
+- `dashboard.js` — `window._initComplete = false` set at module scope before `init()`.
+- `init()` — sets `window._initComplete = true` in all exit paths of the `eth_accounts` promise (success, no-accounts, error, no-ethereum).
+- `handleAccountsChanged` — the 300 ms debounce now also checks `window._initComplete`; `disconnectWallet` is not called if init hasn't finished its own accounts check yet.  
 **Affected files:** `dashboard.js` — `init()`, `handleAccountsChanged()`  
-**Effort:** Small (1h)
+**Effort:** Small (1h)  
+**Status:** ✅ Fixed
 
 ---
 
@@ -154,6 +158,6 @@ HL Wallet  (0xeF0DDF…)    ← Holds hedge capital, executes shorts on Hyperliq
 | UX-003 | ~~Duplicate bot guard on same NFT~~ | 1.5h | ✅ Fixed |
 | UX-001 | ~~"Session lost" banner instead of silent empty state~~ | 1.5h | ✅ Fixed |
 | UX-002 | ~~Live log empty 2 min after bot start~~ | 30 min | ✅ Fixed |
-| UX-004 | Debounce may not cover slow extension restarts | 1h | 🟡 Medium |
+| UX-004 | ~~Debounce may not cover slow extension restarts~~ | 1h | ✅ Fixed |
 | UX-005 | Wrong wallet hint when LP positions exist but no bots | 2–3h | 🟡 Medium |
 | UX-006 | WS exponential backoff + reconnecting pill | 2–3h | 🟡 Medium |

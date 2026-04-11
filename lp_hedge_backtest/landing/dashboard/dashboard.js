@@ -648,8 +648,9 @@ function handleAccountsChanged(accounts) {
     // Rabby and MetaMask briefly fire accountsChanged([]) mid-switch before
     // resolving to the new account. Debounce 300 ms — if an account arrives
     // within that window it was a transient switch, not a real disconnect.
+    // Also: never fire during page init — wait until _initComplete (UX-004).
     setTimeout(() => {
-      if (!window._pendingAccount) disconnectWallet({ showBanner: true });
+      if (!window._pendingAccount && window._initComplete) disconnectWallet({ showBanner: true });
       window._pendingAccount = false;
     }, 300);
     return;
@@ -1747,6 +1748,12 @@ function hideSessionExpiredBanner() {
 
 // ── Init ──────────────────────────────────────────────────────────────────
 
+// UX-004: Guard against accountsChanged([]) firing before init() has finished
+// its own eth_accounts check. Without this, a slow Rabby restart (>300 ms)
+// can trigger disconnectWallet() on a page where the JWT is still valid and
+// the user's wallet hasn't actually gone away.
+window._initComplete = false;
+
 function init() {
   // Start in disconnected state
   renderConnectPrompt();
@@ -1786,9 +1793,13 @@ function init() {
         state.provider.getNetwork().then(net => {
           state.chainId = Number(net.chainId);
           onWalletConnected();
-        }).catch(() => {});
+        }).catch(() => {}).finally(() => { window._initComplete = true; });
+      } else {
+        window._initComplete = true;
       }
-    }).catch(() => {});
+    }).catch(() => { window._initComplete = true; });
+  } else {
+    window._initComplete = true;
   }
 }
 
