@@ -132,8 +132,15 @@ The risk is highest for Web3 wallet extensions (Rabby, MetaMask) because they fi
 **Priority:** 🟡 Medium  
 **Description:** When `viznago_api.service` restarts, all WebSocket connections drop. The dashboard's reconnect logic (10 s retry if `bot.active && saas.jwt`) should re-establish connections, but during the restart window the JWT may be valid while the API is not yet accepting connections — the reconnect silently fails and is not retried again.  
 **Expected behavior:** Implement exponential backoff (1s, 2s, 4s, 8s… up to 60s) for WebSocket reconnects. Show a small "reconnecting…" pill in the live log panel during the gap.  
-**Affected files:** `dashboard.js` — `connectBotWS()`  
-**Effort:** Medium (2–3h)
+**Fix applied:**
+- `saas._wsRetry = {}` added (per-bot retry counter, reset on disconnect and on successful `onopen`).
+- `connectBotWS()` — `ws.onopen` resets `saas._wsRetry[configId] = 0`.
+- `ws.onclose` — if bot is still active and JWT valid: computes `delay = min(1000 * 2^attempt, 60000)`, appends `"⟳ Connection lost — reconnecting in Xs…"` to the live log, then `setTimeout(connectBotWS, delay)`. Sequence: 1s → 2s → 4s → 8s → 16s → 32s → 60s (capped).
+- Non-retried exits (bot stopped or logged out) return immediately without scheduling a retry.
+- `saas._wsRetry` reset in `disconnectWallet` so counters don't carry across sessions.  
+**Affected files:** `dashboard.js` — `connectBotWS()`, `disconnectWallet()`  
+**Effort:** Medium (2–3h)  
+**Status:** ✅ Fixed
 
 ---
 
@@ -165,4 +172,4 @@ HL Wallet  (0xeF0DDF…)    ← Holds hedge capital, executes shorts on Hyperliq
 | UX-002 | ~~Live log empty 2 min after bot start~~ | 30 min | ✅ Fixed |
 | UX-004 | ~~Debounce may not cover slow extension restarts~~ | 1h | ✅ Fixed |
 | UX-005 | ~~Wrong wallet hint when LP positions exist but no bots~~ | 2–3h | ✅ Fixed |
-| UX-006 | WS exponential backoff + reconnecting pill | 2–3h | 🟡 Medium |
+| UX-006 | ~~WS exponential backoff + reconnecting pill~~ | 2–3h | ✅ Fixed |

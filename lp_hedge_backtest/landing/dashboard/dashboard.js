@@ -273,6 +273,7 @@ window.disconnectWallet = function ({ showBanner = false } = {}) {
   saas.bots       = {};
   saas.botsLoaded = false;
   saas.statuses   = {};
+  saas._wsRetry   = {};
   saas.jwt        = null;
   localStorage.removeItem('vf_jwt');
   _drawerOpen.clear();
@@ -2200,12 +2201,21 @@ function clearBotLog(configId) {
 
 // ── WebSocket per bot ─────────────────────────────────────────────────────
 
+// UX-006: Per-bot WebSocket retry counter for exponential backoff.
+// Delay sequence: 1s, 2s, 4s, 8s, 16s, 32s, 60s (capped).
+if (!saas._wsRetry) saas._wsRetry = {};
+
 function connectBotWS(configId) {
   if (saas.sockets[configId]) return; // already connected
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const url   = `${proto}://${location.host}/trading/lp-hedge/api/ws/${configId}?token=${saas.jwt}`;
   const ws    = new WebSocket(url);
   saas.sockets[configId] = ws;
+
+  ws.onopen = () => {
+    // Reset backoff counter on successful connection
+    saas._wsRetry[configId] = 0;
+  };
 
   ws.onmessage = (e) => {
     try {
@@ -2230,11 +2240,21 @@ function connectBotWS(configId) {
 
   ws.onclose = () => {
     delete saas.sockets[configId];
-    // Reconnect after 10 s if the bot is still marked active
+    const bot = Object.values(saas.bots).find(b => b.id === configId);
+    if (!bot?.active || !saas.jwt) return; // bot stopped or logged out — don't retry
+
+    // Exponential backoff: 1s, 2s, 4s … capped at 60s
+    const attempt = saas._wsRetry[configId] || 0;
+    const delay   = Math.min(1000 * Math.pow(2, attempt), 60_000);
+    saas._wsRetry[configId] = attempt + 1;
+
+    const delayS = (delay / 1000).toFixed(0);
+    appendLogLine(configId, `⟳ Connection lost — reconnecting in ${delayS}s…`);
+
     setTimeout(() => {
-      const bot = Object.values(saas.bots).find(b => b.id === configId);
-      if (bot?.active && saas.jwt) connectBotWS(configId);
-    }, 10_000);
+      const stillActive = Object.values(saas.bots).find(b => b.id === configId)?.active;
+      if (stillActive && saas.jwt) connectBotWS(configId);
+    }, delay);
   };
 
   ws.onerror = () => ws.close();
