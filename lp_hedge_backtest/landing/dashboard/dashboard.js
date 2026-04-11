@@ -638,9 +638,25 @@ async function onWalletConnected() {
 
 function handleAccountsChanged(accounts) {
   if (!accounts.length) {
-    disconnectWallet();
+    // Rabby and MetaMask briefly fire accountsChanged([]) mid-switch before
+    // resolving to the new account. Debounce 300 ms — if an account arrives
+    // within that window it was a transient switch, not a real disconnect.
+    setTimeout(() => {
+      if (!window._pendingAccount) disconnectWallet();
+      window._pendingAccount = false;
+    }, 300);
     return;
   }
+  window._pendingAccount = true;
+  const incoming = accounts[0].toLowerCase();
+  const current  = state.address ? state.address.toLowerCase() : null;
+
+  // Account actually changed → clear JWT so the new wallet re-authenticates
+  if (current && incoming !== current) {
+    saas.jwt = null;
+    localStorage.removeItem('vf_jwt');
+  }
+
   state.address = accounts[0];
   updateWalletBar();
   fetchPositions();
