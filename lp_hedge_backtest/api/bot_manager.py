@@ -83,8 +83,9 @@ class BotManager:
                                     "/var/www/dev/trading/email_config.json"),
             "EMAIL_RECIPIENTS":   os.environ.get("EMAIL_RECIPIENTS", ""),
             # Per-bot config — sourced exclusively from DB, not from .env
-            "HYPERLIQUID_SECRET_KEY":      config["hl_api_key"],
-            "HYPERLIQUID_ACCOUNT_ADDRESS": config["hl_wallet_addr"],
+            # Whale mode has no HL credentials (read-only leaderboard); fall back to ""
+            "HYPERLIQUID_SECRET_KEY":      config["hl_api_key"]     or "",
+            "HYPERLIQUID_ACCOUNT_ADDRESS": config["hl_wallet_addr"] or "",
             "UNISWAP_NFT_ID":              str(config["nft_token_id"]),
             "TRIGGER_OFFSET_PCT":          str(abs(float(config["trigger_pct"]))),
             "HEDGE_RATIO":                 str(config["hedge_ratio"]),

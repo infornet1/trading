@@ -75,7 +75,10 @@ async def _auto_restart_bots():
         bots = result.scalars().all()
         for bot in bots:
             try:
-                if not bot.hl_api_key or not bot.hl_wallet_addr:
+                # Whale mode is read-only (no HL credentials needed).
+                # All other modes require both hl_api_key and hl_wallet_addr.
+                needs_creds = bot.mode != "whale" and not bot.paper_trade
+                if needs_creds and (not bot.hl_api_key or not bot.hl_wallet_addr):
                     print(f"[Startup] Skipping bot {bot.id} — missing credentials (hl_api_key or hl_wallet_addr is NULL)", flush=True)
                     continue
                 config = {
@@ -84,8 +87,8 @@ async def _auto_restart_bots():
                     "upper_bound":    str(bot.upper_bound),
                     "trigger_pct":    str(bot.trigger_pct),
                     "hedge_ratio":    str(bot.hedge_ratio),
-                    "hl_api_key":     decrypt(bot.hl_api_key),
-                    "hl_wallet_addr": bot.hl_wallet_addr,
+                    "hl_api_key":     decrypt(bot.hl_api_key) if bot.hl_api_key else "",
+                    "hl_wallet_addr": bot.hl_wallet_addr or "",
                     "mode":           bot.mode,
                     "pair":           bot.pair,
                     "leverage":       str(bot.leverage   or 10),
