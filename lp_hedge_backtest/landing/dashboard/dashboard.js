@@ -2807,10 +2807,12 @@ window.activateProtection = async function (tokenId) {
 
     // Validate: need API key on first create, optional on update
     if (!existingBot && !apiKey) {
-      showError(t('prot.no.hlkey'));
+      if (btn) { btn.disabled = false; btn.innerHTML = `🛡&nbsp; ${t('prot.btn.activate')}`; }
+      showError('Para una nueva protección debes ingresar la Clave Privada HL. Tu wallet guardada se puede reusar, pero la clave privada siempre es requerida la primera vez.');
       return;
     }
     if (!hlWallet) {
+      if (btn) { btn.disabled = false; btn.innerHTML = `🛡&nbsp; ${t('prot.btn.activate')}`; }
       showError(t('prot.no.hlkey'));
       return;
     }
