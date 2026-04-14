@@ -163,6 +163,7 @@ by bot code. This means they execute even if the bot process is down.
 | Wallet hint for new users | Shows "Ingresa tu wallet para ver el balance" below API key when no wallet pre-filled | ✅ Done |
 | Defensor Bajista desc precision | "SHORT solo en caídas" → "SHORT solo cuando el precio rompe por debajo del rango" | ✅ Done |
 | Defensor Bajista disabled — Próximamente badge | Silent bug discovered: both modes identical in bot code (from_above trigger always active). Bajista disabled with amber pill until M2-13 ships. Alcista auto-selected as only active mode. | ✅ Done |
+| Fix: "Activando..." button stuck on new NFT activation | Two early-return validation paths disabled the button but never re-enabled it on failure. Investor hit this activating NFT 5426040 — reused saved HL wallet but no API key entered (required on first create). Fixed + clear Spanish error message. No restart needed. | ✅ Done 2026-04-14 |
 
 ### TIER 3 — Architecture resilience (deferred — post investor meeting)
 
@@ -211,4 +212,4 @@ by bot code. This means they execute even if the bot process is down.
 
 ---
 
-*Last updated: 2026-04-04*
+*Last updated: 2026-04-14*
