@@ -165,6 +165,7 @@ by bot code. This means they execute even if the bot process is down.
 | Defensor Bajista disabled — Próximamente badge | Silent bug discovered: both modes identical in bot code (from_above trigger always active). Bajista disabled with amber pill until M2-13 ships. Alcista auto-selected as only active mode. | ✅ Done |
 | Fix: "Activando..." button stuck on new NFT activation | Two early-return validation paths disabled the button but never re-enabled it on failure. Investor hit this activating NFT 5426040 — reused saved HL wallet but no API key entered (required on first create). Fixed + clear Spanish error message. No restart needed. | ✅ Done 2026-04-14 |
 | Fix: SL too tight — bots whipsawed (NFT 5413901 + 5426040) | Bot SL floor is 0.3% (~$7 room at ETH ~$2,313) — too tight for ETH noise. Bot 17 fired SHORT twice today, both SL hit immediately within minutes. Updated sl_pct = 1.500% via DB for both configs (17 + 18). Droplet rebooted 2026-04-14, both bots restarted confirmed with sl_pct: 1.5 in started events. | ✅ Done 2026-04-14 |
+| Both bots ARMED — ETH above ceilings (2026-04-15 ~17:21) | ETH reached $2,349, crossing above both range ceilings. Bot 17 (NFT 5413901) armed at $2,347.28 ceiling — fires SHORT ≤ $2,335.55. Bot 18 (NFT 5426040) armed at $2,349.63 ceiling — fires SHORT ≤ $2,337.89. First live test of 1.5% SL in action. | 🔄 Live |
 
 ### TIER 3 — Architecture resilience (deferred — post investor meeting)
 
@@ -213,4 +214,4 @@ by bot code. This means they execute even if the bot process is down.
 
 ---
 
-*Last updated: 2026-04-14 (end of session — SL fix + reboot)*
+*Last updated: 2026-04-15 (both bots armed — ETH above ceilings)*
