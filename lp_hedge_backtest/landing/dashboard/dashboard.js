@@ -2573,11 +2573,14 @@ function buildProtectionDrawer(pos) {
           <div class="prot-input-group">
             <input type="number" class="prot-input" id="prot-sl-${tokenId}"
                    value="${slVal}" step="0.01" min="0.01" max="10"
-                   oninput="onTradingPanelChange('${tokenId}')" />
+                   oninput="onSLChange('${tokenId}')" />
             <span class="prot-input-suffix">%</span>
           </div>
           <span style="font-size:0.6rem;color:var(--color-text-muted);margin-top:2px">
             Cierra la posición si pierde este % desde la entrada
+          </span>
+          <span class="prot-sl-warning" id="prot-sl-warn-${tokenId}" style="display:none;font-size:0.6rem;color:#f87171;margin-top:3px">
+            ⚠️ Un SL menor a 0.5% puede cerrarse por el ruido normal del mercado. Mínimo recomendado: 0.5%
           </span>
         </div>
 
@@ -3052,6 +3055,9 @@ async function initTradingPanel(tokenId, pos) {
   // Fetch HL balance and update margin box
   const hlData = await fetchHLBalance();
   _updateMarginBox(tokenId, pos);
+
+  // Show SL warning immediately if saved value is already < 0.5%
+  window.onSLChange(tokenId);
 }
 
 function _updateMarginBox(tokenId, pos) {
@@ -3149,6 +3155,15 @@ function _updateMarginBox(tokenId, pos) {
 }
 
 // Called by oninput on any trading panel control
+window.onSLChange = function (tokenId) {
+  const slInput = document.getElementById(`prot-sl-${tokenId}`);
+  const warnEl  = document.getElementById(`prot-sl-warn-${tokenId}`);
+  if (slInput && warnEl) {
+    warnEl.style.display = parseFloat(slInput.value) < 0.5 ? 'block' : 'none';
+  }
+  window.onTradingPanelChange(tokenId);
+};
+
 window.onTradingPanelChange = function (tokenId) {
   // Update displayed slider labels
   const lev  = document.getElementById(`prot-lev-${tokenId}`);

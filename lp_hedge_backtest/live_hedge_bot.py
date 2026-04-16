@@ -90,10 +90,9 @@ MAX_LEVERAGE        = 15                                                  # hard
 MARGIN_BUFFER       = float(os.getenv("MARGIN_BUFFER",          "1.5"))
 
 # SL / trail
-# Minimum SL floor: anything below 0.3% is smaller than normal price noise on HL
-# and will trigger immediately (whipsaw). The user-set value is clamped to this floor.
-_SL_FLOOR_PCT       = 0.003   # 0.3% hard minimum — never configurable
-DEFAULT_SL_PCT      = max(float(os.getenv("SL_PCT", "0.5")) / 100.0, _SL_FLOOR_PCT)
+# No silent floor — user setting is honored exactly as configured.
+# UI warns when SL < 0.5% (normal ETH noise may trigger immediately).
+DEFAULT_SL_PCT      = float(os.getenv("SL_PCT", "0.5")) / 100.0
 BREAKEVEN_PCT       = float(os.getenv("BREAKEVEN_PCT",          "1.0")) / 100.0
 TRAIL_PCT           = float(os.getenv("TRAIL_PCT",              "1.5")) / 100.0
 REENTRY_BUFFER      = float(os.getenv("REENTRY_BUFFER_PCT",     "0.5")) / 100.0
