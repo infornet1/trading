@@ -154,6 +154,7 @@ by bot code. This means they execute even if the bot process is down.
 | M2-12 | Frontend restart/maintenance guard | Low | UX resilience — auto-detect API unavailability, show non-dismissible "Reconnecting…" overlay + disable all interactive elements (buttons/forms) during maintenance flag or outage. Reuses existing `/status/maintenance` poll. Two layers: (1) maintenance flag disables UI, (2) 2x consecutive health check fails triggers overlay. Frontend only, zero backend change, zero restart needed. | 🔲 |
 | M2-14 | Bot event session grouping in EVENTOS DEL BOT | Low | Events accumulate across test + live sessions — investors see confusing mixed history. Group by "Bot Iniciado" boundary: latest session expanded, older sessions collapsed (▶ Sesión 02 abr · 12:43 PM · 3 eventos). Full history preserved, never deleted. Pure frontend, zero API/backend change. Three options considered: A) filter pill, B) session grouping (recommended), C) separator label. | ✅ Done |
 | M2-15 | Delete internal test events for NFT 5403096 (investor bot) | Low | Test events from pre-meeting session (12:43, 1:10, 1:14 PM) appear in investor's bot card. These were created during internal testing, not by the investor. "SHORT Cerrado" orphaned in current session is misleading — no real HL trade happened. Decision: delete rows from bot_events where config_id = (NFT 5403096 config) AND ts < 2026-04-04 14:43:00. **Requires careful DB access review before executing — do NOT run without explicit coordination.** | 🔲 Pending review |
+| M2-19 | DeFi menu reorder across all pages — Wallet → LP Defensor → Explorar → Whale | Low | Investor-requested (2026-04-16 meeting). Reordered all 6 pages: index, dashboard, wallet, explore, whale, whitepaper. Landing page also gained missing Explorar entry. Zero API restart needed. | ✅ Done 2026-04-16 |
 
 ### Live Session Improvements (2026-04-04 — during investor meeting)
 
@@ -216,4 +217,4 @@ by bot code. This means they execute even if the bot process is down.
 
 ---
 
-*Last updated: 2026-04-16 (platform principle confirmed — zero backend overrides, UI transparency only)*
+*Last updated: 2026-04-16 (M2-19 done — DeFi menu reorder investor-requested)*
