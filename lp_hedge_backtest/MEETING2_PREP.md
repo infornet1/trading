@@ -138,9 +138,9 @@ by bot code. This means they execute even if the bot process is down.
 
 | ID | Item | Effort | Why | Status |
 |---|---|---|---|---|
-| M2-1 | Fee projections on position card (daily/weekly/monthly/annual) | Low | Most compelling investor metric — shows yield potential at a glance | 🔲 |
-| M2-2 | APR + Fee APR in position card header | Low | They see value immediately, no scrolling needed | 🔲 |
-| M2-3 | Distance to trigger % + show BOTH upper and lower triggers in active bot card | Low | "How close is the bot to firing?" — both directions; they show upper+lower | 🔲 |
+| M2-1 | Fee projections on position card (daily/weekly/monthly/annual) | Low | Most compelling investor metric — shows yield potential at a glance | ✅ Done (prior session) |
+| M2-2 | APR + Fee APR in position card header | Low | They see value immediately, no scrolling needed | ✅ Done (prior session) |
+| M2-3 | Distance to trigger % + show BOTH upper and lower triggers in active bot card | Low | "How close is the bot to firing?" — both directions; they show upper+lower | ✅ Done (prior session) |
 | M2-4 | HL balance shown inside protection config modal | Low | Direct investor meeting 1 feedback, they already have it | ✅ Done |
 
 ### TIER 2 — UX parity + important improvements
@@ -227,4 +227,4 @@ by bot code. This means they execute even if the bot process is down.
 
 ---
 
-*Last updated: 2026-04-16 (M2-21 live on Config 17 — first V2 trade pending / M2-22 LP reconciler active)*
+*Last updated: 2026-04-16 (M2-1/2/3 confirmed already done in prior session — Tier 1 now 4/4 complete)*
