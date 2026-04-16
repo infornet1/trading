@@ -85,7 +85,7 @@ class BotEvent(Base):
     event_type    = Column(
         Enum(
             "started", "hedge_opened", "breakeven", "tp_hit", "sl_hit",
-            "trailing_stop", "stopped", "error",
+            "trailing_stop", "stopped", "error", "reentry_guard_cleared",
             # FURY events
             "fury_entry", "fury_sl", "fury_tp", "fury_circuit_breaker",
             # WHALE events
