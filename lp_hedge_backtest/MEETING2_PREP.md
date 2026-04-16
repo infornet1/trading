@@ -169,7 +169,16 @@ by bot code. This means they execute even if the bot process is down.
 | Fix: SL too tight — bots whipsawed (NFT 5413901 + 5426040) | Bot SL floor is 0.3% (~$7 room at ETH ~$2,313) — too tight for ETH noise. Bot 17 fired SHORT twice today, both SL hit immediately within minutes. Updated sl_pct = 1.500% via DB for both configs (17 + 18). Droplet rebooted 2026-04-14, both bots restarted confirmed with sl_pct: 1.5 in started events. | ✅ Done 2026-04-14 |
 | Both bots ARMED — ETH above ceilings (2026-04-15 ~17:21) | ETH reached $2,349, crossing above both range ceilings. Bot 17 (NFT 5413901) armed at $2,347.28 ceiling — fires SHORT ≤ $2,335.55. Bot 18 (NFT 5426040) armed at $2,349.63 ceiling — fires SHORT ≤ $2,337.89. First live test of 1.5% SL in action. | 🔄 Live |
 
-### TIER 3 — Architecture resilience (deferred — post investor meeting)
+### TIER 3 — Architecture resilience
+
+#### Active development (2026-04-16)
+
+| ID | Item | Effort | Why | Status |
+|---|---|---|---|---|
+| M2-21 | V2 engine — native HL SL orders + cancel/replace trail + crash recovery | High | **Shipped as `live_hedge_bot_v2.py`.** Three-part upgrade: (1) native HL trigger SL placed immediately on SHORT open — if bot crashes, HL fires SL automatically; (2) cancel+replace native SL on every trailing-stop move — SL on HL always reflects latest trail level; (3) startup reconciliation — detects orphan SHORTs from prior crashes, recovers state, places SL if missing. Graceful degradation: if native SL fails, code-evaluated SL remains active + warning logged. V2 deployed alongside V1. Routing: `engine_v2=TRUE` in DB → bot_manager launches V2 script. V1 untouched on production configs. Test: flip config 17 (user's own wallet) to V2. | 🔄 Ready to test |
+| M2-22 | API background LP→DB reconciliation + LP event handling | Medium | **Shipped as `api/lp_reconciler.py`.** Hourly background job scans all active aragan/avaro configs, verifies each Uniswap v3 NFT on-chain. If liquidity=0 or NFT burned: sets `active=FALSE`, logs `lp_removed`/`lp_burned` bot_event, stops running bot process, emails admin. Catches LP removals that happen while the bot is stopped (bot's own `_sync_lp_position` only runs while `hedge_active`). Also fixed: bot_manager now handles `lp_removed`/`lp_burned` events with `_mark_inactive` + admin email. Fixed `reentry_guard_cleared` missing from `_EVENT_MAP` (was stored as `error`). New event types added to SQLAlchemy + MariaDB enum: `lp_removed`, `lp_burned`, `orphan_recovered`. | ✅ Done 2026-04-16 |
+
+#### Deferred (post investor meeting)
 
 | ID | Item | Effort | Why | Status |
 |---|---|---|---|---|
@@ -218,4 +227,4 @@ by bot code. This means they execute even if the bot process is down.
 
 ---
 
-*Last updated: 2026-04-16 (M2-20 done — reentry_guard_cleared false error fixed)*
+*Last updated: 2026-04-16 (M2-21 V2 engine ready to test / M2-22 LP reconciler deployed)*

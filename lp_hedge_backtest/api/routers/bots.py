@@ -665,6 +665,7 @@ async def start_bot(
         "whale_custom_addresses": cfg.whale_custom_addresses     or "",
         "whale_watch_assets":     cfg.whale_watch_assets         or "",
         "paper_trade":       is_paper,
+        "engine_v2":         bool(cfg.engine_v2),
     }
     await manager.start(config_id, config_dict)
     cfg.active = True

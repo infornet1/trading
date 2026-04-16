@@ -69,6 +69,7 @@ class BotConfig(Base):
     whale_use_websocket      = Column(Boolean,      nullable=True, default=False)
     whale_oi_spike_threshold = Column(Numeric(5, 3), nullable=True, default=0.030)
     paper_trade     = Column(Boolean, default=False)          # simulate trades, no real orders
+    engine_v2       = Column(Boolean, default=False)          # True → launch live_hedge_bot_v2.py
     active          = Column(Boolean, default=False)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -86,6 +87,10 @@ class BotEvent(Base):
         Enum(
             "started", "hedge_opened", "breakeven", "tp_hit", "sl_hit",
             "trailing_stop", "stopped", "error", "reentry_guard_cleared",
+            # LP safety events
+            "lp_removed", "lp_burned",
+            # V2 recovery
+            "orphan_recovered",
             # FURY events
             "fury_entry", "fury_sl", "fury_tp", "fury_circuit_breaker",
             # WHALE events

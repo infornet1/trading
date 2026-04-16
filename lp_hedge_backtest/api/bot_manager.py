@@ -21,6 +21,7 @@ from api.models import BotConfig, BotEvent
 # Path to bot scripts and venv Python
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOT_SCRIPT       = os.path.join(_BASE, "live_hedge_bot.py")
+BOT_V2_SCRIPT    = os.path.join(_BASE, "live_hedge_bot_v2.py")
 FURY_BOT_SCRIPT  = os.path.join(_BASE, "live_fury_bot.py")
 WHALE_BOT_SCRIPT = os.path.join(_BASE, "live_whale_bot.py")
 VENV_PYTHON      = os.path.join(_BASE, "venv", "bin", "python3")
@@ -35,6 +36,12 @@ _EVENT_MAP = {
     "trailing_stop":        "trailing_stop",
     "stopped":              "stopped",
     "error":                "error",
+    "reentry_guard_cleared": "reentry_guard_cleared",
+    # LP safety events
+    "lp_removed":           "lp_removed",
+    "lp_burned":            "lp_burned",
+    # V2 recovery
+    "orphan_recovered":     "orphan_recovered",
     # FURY events
     "fury_entry":           "fury_entry",
     "fury_sl":              "fury_sl",
@@ -48,9 +55,6 @@ _EVENT_MAP = {
     "whale_flip":           "whale_flip",
     "whale_snapshot":       "whale_snapshot",
     "whale_event":          "whale_event",
-    # LP safety events
-    "lp_removed":           "lp_removed",
-    "lp_burned":            "lp_burned",
 }
 
 
@@ -123,7 +127,12 @@ class BotManager:
             if config.get("paper_trade"):
                 env["PAPER_TRADE"] = "1"
         else:
-            script = BOT_SCRIPT
+            # aragan/avaro: route to V2 engine if config flag is set
+            if config.get("engine_v2", False):
+                script = BOT_V2_SCRIPT
+                env["ENGINE_V2"] = "1"
+            else:
+                script = BOT_SCRIPT
 
         proc = subprocess.Popen(
             [VENV_PYTHON, script],
@@ -249,6 +258,12 @@ class BotManager:
             "details": details,
             "ts":      datetime.now(timezone.utc).isoformat(),
         })
+
+        # LP gone → auto-deactivate config + notify admin
+        if event_type in ("lp_removed", "lp_burned"):
+            await self._mark_inactive(config_id)
+            asyncio.create_task(self._notify_admin_lp_gone(config_id, event_type, details))
+
         # Telegram alert — non-blocking, fire-and-forget
         from api.telegram_alerts import send_alert
         asyncio.create_task(send_alert(config_id, event_type, price, pnl, details))
@@ -282,6 +297,41 @@ class BotManager:
                 await db.commit()
         except Exception as e:
             print(f"[BotManager] DB mark_inactive error: {e}", flush=True)
+
+    async def _notify_admin_lp_gone(self, config_id: int, event_type: str, details: Optional[dict]):
+        """Send admin email when a bot is auto-deactivated due to LP removal."""
+        import json as _json
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        try:
+            email_path = os.environ.get("EMAIL_CONFIG_PATH",
+                                        "/var/www/dev/trading/email_config.json")
+            with open(email_path) as f:
+                cfg = _json.load(f)
+            admin = os.environ.get("EMAIL_RECIPIENTS", "perdomo.gustavo@gmail.com")
+            msg = MIMEMultipart()
+            msg["From"]    = cfg["sender_email"]
+            msg["To"]      = admin
+            msg["Subject"] = f"⚠️ [VIZNIAGO Admin] LP Gone — Config {config_id} Auto-Deactivated"
+            reason = "LP removed (liquidity=0)" if event_type == "lp_removed" else "NFT burned"
+            note   = (details or {}).get("note", "")
+            body = (
+                f"VIZNIAGO auto-deactivated bot config {config_id}.\n\n"
+                f"Reason: {reason}\n"
+                f"Note:   {note}\n"
+                f"Time:   {datetime.now(timezone.utc).isoformat()}\n\n"
+                f"Config set to active=False. User must re-add liquidity and re-arm from the dashboard."
+            )
+            msg.attach(MIMEText(body, "plain"))
+            s = smtplib.SMTP(cfg["smtp_server"], cfg["smtp_port"])
+            s.starttls()
+            s.login(cfg["smtp_username"], cfg["smtp_password"])
+            s.send_message(msg)
+            s.quit()
+            print(f"[BotManager] Admin LP-gone email sent for config {config_id}", flush=True)
+        except Exception as e:
+            print(f"[BotManager] Admin LP-gone email failed: {e}", flush=True)
 
     # ── WebSocket pub/sub ─────────────────────────────────────────────────
 

@@ -41,6 +41,19 @@ async def _run_column_migrations():
         # WHALE mode missing columns
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS whale_use_websocket TINYINT(1) NULL DEFAULT 0",
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS whale_oi_spike_threshold DECIMAL(5,3) NULL DEFAULT 0.030",
+        # V2 engine flag — routes config to live_hedge_bot_v2.py when TRUE
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS engine_v2 TINYINT(1) NOT NULL DEFAULT 0",
+        # Extend bot_events enum with LP safety + V2 recovery event types
+        (
+            "ALTER TABLE bot_events MODIFY COLUMN event_type ENUM("
+            "'started','hedge_opened','breakeven','tp_hit','sl_hit',"
+            "'trailing_stop','stopped','error','reentry_guard_cleared',"
+            "'lp_removed','lp_burned','orphan_recovered',"
+            "'fury_entry','fury_sl','fury_tp','fury_circuit_breaker',"
+            "'whale_new_position','whale_closed','whale_size_increase',"
+            "'whale_size_decrease','whale_flip','whale_snapshot','whale_event'"
+            ") NOT NULL"
+        ),
         # Telegram alerts — create table if not exists
         (
             "CREATE TABLE IF NOT EXISTS telegram_links ("
@@ -111,6 +124,7 @@ async def _auto_restart_bots():
                     "whale_watch_assets":       bot.whale_watch_assets       or "",
                     "whale_use_websocket":      bot.whale_use_websocket      or False,
                     "whale_oi_spike_threshold": str(bot.whale_oi_spike_threshold or 0.03),
+                    "engine_v2":               bool(bot.engine_v2),
                 }
                 await manager.start(bot.id, config)
                 print(f"[Startup] Auto-restarted bot {bot.id} (NFT #{bot.nft_token_id})", flush=True)
@@ -130,11 +144,19 @@ async def lifespan(app: FastAPI):
     # Start Telegram long-poller (fallback when webhook DNS fails)
     from api.telegram_poller import run_poller
     tg_task = asyncio.create_task(run_poller())
+    # Start LP reconciler — hourly scan deactivates configs where LP is gone
+    from api.lp_reconciler import run_lp_reconciler
+    lp_task = asyncio.create_task(run_lp_reconciler())
     yield
     # Graceful shutdown
     tg_task.cancel()
+    lp_task.cancel()
     try:
         await tg_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await lp_task
     except asyncio.CancelledError:
         pass
     from api.bot_manager import manager
