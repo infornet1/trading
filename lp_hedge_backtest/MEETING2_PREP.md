@@ -176,6 +176,7 @@ by bot code. This means they execute even if the bot process is down.
 | M2-11 | Pre-trigger as % before range edge (replace buffer) | Medium | Cleaner UX than current TRIGGER_OFFSET_PCT | 🔲 Post-meeting |
 | M2-13 | Mode enforcement in bot code (Bajista vs Alcista) | Low-Medium | Silent bug: `live_hedge_bot.py` never reads the `mode` field from DB — both modes behave identically today (both triggers always active). Fix: read `BOT_MODE` env var injected by bot_manager at launch; if `aragan`, skip `from_above` trigger entirely. Bajista = `below_range` only. Alcista = both triggers. Low effort code change, requires bot restart per config. | 🔲 Post-meeting |
 | M2-16 | Implement LONG on upside breakout for Defensor Alcista | High | **Critical false promise:** UI says "SHORT en caídas + LONG en rupturas al alza" but bot code has ZERO LONG logic — never implemented. When price breaks above the range ceiling, LP stops earning fees and bot does nothing. Full implementation requires: (1) arm `price_was_below` flag when price is inside range, (2) fire LONG when price breaks above `upper_bound * (1 + UPPER_BUFFER)`, (3) manage LONG with same trailing SL logic, (4) close LONG on TP/SL/re-entry. **Action 1 (UI fix — no restart, zero bot impact): update i18n.js Alcista desc to remove LONG claim until implemented. Action 2 (this item): build the actual LONG logic.** Requires careful testing before deploy to any live config. | 🔲 Post-meeting |
+| M2-17 | Native HL SL order placed immediately when SHORT opens | Medium | **Investor-driven:** current SL is code-evaluated only — if bot process crashes, open SHORT has zero stop protection until restart. Fix: place a native HL trigger order as SL the moment `open_hedge()` succeeds. Two options: **Option A (simpler):** place native SL at open, fixed — never moves even if trailing stop activates. Protects crash scenario, ships faster. **Option B (full):** native SL at open + cancel+replace on every trailing stop move — full protection, requires tracking HL order IDs and handling cancel/replace loop. Recommended path: ship Option A first, upgrade to Option B as follow-on. Triggered by 2026-04-15 live session where investor SHORT opened with 0.3% SL ($7 room) and no native HL protection. | 🔲 Post-meeting |
 
 ### TIER D — VIZNIAGO Differentiators to present at meeting
 
@@ -214,4 +215,4 @@ by bot code. This means they execute even if the bot process is down.
 
 ---
 
-*Last updated: 2026-04-15 (both bots armed — ETH above ceilings)*
+*Last updated: 2026-04-16 (M2-17 added — native HL SL order on SHORT open)*
