@@ -254,25 +254,27 @@ class LiveHedgeBotV2:
         Failure is non-fatal — code-evaluated SL remains active.
         """
         try:
-            # Limit price set 3% above trigger to guarantee fill in fast markets.
-            # tpsl="" → standalone trigger stop (not position-TP/SL mode).
-            # tpsl="sl" is the position-linked variant and can be rejected if HL
-            # hasn't fully settled the fill when the SL request arrives.
-            limit_px = round(sl_price * 1.03, 2)
-            result = self.exchange.order(
-                "ETH",
-                is_buy=True,       # buy back = close SHORT
-                sz=size,
-                limit_px=limit_px,
-                order_type={
+            # grouping="na" + tpsl="sl" = standalone trigger stop (manageable, returns OID).
+            # tpsl="" → HTTP 422. normalTpsl → "Main order cannot be trigger order."
+            # positionTpsl → "waitingForTrigger" with no usable OID (can't cancel/replace).
+            # HL ETH trigger prices must be whole-dollar increments at this price range.
+            trigger_px = round(sl_price)          # nearest $1
+            limit_px   = round(sl_price * 1.03)   # 3% above trigger, $1 granularity
+            order_req = {
+                "coin":       "ETH",
+                "is_buy":     True,        # buy back = close SHORT
+                "sz":         size,
+                "limit_px":   float(limit_px),
+                "order_type": {
                     "trigger": {
-                        "triggerPx": round(sl_price, 2),
+                        "triggerPx": float(trigger_px),
                         "isMarket":  True,
-                        "tpsl":      "",   # standalone trigger — not position-TP/SL mode
+                        "tpsl":      "sl",
                     }
                 },
-                reduce_only=True,
-            )
+                "reduce_only": True,
+            }
+            result = self.exchange.bulk_orders([order_req], grouping="na")
             # Log full raw response for debugging on any failure
             if not result:
                 print(f"⚠️  [V2] Native SL placement: None response from exchange", flush=True)
