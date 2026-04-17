@@ -252,7 +252,10 @@ class LiveHedgeBotV2:
         Failure is non-fatal — code-evaluated SL remains active.
         """
         try:
-            # Limit price set 3% above trigger to guarantee fill in fast markets
+            # Limit price set 3% above trigger to guarantee fill in fast markets.
+            # tpsl="" → standalone trigger stop (not position-TP/SL mode).
+            # tpsl="sl" is the position-linked variant and can be rejected if HL
+            # hasn't fully settled the fill when the SL request arrives.
             limit_px = round(sl_price * 1.03, 2)
             result = self.exchange.order(
                 "ETH",
@@ -263,27 +266,39 @@ class LiveHedgeBotV2:
                     "trigger": {
                         "triggerPx": round(sl_price, 2),
                         "isMarket":  True,
-                        "tpsl":      "sl",
+                        "tpsl":      "",   # standalone trigger — not position-TP/SL mode
                     }
                 },
                 reduce_only=True,
             )
-            if result and result.get("status") == "ok":
-                statuses = result.get("response", {}).get("data", {}).get("statuses", [])
-                if statuses:
-                    s0 = statuses[0]
-                    if "resting" in s0:
-                        oid = s0["resting"]["oid"]
-                        print(f"🛡️  [V2] Native SL placed | OID {oid} | trigger ${sl_price:.2f}", flush=True)
-                        return oid
-                    if "filled" in s0:
-                        # Triggered immediately — position likely already closed
-                        print(f"⚠️  [V2] Native SL filled immediately @ ${sl_price:.2f} — checking position", flush=True)
-                        return None
-                    if "error" in s0:
-                        print(f"⚠️  [V2] Native SL order error: {s0['error']}", flush=True)
-                        return None
-            print(f"⚠️  [V2] Native SL placement unexpected response: {result}", flush=True)
+            # Log full raw response for debugging on any failure
+            if not result:
+                print(f"⚠️  [V2] Native SL placement: None response from exchange", flush=True)
+                return None
+
+            if result.get("status") != "ok":
+                print(f"⚠️  [V2] Native SL placement top-level error: {result}", flush=True)
+                return None
+
+            statuses = result.get("response", {}).get("data", {}).get("statuses", [])
+            if not statuses:
+                print(f"⚠️  [V2] Native SL placement: empty statuses — full response: {result}", flush=True)
+                return None
+
+            s0 = statuses[0]
+            if "resting" in s0:
+                oid = s0["resting"]["oid"]
+                print(f"🛡️  [V2] Native SL placed | OID {oid} | trigger ${sl_price:.2f} | limit ${limit_px:.2f}", flush=True)
+                return oid
+            if "filled" in s0:
+                # Triggered immediately — position likely already closed
+                print(f"⚠️  [V2] Native SL filled immediately @ ${sl_price:.2f} — position may be gone", flush=True)
+                return None
+            if "error" in s0:
+                print(f"⚠️  [V2] Native SL order rejected by HL: '{s0['error']}' — full: {result}", flush=True)
+                return None
+
+            print(f"⚠️  [V2] Native SL unexpected status: {s0} — full: {result}", flush=True)
             return None
         except Exception as e:
             print(f"⚠️  [V2] Native SL placement exception: {e}", flush=True)
@@ -456,7 +471,8 @@ class LiveHedgeBotV2:
                 print(f"✅ SHORT OPENED | Entry: ${self.entry_price:.2f} | "
                       f"SL: ${self.current_sl_price:.2f} | Trigger: {label}", flush=True)
 
-                # V2: place native SL immediately after open
+                # V2: place native SL — small delay lets HL settle the fill before SL request
+                time.sleep(1)
                 oid = self._place_native_sl(self.current_sl_price, size)
                 if oid:
                     self.hl_sl_order_id = oid
