@@ -159,7 +159,9 @@ class LiveHedgeBotV2:
         self.price_was_above   = False
 
         # ── Re-entry guard ─────────────────────────────────────────────────
+        # sl_close_price: price when last short closed — M2-23 re-arm check
         self.reentry_guard_price = None
+        self.sl_close_price      = None
 
         # ── Margin failure guard ────────────────────────────────────────────
         self._margin_fail_count    = 0
@@ -645,6 +647,7 @@ class LiveHedgeBotV2:
         self.open_trigger        = None
         self.hl_sl_order_id      = None
         self.reentry_guard_price = close_price * (1 + REENTRY_BUFFER)
+        self.sl_close_price      = close_price
         self.price_was_above     = False
 
     # ── HL position sync ──────────────────────────────────────────────────────
@@ -916,6 +919,18 @@ class LiveHedgeBotV2:
                     print(f"🔓 Re-entry guard cleared at ${price:.2f}", flush=True)
                     log_event("reentry_guard_cleared", price=price)
                     self.reentry_guard_price = None
+                    self.sl_close_price      = None
+                elif (self.reentry_guard_price and self.sl_close_price
+                        and price < self.sl_close_price):
+                    # M2-23: price continued below where SL closed — whipsaw risk
+                    # gone, re-arm immediately without waiting for guard level
+                    print(f"🔓 [V2] Re-entry guard cleared — price ${price:.2f} below "
+                          f"SL-close ${self.sl_close_price:.2f} (continued downside)",
+                          flush=True)
+                    log_event("reentry_guard_cleared", price=price)
+                    self.reentry_guard_price = None
+                    self.sl_close_price      = None
+                    self.price_was_above     = True
 
                 # ── Entry logic ──────────────────────────────────────────────
                 if not self.hedge_active:

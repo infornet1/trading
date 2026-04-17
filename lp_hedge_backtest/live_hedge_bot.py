@@ -196,10 +196,13 @@ class LiveHedgeBot:
         # or when price falls below lower_bound without triggering.
         self.price_was_above   = False
 
-        # ── Re-entry guard (for below-range trigger) ───────────────────────
-        # After a short closes, price must recover above this level before
-        # the below-range trigger can fire again. None = guard inactive.
+        # ── Re-entry guard ─────────────────────────────────────────────────
+        # After a short closes, price must recover above reentry_guard_price
+        # before the below-range trigger can fire again. None = guard inactive.
+        # sl_close_price: price when the last short was closed — used by M2-23
+        # to also clear the guard if price continues below that level.
         self.reentry_guard_price = None
+        self.sl_close_price      = None
 
         # ── Margin failure guard ────────────────────────────────────────────
         # Tracks consecutive "Sizing/margin check failed" outcomes.
@@ -551,6 +554,7 @@ class LiveHedgeBot:
                 self.short_min_price     = None
                 self.open_trigger        = None
                 self.reentry_guard_price = price * (1 + REENTRY_BUFFER)
+                self.sl_close_price      = price
                 self.price_was_above     = False
                 log_event("stopped", price=price, details={
                     "reason": "external_close",
@@ -583,6 +587,7 @@ class LiveHedgeBot:
                 # Re-entry guard: price must recover above this before
                 # the below-range trigger can fire again
                 self.reentry_guard_price = close_price * (1 + REENTRY_BUFFER)
+                self.sl_close_price      = close_price
 
                 # Reset direction flag so upper-cross trigger also needs a fresh setup
                 self.price_was_above = False
@@ -850,6 +855,18 @@ class LiveHedgeBot:
                           f"(was ${self.reentry_guard_price:.2f})", flush=True)
                     log_event("reentry_guard_cleared", price=price)
                     self.reentry_guard_price = None
+                    self.sl_close_price      = None
+                elif (self.reentry_guard_price and self.sl_close_price
+                        and price < self.sl_close_price):
+                    # M2-23: price continued below where SL closed — whipsaw risk
+                    # gone, re-arm immediately without waiting for guard level
+                    print(f"🔓 Re-entry guard cleared — price ${price:.2f} below "
+                          f"SL-close ${self.sl_close_price:.2f} (continued downside)",
+                          flush=True)
+                    log_event("reentry_guard_cleared", price=price)
+                    self.reentry_guard_price = None
+                    self.sl_close_price      = None
+                    self.price_was_above     = True
 
                 # ── Entry logic (no position open) ───────────────────────────
                 if not self.hedge_active:
