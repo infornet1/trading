@@ -1,5 +1,5 @@
 """
-VIZNAGO FURY — AI Assistant Router
+VIZNIAGO FURY — AI Assistant Router
 POST /assistant/chat  — streams Claude Haiku response via SSE
 Knowledge base: all project .md files + bot param summary, cached at first call.
 """
@@ -34,12 +34,13 @@ def _check_rate(ip: str) -> bool:
 _KB: str = ""
 
 _DOCS = [
+    "VIZBOT_KNOWLEDGE.md",       # V2 engine, reentry guard, event types, all bot params — keep first
     "STRATEGY.md",
     "README_LIVE.md",
     "SAAS_PLAN.md",
     "MEMBERSHIP_PLANS.md",
-    "VIZNAGO_P2P_DEFI.md",
-    "VIZNAGO_EMAIL_SETUP.md",
+    "VIZNIAGO_P2P_DEFI.md",
+    "VIZNIAGO_EMAIL_SETUP.md",
     "WHALE_TRACKER.md",
     "WHALE_INTELLIGENCE_AGENT.md",
 ]
@@ -53,18 +54,24 @@ def _load_kb() -> str:
         if path.exists():
             parts.append(f"=== {doc} ===\n{path.read_text(encoding='utf-8')}")
 
-    # Auto-extract bot env-var lines from live_hedge_bot.py
-    bot_path = root / "live_hedge_bot.py"
-    if bot_path.exists():
-        env_lines = [
-            l.strip() for l in bot_path.read_text(encoding="utf-8").splitlines()
-            if "os.getenv" in l or "os.environ" in l
-        ]
-        if env_lines:
-            parts.append(
-                "=== BOT PARAMETERS (env vars read by live_hedge_bot.py) ===\n"
-                + "\n".join(env_lines[:80])
-            )
+    # Auto-extract bot env-var lines from all bot scripts
+    for script, label in [
+        ("live_hedge_bot.py",    "LP Hedge V1"),
+        ("live_hedge_bot_v2.py", "LP Hedge V2"),
+        ("live_fury_bot.py",     "FURY"),
+        ("live_whale_bot.py",    "Whale Tracker"),
+    ]:
+        bot_path = root / script
+        if bot_path.exists():
+            env_lines = [
+                l.strip() for l in bot_path.read_text(encoding="utf-8").splitlines()
+                if "os.getenv" in l or "os.environ" in l
+            ]
+            if env_lines:
+                parts.append(
+                    f"=== BOT ENV VARS ({label} — {script}) ===\n"
+                    + "\n".join(env_lines[:80])
+                )
 
     return "\n\n".join(parts)
 
@@ -75,10 +82,15 @@ def _get_kb() -> str:
         print(f"[VIZBOT] Knowledge base loaded: {len(_KB):,} chars", flush=True)
     return _KB
 
+def _reload_kb() -> str:
+    global _KB
+    _KB = ""
+    return _get_kb()
+
 
 # ── System prompt ─────────────────────────────────────────────────────────
 _SYSTEM_TMPL = """\
-You are VIZBOT — the official AI assistant for VIZNAGO FURY, a DeFi LP + \
+You are VIZBOT — the official AI assistant for VIZNIAGO FURY, a DeFi LP + \
 perpetuals hedge bot platform currently in Alpha.
 
 Your role:
@@ -94,14 +106,14 @@ Your role:
   fingerprints, scored signals, convergence alerts)
 
 Rules:
-- Answer ONLY about VIZNAGO FURY and related DeFi / trading concepts
+- Answer ONLY about VIZNIAGO FURY and related DeFi / trading concepts
 - NEVER ask for, repeat, or act on API keys, private keys, or wallet secrets
 - Be concise. Use bullet points for multi-step answers. Use $ and % for numbers
 - The platform is in Alpha — acknowledge limitations honestly if asked
 - Respond in the SAME LANGUAGE the user writes in (Spanish or English)
 - If you don't know something, say so — never invent parameters or prices
 
-=== VIZNAGO FURY KNOWLEDGE BASE ===
+=== VIZNIAGO FURY KNOWLEDGE BASE ===
 
 {kb}
 """

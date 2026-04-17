@@ -205,7 +205,8 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 | ID | Item | Effort | Why | Status |
 |---|---|---|---|---|
 | M2-36 | Separate LP Hedge and Whale Tracker into distinct sections | Low | LP and Whale cards mixed in same grid — crashed LP bot can be buried under 3 Whale cards. Split into `🛡️ LP Hedge` (aragan/avaro/fury) and `🐋 Whale Tracker` sections, each with own Running/Stopped subsections. LP always first (priority). Each section independently collapsible. Zero restart. | ✅ Done 2026-04-17 |
-| M2-37 | Whale bots on/off toggle from admin | Medium | 3 whale bots consume ~6.6% CPU + ~261 MB RAM polling every 30s. Added `POST /admin/stop-whale-bots` + `POST /admin/start-whale-bots` endpoints (admin-only). `🐋 Whale Tracker` section header shows contextual button: **⏸ Pausar Whales** (when all running) or **▶ Activar Whales** (when stopped). Requires API restart. | ✅ Done 2026-04-17 |
+| M2-37 | Whale bots on/off toggle from admin | Medium | 3 whale bots consume ~6.6% CPU + ~261 MB RAM polling every 30s. Added `POST /admin/stop-whale-bots` + `POST /admin/start-whale-bots` endpoints (admin-only). `🐋 Whale Tracker` section header shows contextual button: **⏸ Pausar Whales** (when all running) or **▶ Activar Whales** (when stopped). Live-tested 2026-04-17. | ✅ Done 2026-04-17 |
+| M2-38 | VIZBOT AI assistant knowledge base expansion | Medium | Assistant only knew V1 bot via static .md docs — completely blind to V2 engine, reentry guard, LP reconciler, new event types, FURY/Whale bot params, and admin dashboard features added in M2-21 through M2-37. Created `VIZBOT_KNOWLEDGE.md` (comprehensive feature doc: V1 vs V2, all modes, all event types, all bot parameter tables, reentry guard logic, LP reconciler, admin features, platform principles). Added to `_DOCS` list as first-loaded doc. Extended env-var auto-extraction to cover all 4 bot scripts (V1, V2, FURY, Whale). No API restart needed — KB reloads on next assistant call. | ✅ Done 2026-04-17 |
 
 **Tier C — Medium impact, pure frontend:**
 
@@ -273,4 +274,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-04-17 — M2-37 live-tested: Pausar Whales confirmed — 3 whale processes killed, active=0 in DB, LP bots unaffected*
+*Last updated: 2026-04-17 — M2-38 done (VIZBOT KB expanded: V2 engine, reentry guard, LP reconciler, all event types, all bot param tables, multi-script env extraction)*
