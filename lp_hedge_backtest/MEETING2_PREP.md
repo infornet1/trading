@@ -200,6 +200,12 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 | M2-29 | Engine V2 toggle from admin UI | Low | Switching V1↔V2 currently requires direct DB access. Toggle on card or wallet panel — `PATCH /admin/pool/{id}` with `engine_v2`. | 🔲 Post-meeting |
 | M2-30 | Force LP reconciler scan button | Low | Must wait up to 1 hour for reconciler to catch LP removals. Admin toolbar button: `POST /admin/reconcile-now` → triggers `_reconcile_all()` immediately. | 🔲 Post-meeting |
 
+**Tier B.5 — Admin card layout:**
+
+| ID | Item | Effort | Why | Status |
+|---|---|---|---|---|
+| M2-36 | Separate LP Hedge and Whale Tracker into distinct sections | Low | LP and Whale cards mixed in same grid — crashed LP bot can be buried under 3 Whale cards. Split into `🛡️ LP Hedge` (aragan/avaro/fury) and `🐋 Whale Tracker` sections, each with own Running/Stopped subsections. LP always first (priority). Each section independently collapsible. Zero restart. | ✅ Done 2026-04-17 |
+
 **Tier C — Medium impact, pure frontend:**
 
 | ID | Item | Effort | Why | Status |
@@ -266,4 +272,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-04-17 — M2-24/25/26/27 done (admin A-tier: engine badge, event labels, SL copy, guard pill — no restart needed)*
+*Last updated: 2026-04-17 — M2-36 done (admin card sections: LP Hedge / Whale Tracker separated, no restart)*

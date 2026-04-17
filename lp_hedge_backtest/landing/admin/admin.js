@@ -260,44 +260,102 @@ function renderPools(pools) {
     return;
   }
 
-  const price   = state.ethPrice;
-  const running = pools.filter(p => p.running);
-  const stopped = pools.filter(p => !p.running);
+  const price = state.ethPrice;
+
+  // Classify pools by bot family
+  const LP_MODES    = new Set(['aragan', 'avaro', 'fury']);
+  const lpPools     = pools.filter(p => LP_MODES.has(p.mode));
+  const whalePools  = pools.filter(p => p.mode === 'whale');
+  const otherPools  = pools.filter(p => !LP_MODES.has(p.mode) && p.mode !== 'whale');
 
   let html = '';
 
-  // ── Running section ─────────────────────────────────────────────────
-  html += `<div class="pools-section">
-  <div class="pools-section-header">
-    <span>Running <span class="pools-count">${running.length}</span></span>
-  </div>
-  <div class="pools-cards-grid">
-    ${running.length
-      ? running.map(p => poolCard(p, price)).join('')
-      : '<div class="loading-msg">Sin bots corriendo ahora.</div>'}
-  </div>
-</div>`;
+  // ── LP Hedge section ────────────────────────────────────────────────
+  if (lpPools.length) {
+    const lpRunning = lpPools.filter(p => p.running);
+    const lpStopped = lpPools.filter(p => !p.running);
+    html += renderBotSection({
+      title:      '🛡️ LP Hedge',
+      running:    lpRunning,
+      stopped:    lpStopped,
+      price,
+      toggleKey:  'lp',
+    });
+  }
 
-  // ── Configured / stopped section (always visible) ───────────────────
-  if (stopped.length) {
-    html += `<div class="pools-section">
-  <div class="pools-section-header pools-section-header--muted" onclick="toggleHistorical()">
-    <span>Configured <span class="pools-count">${stopped.length}</span></span>
-    <button class="btn-outline-sm" style="pointer-events:none">${state.historicalOpen ? '▲ Hide' : '▼ Show'}</button>
-  </div>
-  <div class="pools-cards-grid ${state.historicalOpen ? '' : 'hidden'}" id="historical-cards">
-    ${stopped.map(p => poolCard(p, price, true)).join('')}
-  </div>
-</div>`;
+  // ── Whale Tracker section ───────────────────────────────────────────
+  if (whalePools.length) {
+    const whaleRunning = whalePools.filter(p => p.running);
+    const whaleStopped = whalePools.filter(p => !p.running);
+    html += renderBotSection({
+      title:      '🐋 Whale Tracker',
+      running:    whaleRunning,
+      stopped:    whaleStopped,
+      price,
+      toggleKey:  'whale',
+    });
+  }
+
+  // ── Other / unknown modes ───────────────────────────────────────────
+  if (otherPools.length) {
+    const otherRunning = otherPools.filter(p => p.running);
+    const otherStopped = otherPools.filter(p => !p.running);
+    html += renderBotSection({
+      title:      '⚙️ Otros',
+      running:    otherRunning,
+      stopped:    otherStopped,
+      price,
+      toggleKey:  'other',
+    });
   }
 
   grid.innerHTML = html;
   renderRiskStrip(pools);
 }
 
-function toggleHistorical() {
-  state.historicalOpen = !state.historicalOpen;
+function renderBotSection({ title, running, stopped, price, toggleKey }) {
+  const stoppedKey  = `historicalOpen_${toggleKey}`;
+  const isOpen      = state[stoppedKey] !== false; // default open
+  let html = '';
+
+  // Running subsection
+  html += `<div class="pools-section">
+  <div class="pools-section-header">
+    <span>${title} <span class="pools-count">${running.length} running</span></span>
+  </div>
+  <div class="pools-cards-grid">
+    ${running.length
+      ? running.map(p => poolCard(p, price)).join('')
+      : `<div class="loading-msg">Sin bots ${title} corriendo ahora.</div>`}
+  </div>
+</div>`;
+
+  // Stopped subsection (collapsible)
+  if (stopped.length) {
+    html += `<div class="pools-section">
+  <div class="pools-section-header pools-section-header--muted"
+       onclick="toggleSectionStopped('${toggleKey}')">
+    <span>Configured / Stopped <span class="pools-count">${stopped.length}</span></span>
+    <button class="btn-outline-sm" style="pointer-events:none">${isOpen ? '▲ Hide' : '▼ Show'}</button>
+  </div>
+  <div class="pools-cards-grid ${isOpen ? '' : 'hidden'}" id="stopped-${toggleKey}">
+    ${stopped.map(p => poolCard(p, price, true)).join('')}
+  </div>
+</div>`;
+  }
+
+  return html;
+}
+
+function toggleSectionStopped(key) {
+  const stateKey = `historicalOpen_${key}`;
+  state[stateKey] = state[stateKey] === false ? true : false;
   if (state.lastPools) renderPools(state.lastPools);
+}
+
+// Legacy toggle kept for any external references
+function toggleHistorical() {
+  toggleSectionStopped('lp');
 }
 
 // ── Health logic ───────────────────────────────────────────────────────────
