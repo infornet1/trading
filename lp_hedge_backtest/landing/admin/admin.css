@@ -36,6 +36,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
   cursor: pointer; text-decoration: none;
 }
 .btn-outline-sm:hover { border-color: var(--gold); color: var(--gold); }
+.btn-danger-sm  { border-color: #e74c3c !important; color: #e74c3c !important; }
+.btn-danger-sm:hover  { background: rgba(231,76,60,.1) !important; }
+.btn-success-sm { border-color: #2ecc71 !important; color: #2ecc71 !important; }
+.btn-success-sm:hover { background: rgba(46,204,113,.1) !important; }
 
 /* ── Auto-refresh control (navbar) ──────────────────────────────────── */
 .refresh-control {

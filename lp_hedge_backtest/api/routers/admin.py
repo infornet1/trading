@@ -150,6 +150,85 @@ async def nuclear_stop(admin: str = Depends(get_current_admin)):
     }
 
 
+@router.post("/stop-whale-bots")
+async def stop_whale_bots(admin: str = Depends(get_current_admin)):
+    """Stop all running whale bots and mark them inactive (saves ~6.6% CPU + ~261 MB RAM)."""
+    stopped = []
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(BotConfig).where(BotConfig.mode == "whale", BotConfig.active == True)
+        )
+        whale_configs = result.scalars().all()
+        for cfg in whale_configs:
+            if cfg.id in manager._procs:
+                await manager.stop(cfg.id)
+                stopped.append(cfg.id)
+        await db.execute(
+            update(BotConfig).where(BotConfig.mode == "whale").values(active=False)
+        )
+        await db.commit()
+    return {"status": "ok", "stopped_count": len(stopped), "stopped_ids": stopped}
+
+
+@router.post("/start-whale-bots")
+async def start_whale_bots(admin: str = Depends(get_current_admin)):
+    """Start all inactive whale bot configs."""
+    from api.crypto import decrypt
+    started = []
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(BotConfig).where(BotConfig.mode == "whale", BotConfig.active == False)
+        )
+        whale_configs = result.scalars().all()
+        for bot in whale_configs:
+            if bot.id in manager._procs:
+                continue
+            config = {
+                "nft_token_id":             bot.nft_token_id,
+                "lower_bound":              str(bot.lower_bound or 0),
+                "upper_bound":              str(bot.upper_bound or 0),
+                "trigger_pct":              str(bot.trigger_pct or 0),
+                "hedge_ratio":              str(bot.hedge_ratio or 0),
+                "hl_api_key":               "",
+                "hl_wallet_addr":           "",
+                "mode":                     "whale",
+                "pair":                     bot.pair or "ETH",
+                "leverage":                 str(bot.leverage or 10),
+                "sl_pct":                   str(bot.sl_pct or 0.1),
+                "tp_pct":                   str(bot.tp_pct) if bot.tp_pct else "",
+                "trailing_stop":            "0",
+                "auto_rearm":               "0",
+                "fury_symbol":              "",
+                "fury_rsi_period":          "9",
+                "fury_rsi_long_th":         "35",
+                "fury_rsi_short_th":        "65",
+                "fury_leverage_max":        "12",
+                "fury_risk_pct":            "2.0",
+                "whale_top_n":              str(bot.whale_top_n or 50),
+                "whale_min_notional":       str(bot.whale_min_notional or 50000),
+                "whale_poll_interval":      str(bot.whale_poll_interval or 30),
+                "whale_custom_addresses":   bot.whale_custom_addresses or "",
+                "whale_watch_assets":       bot.whale_watch_assets or "",
+                "whale_use_websocket":      bot.whale_use_websocket or False,
+                "whale_oi_spike_threshold": str(bot.whale_oi_spike_threshold or 0.03),
+                "engine_v2":               False,
+            }
+            try:
+                await manager.start(bot.id, config)
+                started.append(bot.id)
+            except Exception as e:
+                print(f"[WhaleStart] Failed to start bot {bot.id}: {e}", flush=True)
+        if started:
+            ids = [b.id for b in whale_configs if b.id in started]
+            await db.execute(
+                update(BotConfig)
+                .where(BotConfig.id.in_(started))
+                .values(active=True)
+            )
+            await db.commit()
+    return {"status": "ok", "started_count": len(started), "started_ids": started}
+
+
 # ── Overview ───────────────────────────────────────────────────────────────
 
 @router.get("/overview")

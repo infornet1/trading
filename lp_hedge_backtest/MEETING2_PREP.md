@@ -205,6 +205,7 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 | ID | Item | Effort | Why | Status |
 |---|---|---|---|---|
 | M2-36 | Separate LP Hedge and Whale Tracker into distinct sections | Low | LP and Whale cards mixed in same grid — crashed LP bot can be buried under 3 Whale cards. Split into `🛡️ LP Hedge` (aragan/avaro/fury) and `🐋 Whale Tracker` sections, each with own Running/Stopped subsections. LP always first (priority). Each section independently collapsible. Zero restart. | ✅ Done 2026-04-17 |
+| M2-37 | Whale bots on/off toggle from admin | Medium | 3 whale bots consume ~6.6% CPU + ~261 MB RAM polling every 30s. Added `POST /admin/stop-whale-bots` + `POST /admin/start-whale-bots` endpoints (admin-only). `🐋 Whale Tracker` section header shows contextual button: **⏸ Pausar Whales** (when all running) or **▶ Activar Whales** (when stopped). Requires API restart. | ✅ Done 2026-04-17 |
 
 **Tier C — Medium impact, pure frontend:**
 
@@ -272,4 +273,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-04-17 — M2-36 done (admin card sections: LP Hedge / Whale Tracker separated, no restart)*
+*Last updated: 2026-04-17 — M2-37 done (Whale toggle: stop/start-whale-bots endpoints + section header button, API restarted)*

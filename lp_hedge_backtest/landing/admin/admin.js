@@ -287,12 +287,17 @@ function renderPools(pools) {
   if (whalePools.length) {
     const whaleRunning = whalePools.filter(p => p.running);
     const whaleStopped = whalePools.filter(p => !p.running);
+    const whaleAllRunning = whaleRunning.length === whalePools.length;
+    const whaleToggleBtn = whaleAllRunning
+      ? `<button class="btn-outline-sm btn-danger-sm" onclick="toggleWhaleBots(false)" title="Libera ~6.6% CPU y ~261 MB RAM">⏸ Pausar Whales</button>`
+      : `<button class="btn-outline-sm btn-success-sm" onclick="toggleWhaleBots(true)" title="Reiniciar todos los whale bots">▶ Activar Whales</button>`;
     html += renderBotSection({
-      title:      '🐋 Whale Tracker',
-      running:    whaleRunning,
-      stopped:    whaleStopped,
+      title:       '🐋 Whale Tracker',
+      running:     whaleRunning,
+      stopped:     whaleStopped,
       price,
-      toggleKey:  'whale',
+      toggleKey:   'whale',
+      extraHeader: whaleToggleBtn,
     });
   }
 
@@ -313,7 +318,7 @@ function renderPools(pools) {
   renderRiskStrip(pools);
 }
 
-function renderBotSection({ title, running, stopped, price, toggleKey }) {
+function renderBotSection({ title, running, stopped, price, toggleKey, extraHeader = '' }) {
   const stoppedKey  = `historicalOpen_${toggleKey}`;
   const isOpen      = state[stoppedKey] !== false; // default open
   let html = '';
@@ -322,6 +327,7 @@ function renderBotSection({ title, running, stopped, price, toggleKey }) {
   html += `<div class="pools-section">
   <div class="pools-section-header">
     <span>${title} <span class="pools-count">${running.length} running</span></span>
+    ${extraHeader}
   </div>
   <div class="pools-cards-grid">
     ${running.length
@@ -356,6 +362,20 @@ function toggleSectionStopped(key) {
 // Legacy toggle kept for any external references
 function toggleHistorical() {
   toggleSectionStopped('lp');
+}
+
+async function toggleWhaleBots(start) {
+  const action = start ? 'start-whale-bots' : 'stop-whale-bots';
+  const label  = start ? 'Activar' : 'Pausar';
+  if (!confirm(`¿${label} todos los Whale bots?`)) return;
+  try {
+    const data = await apiPost(`/admin/${action}`);
+    const n    = start ? data.started_count : data.stopped_count;
+    alert(`✅ ${label}: ${n} whale bot(s)`);
+    await renderOverview();
+  } catch (e) {
+    if (e.message !== 'Session expired') alert('Error: ' + e.message);
+  }
 }
 
 // ── Health logic ───────────────────────────────────────────────────────────
