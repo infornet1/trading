@@ -273,4 +273,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-04-17 — M2-37 done (Whale toggle: stop/start-whale-bots endpoints + section header button, API restarted)*
+*Last updated: 2026-04-17 — M2-37 live-tested: Pausar Whales confirmed — 3 whale processes killed, active=0 in DB, LP bots unaffected*
