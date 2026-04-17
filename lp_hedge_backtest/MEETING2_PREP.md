@@ -187,10 +187,10 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 | ID | Item | Effort | Why | Status |
 |---|---|---|---|---|
-| M2-24 | Engine badge (V1/V2) on bot cards | Low | `engine_v2` field already in API response — cards show no indicator, admin can't tell which engine is running at a glance. Add `[V2]`/`[V1]` badge to card footer. | 🔲 Ready |
-| M2-25 | Missing event labels for new event types | Low | `evtLabel()` / `evtColor()` have no entries for `lp_removed`, `lp_burned`, `orphan_recovered`, `fury_entry`, `fury_sl`, `fury_tp`, `whale_*` — shows raw type string in event history and mini-events. Add ~10 entries to both maps. | 🔲 Ready |
-| M2-26 | Fix stale "SIN SL NATIVO" copy in detail drawer | Low | Message still says *"Implementar Opción A"* — V2 exists now. Confusing for admin. Update to reflect current state. | 🔲 Ready |
-| M2-27 | Reentry guard pill on idle card | Low | No visibility into whether a bot is in guard mode without expanding drawer. Add `🔒 Guard $X` pill next to IDLE status when `reentry_guard_price` is active (needs API to expose it). | 🔲 Ready |
+| M2-24 | Engine badge (V1/V2) on bot cards | Low | `engine_v2` field not in API response but `"engine":"v2"` is logged in started event details — derived client-side from `recent_events`. V2=green badge, V1=muted badge, tooltip explains each. No API change needed. | ✅ Done 2026-04-17 |
+| M2-25 | Missing event labels for new event types | Low | `evtLabel()` / `evtColor()` had no entries for `lp_removed`, `lp_burned`, `orphan_recovered`, `fury_*`, `whale_*` — showed raw type string. Added 14 new entries to both maps. | ✅ Done 2026-04-17 |
+| M2-26 | Fix stale "SIN SL NATIVO" copy in detail drawer | Low | Message said *"Implementar Opción A"* — V2 exists now. Updated to accurately describe current state: software-only SL, crash risk if bot goes down. | ✅ Done 2026-04-17 |
+| M2-27 | Reentry guard pill on idle card | Low | Guard state is in-memory only (not in DB). Derived client-side from `recent_events`: guard is active if latest close event (sl_hit/trailing_stop) precedes latest reset event (reentry_guard_cleared/started). Shows `🔒 $X` amber pill in card footer when active. | ✅ Done 2026-04-17 |
 
 **Tier B — High impact, needs backend endpoint:**
 
@@ -266,4 +266,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-04-17 — Admin dashboard assessment done (M2-24 to M2-35 added); A-tier quick wins ready to implement*
+*Last updated: 2026-04-17 — M2-24/25/26/27 done (admin A-tier: engine badge, event labels, SL copy, guard pill — no restart needed)*

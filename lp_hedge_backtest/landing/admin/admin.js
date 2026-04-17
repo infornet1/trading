@@ -343,6 +343,36 @@ function poolHealth(p, currentPrice) {
   return { level: 'green', reason: 'En rango — fees activos' };
 }
 
+// Helper: infer reentry guard state from recent_events without extra API call.
+// Guard is active if the most recent close event (sl_hit / trailing_stop) comes
+// AFTER the most recent reentry_guard_cleared or started event.
+function poolGuardPill(p) {
+  if (p.mode === 'whale') return '';
+  const events = p.recent_events || [];
+  const CLOSE_TYPES   = new Set(['sl_hit', 'trailing_stop', 'tp_hit']);
+  const RESET_TYPES   = new Set(['reentry_guard_cleared', 'started']);
+  const lastClose  = events.find(e => CLOSE_TYPES.has(e.type));
+  const lastReset  = events.find(e => RESET_TYPES.has(e.type));
+  if (!lastClose) return '';
+  // events are DESC order — if lastClose appears before lastReset, guard is active
+  const closeIdx = events.indexOf(lastClose);
+  const resetIdx = lastReset ? events.indexOf(lastReset) : Infinity;
+  if (closeIdx >= resetIdx) return ''; // reset happened after close → guard cleared
+  const guardPx = lastClose.details?.reentry_guard;
+  if (!guardPx) return '';
+  return `<span class="badge badge--yellow" title="Reentry guard activo — precio debe superar este nivel">🔒 $${fmtNum(guardPx)}</span>`;
+}
+
+// Helper: derive engine version from started event details (no extra API call)
+function poolEngineTag(p) {
+  const events = p.recent_events || [];
+  const started = events.find(e => e.type === 'started');
+  const isV2 = started?.details?.engine === 'v2';
+  return isV2
+    ? `<span class="badge badge--green" title="Motor V2 — SL nativo + recuperación de crash">V2</span>`
+    : `<span class="badge badge--muted" title="Motor V1 — protección por software">V1</span>`;
+}
+
 // Helper: compute both trigger prices for a pool config
 function poolTriggers(p) {
   const trigPct = p.trigger_pct ?? -0.5;
@@ -587,7 +617,7 @@ function poolCard(p, ethPrice, isHistorical = false) {
 
   <div class="pool-footer">
     <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
-      ${botStatus}${heartbeatBadge}${shortBadge}
+      ${botStatus}${heartbeatBadge}${shortBadge}${poolGuardPill(p)}
       <span class="badge badge--muted">${
         p.mode === 'aragan' ? 'Defensor Bajista' :
         p.mode === 'avaro'  ? 'Defensor Alcista' :
@@ -596,6 +626,7 @@ function poolCard(p, ethPrice, isHistorical = false) {
         p.mode.toUpperCase()
       }</span>
       <span class="badge badge--muted">${chainName(p.chain_id)}</span>
+      ${poolEngineTag(p)}
     </div>
     <span style="color:var(--muted);font-size:.7rem">${p.user_plan.toUpperCase()}</span>
   </div>
@@ -769,7 +800,7 @@ function renderHlDetail(d, ethPrice = null) {
   <div class="detail-section-title">Stop-Loss Nativo — Hyperliquid</div>
   <div class="hl-sl-row">
     <span class="badge badge--red">⚠ SIN SL NATIVO</span>
-    <span class="muted">Solo protección por software (polling cada 30s). Implementar Opción A para cobertura nativa.</span>
+    <span class="muted">Protección solo por software (polling cada 30s). Si el bot se cae con posición abierta, no hay SL activo en HL hasta que reinicie.</span>
   </div>
 </div>`);
     }
@@ -1201,9 +1232,23 @@ function evtLabel(type) {
     sl_hit:                '🛑 SL activado',
     trailing_stop:         '🛑 Trailing stop',
     bounds_refreshed:      '🔄 Rango actualizado',
-    reentry_guard_cleared: '🔓 Re-entry guard limpiado',
+    reentry_guard_cleared: '🔓 Re-entrada lista',
+    lp_removed:            '💧 LP retirado',
+    lp_burned:             '🔥 NFT quemado',
+    orphan_recovered:      '♻️ Posición recuperada',
     stopped:               '⏹ Detenido',
     error:                 '❌ Error',
+    fury_entry:            '⚡ FURY entrada',
+    fury_sl:               '⚡ FURY SL',
+    fury_tp:               '⚡ FURY TP',
+    fury_circuit_breaker:  '⚡ FURY circuit breaker',
+    whale_new_position:    '🐋 Nueva posición',
+    whale_closed:          '🐋 Posición cerrada',
+    whale_size_increase:   '🐋 Tamaño aumentado',
+    whale_size_decrease:   '🐋 Tamaño reducido',
+    whale_flip:            '🐋 Cambio de lado',
+    whale_snapshot:        '🐋 Snapshot',
+    whale_event:           '🐋 Evento',
   }[type] || type;
 }
 
@@ -1217,8 +1262,22 @@ function evtColor(type) {
     trailing_stop:         'red',
     bounds_refreshed:      'muted',
     reentry_guard_cleared: 'muted',
+    lp_removed:            'yellow',
+    lp_burned:             'red',
+    orphan_recovered:      'green',
     stopped:               'muted',
     error:                 'red',
+    fury_entry:            'yellow',
+    fury_sl:               'red',
+    fury_tp:               'green',
+    fury_circuit_breaker:  'red',
+    whale_new_position:    'yellow',
+    whale_closed:          'muted',
+    whale_size_increase:   'yellow',
+    whale_size_decrease:   'muted',
+    whale_flip:            'yellow',
+    whale_snapshot:        'muted',
+    whale_event:           'muted',
   }[type] || 'muted';
 }
 
