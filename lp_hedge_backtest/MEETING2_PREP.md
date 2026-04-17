@@ -179,6 +179,44 @@ by bot code. This means they execute even if the bot process is down.
 | M2-23 | Reentry guard — re-arm when price continues below SL hit level | Low | **Confirmed real gap (observed 2026-04-17 on Config 17).** Current logic: after SL hit, reentry guard set (e.g. $2,383.80); bot stays disarmed until price goes ABOVE guard. Failure mode: if price never reaches guard but stays below trigger (danger zone), bot is unprotected indefinitely — observed as ~1hr exposure gap (09:28 SL hit → 10:31 re-arm). **Fix:** two-condition guard clear — (1) existing: price > guard_price; (2) new: price drops below SL-hit price (price continued falling past where SL fired → whipsaw risk gone → safe to re-arm). Added `sl_close_price` state var; set in `close_hedge()` / `_reset_short_state()`; checked in main loop guard section. Whipsaw protection preserved for bounces at trigger level; gap protection fixed for continued downside moves. Applied to both V1 (`live_hedge_bot.py`) and V2 (`live_hedge_bot_v2.py`). **Deployed 2026-04-17 13:16 — both bots restarted idle, ETH $2,407.** Suggested by investor 2026-04-17. | ✅ Done 2026-04-17 |
 | M2-22 | API background LP→DB reconciliation + LP event handling | Medium | **Shipped as `api/lp_reconciler.py`.** Hourly background job scans all active aragan/avaro configs, verifies each Uniswap v3 NFT on-chain. If liquidity=0 or NFT burned: sets `active=FALSE`, logs `lp_removed`/`lp_burned` bot_event, stops running bot process, emails admin. Catches LP removals that happen while the bot is stopped (bot's own `_sync_lp_position` only runs while `hedge_active`). Also fixed: bot_manager now handles `lp_removed`/`lp_burned` events with `_mark_inactive` + admin email. Fixed `reentry_guard_cleared` missing from `_EVENT_MAP` (was stored as `error`). New event types added to SQLAlchemy + MariaDB enum: `lp_removed`, `lp_burned`, `orphan_recovered`. | ✅ Done 2026-04-16 |
 
+#### Admin Dashboard improvements (assessed 2026-04-17)
+
+Full assessment performed against current `admin/admin.js` (1263 lines). Four priority tiers identified.
+
+**Tier A — High impact, zero restart (pure frontend ~30 min total):**
+
+| ID | Item | Effort | Why | Status |
+|---|---|---|---|---|
+| M2-24 | Engine badge (V1/V2) on bot cards | Low | `engine_v2` field already in API response — cards show no indicator, admin can't tell which engine is running at a glance. Add `[V2]`/`[V1]` badge to card footer. | 🔲 Ready |
+| M2-25 | Missing event labels for new event types | Low | `evtLabel()` / `evtColor()` have no entries for `lp_removed`, `lp_burned`, `orphan_recovered`, `fury_entry`, `fury_sl`, `fury_tp`, `whale_*` — shows raw type string in event history and mini-events. Add ~10 entries to both maps. | 🔲 Ready |
+| M2-26 | Fix stale "SIN SL NATIVO" copy in detail drawer | Low | Message still says *"Implementar Opción A"* — V2 exists now. Confusing for admin. Update to reflect current state. | 🔲 Ready |
+| M2-27 | Reentry guard pill on idle card | Low | No visibility into whether a bot is in guard mode without expanding drawer. Add `🔒 Guard $X` pill next to IDLE status when `reentry_guard_price` is active (needs API to expose it). | 🔲 Ready |
+
+**Tier B — High impact, needs backend endpoint:**
+
+| ID | Item | Effort | Why | Status |
+|---|---|---|---|---|
+| M2-28 | Per-bot restart from admin UI | Medium | Nuclear stops all; no targeted restart. Crashed bot (`active=True`, `running=False`) requires direct DB+systemctl. New `POST /admin/restart/{config_id}` + button on card. | 🔲 Post-meeting |
+| M2-29 | Engine V2 toggle from admin UI | Low | Switching V1↔V2 currently requires direct DB access. Toggle on card or wallet panel — `PATCH /admin/pool/{id}` with `engine_v2`. | 🔲 Post-meeting |
+| M2-30 | Force LP reconciler scan button | Low | Must wait up to 1 hour for reconciler to catch LP removals. Admin toolbar button: `POST /admin/reconcile-now` → triggers `_reconcile_all()` immediately. | 🔲 Post-meeting |
+
+**Tier C — Medium impact, pure frontend:**
+
+| ID | Item | Effort | Why | Status |
+|---|---|---|---|---|
+| M2-31 | V2 bot count in stats bar | Low | Stats show total active bots but no V1/V2 split. Filterable client-side from pools data already loaded. | 🔲 Post-meeting |
+| M2-32 | CAÍDO bots banner at page top | Low | When `active=True` but `running=False` (crashed), card turns red but no prominent admin alert. Add banner: *"⚠️ X bots crashed — attention required"* auto-shown when any crashed bot detected. | 🔲 Post-meeting |
+
+**Tier D — Low priority / Step 8:**
+
+| ID | Item | Effort | Why | Status |
+|---|---|---|---|---|
+| M2-33 | Override Plan / Suspend / Refund / Note actions | High | Already stubbed with `alert('Disponible en Step 8')`. Full billing management — deferred to subscription system. | 🔲 Step 8 |
+| M2-34 | Reconciler last-run timestamp in admin | Low | No visibility into when LP reconciler last scanned. Nice-to-have status indicator. | 🔲 Post-meeting |
+| M2-35 | Platform-wide cumulative P&L stat | Medium | Aggregate all bot close events — investor-facing health metric for admin overview. | 🔲 Post-meeting |
+
+---
+
 #### Deferred (post investor meeting)
 
 | ID | Item | Effort | Why | Status |
@@ -228,4 +266,4 @@ by bot code. This means they execute even if the bot process is down.
 
 ---
 
-*Last updated: 2026-04-17 — Config 20 (investor NFT 5435626) graduated to V2 at 14:10; both hedge bots now on V2 engine*
+*Last updated: 2026-04-17 — Admin dashboard assessment done (M2-24 to M2-35 added); A-tier quick wins ready to implement*
