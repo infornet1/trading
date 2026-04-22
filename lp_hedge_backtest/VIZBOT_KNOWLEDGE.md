@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-04-22
+# Last updated: 2026-04-22 (M2-39 circuit breaker + M2-40 ext-close cooldown)
 
 ---
 
@@ -16,6 +16,8 @@
 - **Native TP**: placed as a standalone trigger order on HL (`tpsl="tp"`, `grouping="na"`) at open when `TP_PCT` is configured. `limit_px = trigger * 0.97` (3% below, buys back at discount). Both native orders are cancelled before any code-path market close to prevent double-fill.
 - Includes **crash recovery**: on startup the bot checks for any open position on the HL wallet. If found, it re-adopts it — sets `hedge_active=True`, finds existing native SL/TP orders or places fresh ones, and continues monitoring.
 - Includes **LP reconciler**: a background job runs hourly to verify each Uniswap V3 NFT still has liquidity. If LP was removed or NFT burned while the bot was stopped, the reconciler marks the config `inactive` in DB, logs an event, stops the process, and emails the admin.
+- **Circuit breaker (M2-39)**: after 3 consecutive `sl_hit`/`trailing_stop` closes, re-entry is paused for 20 min. Counter resets on `tp_hit`. Fires a `circuit_breaker` DB event and email. Status line shows `🔴 CIRCUIT BREAKER (Xs)`.
+- **External-close cooldown (M2-40)**: when native SL fires on HL between polls (`external_close`), a 5-min cooldown blocks re-entry before the reentry guard logic runs. Prevents immediate re-entry into the same choppy conditions. Status line shows `⏸️ EXT COOLDOWN (Xs)`.
 - Identified by a **V2 (green badge)** on the admin dashboard bot card.
 - Native SL uses a 1-second settle delay after market open to allow HL to register the fill before the SL order is submitted.
 

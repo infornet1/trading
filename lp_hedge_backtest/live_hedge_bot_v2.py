@@ -168,6 +168,13 @@ class LiveHedgeBotV2:
         self._margin_fail_count    = 0
         self._margin_backoff_until = 0.0
 
+        # ── M2-39: Circuit breaker ──────────────────────────────────────────
+        self._consecutive_stops      = 0
+        self._circuit_breaker_until  = 0.0
+
+        # ── M2-40: Cooldown post external_close ─────────────────────────────
+        self._ext_close_cooldown_until = 0.0
+
         # ── Position sync ─────────────────────────────────────────────────────
         self.last_hl_sync = 0.0
         self.last_lp_sync = 0.0
@@ -441,6 +448,13 @@ class LiveHedgeBotV2:
     _MAX_MARGIN_FAILURES  = 5
     _MARGIN_BACKOFF_SECS  = 300
 
+    # M2-39: circuit breaker
+    _CB_STOP_THRESHOLD    = 3     # consecutive SL/trailing stops before pause
+    _CB_PAUSE_SECS        = 1200  # 20 minutes
+
+    # M2-40: cooldown after native SL fires between polls (external_close)
+    _EXT_COOLDOWN_SECS    = 300   # 5 minutes
+
     def _calc_order_params(self, price):
         x_max = calc_x_max_eth(self.liquidity, self.tick_lower, self.tick_upper)
         if x_max < MIN_HEDGE_ETH:
@@ -691,15 +705,18 @@ class LiveHedgeBotV2:
 
             result = self.exchange.market_close("ETH")
             if result is None:
+                # M2-40: native SL fired on HL between polls — set re-arm cooldown
+                self._ext_close_cooldown_until = time.time() + self._EXT_COOLDOWN_SECS
                 print(f"⚠️  market_close returned None — position already gone. Resetting.", flush=True)
                 self._reset_short_state(price)
                 log_event("stopped", price=price, details={
-                    "reason": "external_close",
-                    "note":   "HL position not found — manual close or liquidation",
+                    "reason":   "external_close",
+                    "note":     "HL position not found — native SL fired or manual close",
+                    "cooldown": self._EXT_COOLDOWN_SECS,
                 })
                 self.send_email("⚠️ Hedge Externally Closed",
                     f"NFT #{NFT_ID}: HL SHORT not found during close attempt.\n"
-                    f"Bot reset to IDLE — re-entry guard active.")
+                    f"Bot reset to IDLE — {self._EXT_COOLDOWN_SECS // 60} min cooldown before re-arm (M2-40).")
                 if not AUTO_REARM:
                     sys.exit(0)
                 return
@@ -716,10 +733,32 @@ class LiveHedgeBotV2:
                     log_event("stopped", price=price, details={"reason": "auto_rearm_disabled"})
                     sys.exit(0)
 
+                # M2-39: track consecutive stops for circuit breaker
+                if reason in ("sl_hit", "trailing_stop"):
+                    self._consecutive_stops += 1
+                    if self._consecutive_stops >= self._CB_STOP_THRESHOLD:
+                        self._circuit_breaker_until = time.time() + self._CB_PAUSE_SECS
+                        self._consecutive_stops = 0
+                        log_event("circuit_breaker", price=price, details={
+                            "reason":   f"{self._CB_STOP_THRESHOLD} consecutive stops",
+                            "pause_s":  self._CB_PAUSE_SECS,
+                        })
+                        self.send_email(
+                            "⚠️ Circuit Breaker Activated (M2-39)",
+                            f"NFT #{NFT_ID}: {self._CB_STOP_THRESHOLD} consecutive stops — "
+                            f"pausing re-entry for {self._CB_PAUSE_SECS // 60} min.\n"
+                            f"Last exit: ${close_price:.2f}",
+                        )
+                        print(f"🔴 [M2-39] Circuit breaker — pausing {self._CB_PAUSE_SECS // 60} min", flush=True)
+                elif reason == "tp_hit":
+                    self._consecutive_stops = 0  # clean win resets the counter
+
                 pnl_str = f"{pnl_est:.2f}%" if pnl_est is not None else "n/a"
-                print(f"✅ SHORT CLOSED | Reason: {reason} | Exit: ${close_price:.2f} | PnL: {pnl_str}", flush=True)
+                cb_str  = f" | streak {self._consecutive_stops}/{self._CB_STOP_THRESHOLD}" if reason in ("sl_hit", "trailing_stop") else ""
+                print(f"✅ SHORT CLOSED | Reason: {reason} | Exit: ${close_price:.2f} | PnL: {pnl_str}{cb_str}", flush=True)
                 log_event(reason, price=price, pnl=pnl_est, details={
-                    "reentry_guard": round(self.reentry_guard_price, 4),
+                    "reentry_guard":      round(self.reentry_guard_price, 4),
+                    "consecutive_stops":  self._consecutive_stops,
                 })
                 self.send_email(
                     f"Short CLOSED ✅ ({reason})",
@@ -766,14 +805,17 @@ class LiveHedgeBotV2:
                 # V2: cancel any orphan SL/TP orders before resetting
                 self._cancel_native_sl()
                 self._cancel_native_tp()
+                # M2-40: set cooldown before re-arm
+                self._ext_close_cooldown_until = time.time() + self._EXT_COOLDOWN_SECS
                 self._reset_short_state(price)
                 log_event("stopped", price=price, details={
-                    "reason": "external_close",
-                    "note":   "HL position not found during periodic sync",
+                    "reason":   "external_close",
+                    "note":     "HL position not found during periodic sync",
+                    "cooldown": self._EXT_COOLDOWN_SECS,
                 })
                 self.send_email("⚠️ Hedge Externally Closed (sync)",
                     f"NFT #{NFT_ID}: ETH SHORT disappeared during routine sync.\n"
-                    f"Bot reset to IDLE.")
+                    f"Bot reset to IDLE — {self._EXT_COOLDOWN_SECS // 60} min cooldown before re-arm (M2-40).")
                 if not AUTO_REARM:
                     sys.exit(0)
         except Exception as e:
@@ -1069,19 +1111,30 @@ class LiveHedgeBotV2:
 
                 # ── Entry logic ──────────────────────────────────────────────
                 if not self.hedge_active:
-                    opened = False
+                    # M2-39: circuit breaker check
+                    if now < self._circuit_breaker_until:
+                        remaining = int(self._circuit_breaker_until - now)
+                        print(f"🔴 [M2-39] Circuit breaker active — {remaining}s remaining",
+                              end="\r", flush=True)
+                    # M2-40: post-external_close cooldown check
+                    elif now < self._ext_close_cooldown_until:
+                        remaining = int(self._ext_close_cooldown_until - now)
+                        print(f"⏸️  [M2-40] Ext-close cooldown — {remaining}s remaining",
+                              end="\r", flush=True)
+                    else:
+                        opened = False
 
-                    if self.price_was_above and price <= upper_trigger:
-                        self.open_hedge(price, trigger="from_above")
-                        self.price_was_above = False
-                        opened = True
+                        if self.price_was_above and price <= upper_trigger:
+                            self.open_hedge(price, trigger="from_above")
+                            self.price_was_above = False
+                            opened = True
 
-                    if not opened and price <= lower_trigger:
-                        if self.reentry_guard_price is None:
-                            self.open_hedge(price, trigger="below_range")
-                        else:
-                            print(f"⏸️  Below trigger but re-entry guard active "
-                                  f"(need ${self.reentry_guard_price:.2f})", flush=True)
+                        if not opened and price <= lower_trigger:
+                            if self.reentry_guard_price is None:
+                                self.open_hedge(price, trigger="below_range")
+                            else:
+                                print(f"⏸️  Below trigger but re-entry guard active "
+                                      f"(need ${self.reentry_guard_price:.2f})", flush=True)
 
                 # ── Manage open short ────────────────────────────────────────
                 elif self.hedge_active:
@@ -1104,9 +1157,14 @@ class LiveHedgeBotV2:
                         f"SL ${self.current_sl_price:.2f} [{sl_src}] | {be}"
                     )
                 else:
-                    guard = f"guard ${self.reentry_guard_price:.2f}" if self.reentry_guard_price else "ready"
-                    armed = " | ↓armed" if self.price_was_above else ""
-                    short_status = f"⚪ IDLE ({guard}{armed})"
+                    if now < self._circuit_breaker_until:
+                        short_status = f"🔴 CIRCUIT BREAKER ({int(self._circuit_breaker_until - now)}s)"
+                    elif now < self._ext_close_cooldown_until:
+                        short_status = f"⏸️  EXT COOLDOWN ({int(self._ext_close_cooldown_until - now)}s)"
+                    else:
+                        guard = f"guard ${self.reentry_guard_price:.2f}" if self.reentry_guard_price else "ready"
+                        armed = " | ↓armed" if self.price_was_above else ""
+                        short_status = f"⚪ IDLE ({guard}{armed})"
 
                 print(
                     f"[{time.strftime('%H:%M:%S')}] ETH ${price:.2f} | "
