@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-04-17
+# Last updated: 2026-04-22
 
 ---
 
@@ -12,8 +12,9 @@
 - Identified by a **V1 (grey badge)** on the admin dashboard bot card.
 
 ### V2 Engine (live_hedge_bot_v2.py)
-- Stop-loss is placed as a **native trigger order on Hyperliquid** (`tpsl: ""` standalone mode) immediately after every hedge is opened. Even if the bot process dies, HL itself will close the position when SL is hit.
-- Includes **crash recovery**: on startup the bot checks for any open position on the HL wallet. If found, it re-adopts it — sets `hedge_active=True`, re-places the native SL, and continues monitoring as if nothing happened.
+- **Native SL**: placed as a standalone trigger order on HL (`tpsl="sl"`, `grouping="na"`) immediately after every hedge opens. Triggers even if bot process is dead. Uses whole-dollar rounding; `limit_px = trigger * 1.03` (3% above, ensures fill).
+- **Native TP**: placed as a standalone trigger order on HL (`tpsl="tp"`, `grouping="na"`) at open when `TP_PCT` is configured. `limit_px = trigger * 0.97` (3% below, buys back at discount). Both native orders are cancelled before any code-path market close to prevent double-fill.
+- Includes **crash recovery**: on startup the bot checks for any open position on the HL wallet. If found, it re-adopts it — sets `hedge_active=True`, finds existing native SL/TP orders or places fresh ones, and continues monitoring.
 - Includes **LP reconciler**: a background job runs hourly to verify each Uniswap V3 NFT still has liquidity. If LP was removed or NFT burned while the bot was stopped, the reconciler marks the config `inactive` in DB, logs an event, stops the process, and emails the admin.
 - Identified by a **V2 (green badge)** on the admin dashboard bot card.
 - Native SL uses a 1-second settle delay after market open to allow HL to register the fill before the SL order is submitted.

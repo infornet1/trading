@@ -152,8 +152,9 @@ class LiveHedgeBotV2:
         self.short_min_price   = None
         self.open_trigger      = None
 
-        # V2: native HL SL order tracking
+        # V2: native HL order tracking
         self.hl_sl_order_id: Optional[int] = None
+        self.hl_tp_order_id: Optional[int] = None
 
         # ── Direction tracking ─────────────────────────────────────────────
         self.price_was_above   = False
@@ -334,6 +335,82 @@ class LiveHedgeBotV2:
             print(f"⚠️  [V2] Native SL cancel exception: {e}", flush=True)
             return False
 
+    def _place_native_tp(self, tp_price: float, size: float) -> Optional[int]:
+        """
+        Place a native HL take-profit trigger order.
+        For a SHORT, TP fires when price drops to tp_price — buy back at a discount.
+        Returns the oid on success, None on failure (graceful degradation).
+        """
+        try:
+            trigger_px = round(tp_price)
+            limit_px   = round(tp_price * 0.97)   # 3% below trigger — fill at better price
+            order_req = {
+                "coin":       "ETH",
+                "is_buy":     True,
+                "sz":         size,
+                "limit_px":   float(limit_px),
+                "order_type": {
+                    "trigger": {
+                        "triggerPx": float(trigger_px),
+                        "isMarket":  True,
+                        "tpsl":      "tp",
+                    }
+                },
+                "reduce_only": True,
+            }
+            result = self.exchange.bulk_orders([order_req], grouping="na")
+            if not result:
+                print(f"⚠️  [V2] Native TP placement: None response from exchange", flush=True)
+                return None
+
+            if result.get("status") != "ok":
+                print(f"⚠️  [V2] Native TP placement top-level error: {result}", flush=True)
+                return None
+
+            statuses = result.get("response", {}).get("data", {}).get("statuses", [])
+            if not statuses:
+                print(f"⚠️  [V2] Native TP placement: empty statuses — full response: {result}", flush=True)
+                return None
+
+            s0 = statuses[0]
+            if "resting" in s0:
+                oid = s0["resting"]["oid"]
+                print(f"🎯 [V2] Native TP placed | OID {oid} | trigger ${tp_price:.2f} | limit ${limit_px:.2f}", flush=True)
+                return oid
+            if "filled" in s0:
+                print(f"⚠️  [V2] Native TP filled immediately @ ${tp_price:.2f} — position may be gone", flush=True)
+                return None
+            if "error" in s0:
+                print(f"⚠️  [V2] Native TP order rejected by HL: '{s0['error']}' — full: {result}", flush=True)
+                return None
+
+            print(f"⚠️  [V2] Native TP unexpected status: {s0} — full: {result}", flush=True)
+            return None
+        except Exception as e:
+            print(f"⚠️  [V2] Native TP placement exception: {e}", flush=True)
+            return None
+
+    def _cancel_native_tp(self) -> bool:
+        """Cancel the current native TP order. Returns True if cancelled or no order was active."""
+        if self.hl_tp_order_id is None:
+            return True
+        try:
+            result = self.exchange.cancel("ETH", self.hl_tp_order_id)
+            if result and result.get("status") == "ok":
+                print(f"🗑️  [V2] Native TP cancelled | OID {self.hl_tp_order_id}", flush=True)
+                self.hl_tp_order_id = None
+                return True
+            err_msg = str(result)
+            if "order not found" in err_msg.lower() or "no order" in err_msg.lower():
+                print(f"ℹ️  [V2] Native TP OID {self.hl_tp_order_id} already gone (external fill?)", flush=True)
+                self.hl_tp_order_id = None
+                return True
+            print(f"⚠️  [V2] Native TP cancel failed: {result}", flush=True)
+            return False
+        except Exception as e:
+            print(f"⚠️  [V2] Native TP cancel exception: {e}", flush=True)
+            return False
+
     def _replace_native_sl(self, new_sl_price: float) -> bool:
         """
         Cancel existing SL and place a new one at new_sl_price.
@@ -492,11 +569,24 @@ class LiveHedgeBotV2:
                         f"If the bot crashes, this SHORT has no native HL protection until restart.",
                     )
 
+                # V2: place native TP if configured
+                if TP_PCT is not None:
+                    tp_price = self.entry_price * (1 - TP_PCT)
+                    tp_oid = self._place_native_tp(tp_price, size)
+                    if tp_oid:
+                        self.hl_tp_order_id = tp_oid
+                    else:
+                        log_event("error", price=price, details={
+                            "warning": "[V2] Native TP placement failed at open — code-evaluated TP active",
+                            "tp": round(tp_price, 4),
+                        })
+
                 log_event("hedge_opened", price=price, details={
                     "trigger":    trigger,
                     "entry":      self.entry_price,
                     "sl":         round(self.current_sl_price, 4),
                     "sl_oid":     self.hl_sl_order_id,
+                    "tp_oid":     self.hl_tp_order_id,
                     "size_eth":   size,
                     "x_max":      round(x_max, 4),
                     "ratio_pct":  HEDGE_RATIO,
@@ -505,6 +595,10 @@ class LiveHedgeBotV2:
                     "margin":     round(req_margin, 2),
                     "engine":     "v2",
                 })
+                tp_line = (
+                    f"Native TP:    ${self.entry_price * (1 - TP_PCT):.2f} (OID: {self.hl_tp_order_id or 'FAILED'})\n"
+                    if TP_PCT is not None else ""
+                )
                 self.send_email(
                     f"Short OPENED 🚨 ({label})",
                     f"SHORT opened — VIZNIAGO V2\n"
@@ -515,6 +609,7 @@ class LiveHedgeBotV2:
                     f"Leverage:     {leverage}x\n"
                     f"Notional:     ${notional:.2f}\n"
                     f"Native SL:    ${self.current_sl_price:.2f} (OID: {self.hl_sl_order_id or 'FAILED'})\n"
+                    f"{tp_line}"
                     f"Breakeven at: -{BREAKEVEN_PCT*100:.1f}% → trail {TRAIL_PCT*100:.1f}% from min",
                 )
             else:
@@ -590,8 +685,9 @@ class LiveHedgeBotV2:
 
     def close_hedge(self, price, reason):
         try:
-            # V2: cancel native SL before market close to avoid double-fill
+            # V2: cancel native SL + TP before market close to avoid double-fill
             self._cancel_native_sl()
+            self._cancel_native_tp()
 
             result = self.exchange.market_close("ETH")
             if result is None:
@@ -648,6 +744,7 @@ class LiveHedgeBotV2:
         self.short_min_price     = None
         self.open_trigger        = None
         self.hl_sl_order_id      = None
+        self.hl_tp_order_id      = None
         self.reentry_guard_price = close_price * (1 + REENTRY_BUFFER)
         self.sl_close_price      = close_price
         self.price_was_above     = False
@@ -666,8 +763,9 @@ class LiveHedgeBotV2:
             )
             if not found:
                 print(f"⚠️  HL sync: ETH SHORT not found — external close. Resetting.", flush=True)
-                # V2: cancel any orphan SL order before resetting
+                # V2: cancel any orphan SL/TP orders before resetting
                 self._cancel_native_sl()
+                self._cancel_native_tp()
                 self._reset_short_state(price)
                 log_event("stopped", price=price, details={
                     "reason": "external_close",
@@ -773,16 +871,25 @@ class LiveHedgeBotV2:
             self.short_min_price   = entry_px
             self.open_trigger      = "recovered"
 
-            # Check for existing SL order on HL
+            # Check for existing SL and TP orders on HL
             try:
                 open_orders = self.info.open_orders(HL_ADDRESS)
+                trigger_orders = [
+                    o for o in open_orders
+                    if o.get("coin") == "ETH"
+                    and o.get("side", "").upper() == "B"
+                    and o.get("triggerPx") is not None
+                ]
+                # HL open_orders includes an "orderType" field: "Stop Market" for SL, "Take Profit Market" for TP
                 existing_sl = next(
-                    (o for o in open_orders
-                     if o.get("coin") == "ETH"
-                     and o.get("side", "").upper() == "B"     # buy = close short
-                     and o.get("triggerPx") is not None),     # is a trigger order
+                    (o for o in trigger_orders if "stop" in o.get("orderType", "").lower()),
                     None,
                 )
+                existing_tp = next(
+                    (o for o in trigger_orders if "take profit" in o.get("orderType", "").lower()),
+                    None,
+                )
+
                 if existing_sl:
                     self.hl_sl_order_id = existing_sl["oid"]
                     print(
@@ -798,6 +905,25 @@ class LiveHedgeBotV2:
                         print(f"✅ [V2] Recovery SL placed | OID {oid}", flush=True)
                     else:
                         print(f"⚠️  [V2] Recovery SL placement failed — code-evaluated only", flush=True)
+
+                if TP_PCT is not None:
+                    if existing_tp:
+                        self.hl_tp_order_id = existing_tp["oid"]
+                        print(
+                            f"✅ [V2] Existing TP order found | OID {self.hl_tp_order_id} "
+                            f"| trigger ${existing_tp.get('triggerPx', '?')}",
+                            flush=True,
+                        )
+                    else:
+                        tp_price = entry_px * (1 - TP_PCT)
+                        print(f"⚠️  [V2] No native TP found — placing at ${tp_price:.2f}", flush=True)
+                        tp_oid = self._place_native_tp(tp_price, size)
+                        if tp_oid:
+                            self.hl_tp_order_id = tp_oid
+                            print(f"✅ [V2] Recovery TP placed | OID {tp_oid}", flush=True)
+                        else:
+                            print(f"⚠️  [V2] Recovery TP placement failed — code-evaluated only", flush=True)
+
             except Exception as e:
                 print(f"⚠️  [V2] Could not check open orders: {e}", flush=True)
 
@@ -806,8 +932,14 @@ class LiveHedgeBotV2:
                 "size":    size,
                 "sl":      round(self.current_sl_price, 4),
                 "sl_oid":  self.hl_sl_order_id,
+                "tp_oid":  self.hl_tp_order_id,
                 "note":    "Bot restarted while SHORT was open — state recovered from HL",
             })
+            tp_recovery_line = (
+                f"  TP price:    ${entry_px * (1 - TP_PCT):.2f} (-{TP_PCT*100:.1f}%)\n"
+                f"  TP OID:      {self.hl_tp_order_id or 'placement failed'}\n"
+                if TP_PCT is not None else ""
+            )
             self.send_email(
                 "⚠️ [V2] Orphan SHORT Recovered at Startup",
                 f"NFT #{NFT_ID}: VIZNIAGO V2 detected an orphan SHORT at startup.\n"
@@ -817,8 +949,9 @@ class LiveHedgeBotV2:
                 f"  Size:        {size:.4f} ETH\n"
                 f"  Leverage:    {lev_val}x\n"
                 f"  SL price:    ${self.current_sl_price:.2f} (+{DEFAULT_SL_PCT*100:.1f}%)\n"
-                f"  SL OID:      {self.hl_sl_order_id or 'placement failed'}\n\n"
-                f"Bot is now managing this position. Trail restarts from entry price.",
+                f"  SL OID:      {self.hl_sl_order_id or 'placement failed'}\n"
+                f"{tp_recovery_line}"
+                f"\nBot is now managing this position. Trail restarts from entry price.",
             )
 
         except Exception as e:
