@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-04-22 (M2-39 circuit breaker + M2-40 ext-close cooldown)
+# Last updated: 2026-04-22 (M2-9 native TP live-validated; M2-40 live-validated; M2-13 live-validated)
 
 ---
 
@@ -13,11 +13,11 @@
 
 ### V2 Engine (live_hedge_bot_v2.py)
 - **Native SL**: placed as a standalone trigger order on HL (`tpsl="sl"`, `grouping="na"`) immediately after every hedge opens. Triggers even if bot process is dead. Uses whole-dollar rounding; `limit_px = trigger * 1.03` (3% above, ensures fill).
-- **Native TP**: placed as a standalone trigger order on HL (`tpsl="tp"`, `grouping="na"`) at open when `TP_PCT` is configured. `limit_px = trigger * 0.97` (3% below, buys back at discount). Both native orders are cancelled before any code-path market close to prevent double-fill.
+- **Native TP**: placed as a standalone trigger order on HL (`tpsl="tp"`, `grouping="na"`) at open when `TP_PCT` is configured. `limit_px = trigger * 0.97` (3% below, buys back at discount). Both native orders are cancelled before any code-path market close to prevent double-fill. **Live-validated 2026-04-22:** Config 20 `hedge_opened` at 13:48 UTC confirmed `tp_oid: 392796553319` in event details.
 - Includes **crash recovery**: on startup the bot checks for any open position on the HL wallet. If found, it re-adopts it — sets `hedge_active=True`, finds existing native SL/TP orders or places fresh ones, and continues monitoring.
 - Includes **LP reconciler**: a background job runs hourly to verify each Uniswap V3 NFT still has liquidity. If LP was removed or NFT burned while the bot was stopped, the reconciler marks the config `inactive` in DB, logs an event, stops the process, and emails the admin.
 - **Circuit breaker (M2-39)**: after 3 consecutive `sl_hit`/`trailing_stop` closes, re-entry is paused for 20 min. Counter resets on `tp_hit`. Fires a `circuit_breaker` DB event and email. Status line shows `🔴 CIRCUIT BREAKER (Xs)`.
-- **External-close cooldown (M2-40)**: when native SL fires on HL between polls (`external_close`), a 5-min cooldown blocks re-entry before the reentry guard logic runs. Prevents immediate re-entry into the same choppy conditions. Status line shows `⏸️ EXT COOLDOWN (Xs)`.
+- **External-close cooldown (M2-40)**: when native SL fires on HL between polls (`external_close`), a 5-min cooldown blocks re-entry before the reentry guard logic runs. Prevents immediate re-entry into the same choppy conditions. Status line shows `⏸️ EXT COOLDOWN (Xs)`. **Live-validated 2026-04-22:** native SL fired at 13:57 UTC on Config 20; `stopped` event logged with `cooldown: 300`; reentry guard cleared 31s later but cooldown held until 14:02:46 UTC.
 - Identified by a **V2 (green badge)** on the admin dashboard bot card.
 - Native SL uses a 1-second settle delay after market open to allow HL to register the fill before the SL order is submitted.
 
@@ -78,7 +78,7 @@ This two-condition logic (added M2-23, 2026-04-17) prevents a 1-hour+ exposure w
 | `trailing_stop` | Trailing stop fired — hedge closed with profit. Reentry guard set |
 | `tp_hit` | Take profit hit — hedge closed at full profit target |
 | `reentry_guard_cleared` | Reentry guard lifted — bot is re-armed and watching for next entry |
-| `stopped` | Bot process stopped cleanly (manual stop or API shutdown) |
+| `stopped` | Hedge stopped. Details `reason` field distinguishes: `"manual"` = clean API shutdown; `"external_close"` = HL position disappeared (native SL fired or manual close on HL); `"auto_rearm_disabled"` = hedge closed and AUTO_REARM=off. Process stays alive for `external_close` if AUTO_REARM=on. |
 | `error` | Non-fatal error — details in event. Bot continues running |
 | `lp_removed` | LP reconciler detected liquidity = 0 on the NFT. Bot stopped, config marked inactive |
 | `lp_burned` | LP reconciler detected NFT was burned. Bot stopped, config marked inactive |
