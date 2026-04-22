@@ -68,6 +68,11 @@ TP_PCT   = float(_tp_env) / 100.0 if _tp_env else None
 TRAILING_STOP = os.getenv("TRAILING_STOP", "1").strip() not in ("0", "false", "False")
 AUTO_REARM    = os.getenv("AUTO_REARM",    "1").strip() not in ("0", "false", "False")
 
+# M2-13: mode enforcement — aragan (Bajista) = below_range trigger only
+#         avaro (Alcista) = both triggers (from_above + below_range)
+BOT_MODE           = os.getenv("BOT_MODE", "avaro").strip().lower()
+FROM_ABOVE_ENABLED = BOT_MODE != "aragan"
+
 MIN_HEDGE_ETH    = 0.001
 MIN_NOTIONAL_USD = 10.0
 HL_SYNC_INTERVAL = 300
@@ -1013,9 +1018,14 @@ class LiveHedgeBotV2:
         upper_trigger = self.upper_bound * (1 - UPPER_BUFFER)
         x_max         = calc_x_max_eth(self.liquidity, self.tick_lower, self.tick_upper)
 
+        trigger_desc = (
+            f"BELOW ${lower_trigger:.2f} | FROM ABOVE @ ${upper_trigger:.2f}"
+            if FROM_ABOVE_ENABLED else
+            f"BELOW ${lower_trigger:.2f} only (mode=aragan/Bajista)"
+        )
         print(f"📐 Range:         ${self.lower_bound:.2f} — ${self.upper_bound:.2f}", flush=True)
-        print(f"📐 Short triggers: BELOW ${lower_trigger:.2f} | "
-              f"FROM ABOVE @ ${upper_trigger:.2f}", flush=True)
+        print(f"📐 Short triggers: {trigger_desc}", flush=True)
+        print(f"📐 Mode:          {BOT_MODE} | from_above={'ON' if FROM_ABOVE_ENABLED else 'OFF'}", flush=True)
         print(f"📐 SL: {DEFAULT_SL_PCT*100:.2f}% | "
               f"TP: {TP_PCT*100:.2f}% (fixed)" if TP_PCT else f"📐 SL: {DEFAULT_SL_PCT*100:.2f}% | TP: off",
               flush=True)
@@ -1036,11 +1046,13 @@ class LiveHedgeBotV2:
                 "target_leverage": TARGET_LEVERAGE,
                 "sl_pct":          DEFAULT_SL_PCT * 100,
                 "tp_pct":          TP_PCT * 100 if TP_PCT else None,
-                "trailing_stop":   TRAILING_STOP,
-                "auto_rearm":      AUTO_REARM,
-                "breakeven_pct":   BREAKEVEN_PCT * 100,
-                "trail_pct":       TRAIL_PCT * 100,
-                "engine":          "v2",
+                "trailing_stop":      TRAILING_STOP,
+                "auto_rearm":         AUTO_REARM,
+                "breakeven_pct":      BREAKEVEN_PCT * 100,
+                "trail_pct":          TRAIL_PCT * 100,
+                "engine":             "v2",
+                "mode":               BOT_MODE,
+                "from_above_enabled": FROM_ABOVE_ENABLED,
             })
             self.send_email(
                 "VIZNIAGO V2 Defensor Started 🚀",
@@ -1084,7 +1096,8 @@ class LiveHedgeBotV2:
 
             if price:
                 # ── Direction tracking ───────────────────────────────────────
-                if price > self.upper_bound:
+                # M2-13: from_above only tracked/fired when mode allows it (avaro)
+                if FROM_ABOVE_ENABLED and price > self.upper_bound:
                     if not self.price_was_above:
                         print(f"⬆️  Price above range (${price:.2f}) — from-above trigger armed", flush=True)
                     self.price_was_above = True
@@ -1124,7 +1137,7 @@ class LiveHedgeBotV2:
                     else:
                         opened = False
 
-                        if self.price_was_above and price <= upper_trigger:
+                        if FROM_ABOVE_ENABLED and self.price_was_above and price <= upper_trigger:
                             self.open_hedge(price, trigger="from_above")
                             self.price_was_above = False
                             opened = True

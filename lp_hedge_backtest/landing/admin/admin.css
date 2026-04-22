@@ -507,3 +507,43 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
   font-size: .78rem;
   font-style: italic;
 }
+
+/* M2-32: CAÍDO bots banner */
+.caido-banner {
+  background: rgba(255,61,0,.12);
+  border-top: 2px solid rgba(255,61,0,.5);
+  border-bottom: 2px solid rgba(255,61,0,.5);
+  color: #ff6b3d;
+  font-size: .82rem;
+  padding: .55rem 1.5rem;
+  text-align: center;
+  letter-spacing: .02em;
+}
+.caido-banner.hidden { display: none; }
+
+/* M2-12: Reconnect overlay */
+.reconnect-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(10,10,20,.82);
+  display: flex; align-items: center; justify-content: center;
+}
+.reconnect-overlay.hidden { display: none; }
+.reconnect-box {
+  background: var(--card-bg, #1a1a2e);
+  border: 1px solid rgba(255,214,0,.3);
+  border-radius: 12px;
+  padding: 2.5rem 3rem;
+  text-align: center;
+  max-width: 400px;
+}
+.reconnect-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid rgba(255,214,0,.2);
+  border-top-color: #ffd600;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin: 0 auto 1.2rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.reconnect-msg  { font-size: 1rem; font-weight: 700; color: #ffd600; margin-bottom: .5rem; }
+.reconnect-sub  { font-size: .78rem; color: var(--muted, #888); }

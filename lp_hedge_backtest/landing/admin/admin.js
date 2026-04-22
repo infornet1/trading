@@ -165,16 +165,46 @@ async function fetchEthPrice() {
   } catch { /* keep last known price */ }
 }
 
+// ── M2-12: API health tracking ─────────────────────────────────────────────
+let _apiFails = 0;
+const _API_FAIL_THRESHOLD = 2;
+
+function _showReconnectOverlay(show) {
+  let overlay = document.getElementById('reconnect-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'reconnect-overlay';
+    overlay.className = 'reconnect-overlay';
+    overlay.innerHTML = `
+      <div class="reconnect-box">
+        <div class="reconnect-spinner"></div>
+        <div class="reconnect-msg">Reconectando con el servidor…</div>
+        <div class="reconnect-sub">El panel se actualizará automáticamente al restablecer la conexión.</div>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.toggle('hidden', !show);
+  // Disable all interactive elements while disconnected
+  document.querySelectorAll('button, input, select, textarea').forEach(el => {
+    if (show) el.setAttribute('data-m12-disabled', '1'), el.disabled = true;
+    else if (el.getAttribute('data-m12-disabled')) el.removeAttribute('data-m12-disabled'), el.disabled = false;
+  });
+}
+
 // ── Refresh cycle ──────────────────────────────────────────────────────────
 async function doRefresh() {
   setStatus('Actualizando...');
   try {
     await Promise.all([fetchEthPrice(), renderOverview()]);
+    _apiFails = 0;
+    _showReconnectOverlay(false);
     const now = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setStatus(state.refreshInterval > 0
       ? `Actualizado ${now} · Auto ${msToLabel(state.refreshInterval)}`
       : `Actualizado ${now}`);
   } catch (e) {
+    _apiFails++;
+    if (_apiFails >= _API_FAIL_THRESHOLD) _showReconnectOverlay(true);
     setStatus(`Error: ${e.message}`);
   }
 }
@@ -227,10 +257,32 @@ async function renderOverview() {
   const data = await apiGet('/admin/overview');
   state.lastPools = data.pools;
   renderStats(data.stats);
+  renderCaidoBanner(data.pools);
   renderPools(data.pools);
   // Re-load HL detail for any currently expanded cards
   for (const configId of state.expanded) {
     loadHlDetail(configId);
+  }
+}
+
+// M2-32: CAÍDO bots banner — shown when any LP bot is active=true but running=false
+function renderCaidoBanner(pools) {
+  const LP_MODES = new Set(['aragan', 'avaro', 'fury']);
+  const caidos = pools.filter(p => LP_MODES.has(p.mode) && p.active && !p.running);
+  let banner = document.getElementById('caido-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'caido-banner';
+    banner.className = 'caido-banner';
+    const content = document.getElementById('admin-content');
+    content.insertBefore(banner, content.firstChild);
+  }
+  if (caidos.length) {
+    const nftList = caidos.map(p => `NFT #${p.nft_token_id}`).join(', ');
+    banner.innerHTML = `⚠️ <strong>${caidos.length} bot${caidos.length > 1 ? 's' : ''} caído${caidos.length > 1 ? 's' : ''}</strong> — atención requerida: ${nftList}`;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
   }
 }
 
@@ -250,6 +302,16 @@ function renderStats(s) {
   if (whaleEl) {
     const whaleBots = s.whale_bots ?? '—';
     whaleEl.textContent = whaleBots;
+  }
+
+  // M2-31: V2 bot count — derived from pools already in memory
+  const v2El = document.getElementById('stat-v2-bots');
+  if (v2El && state.lastPools) {
+    const v2Count = state.lastPools.filter(p => {
+      const started = (p.recent_events || []).find(e => e.event_type === 'started');
+      return started?.details?.engine === 'v2';
+    }).length;
+    v2El.textContent = v2Count;
   }
 }
 
