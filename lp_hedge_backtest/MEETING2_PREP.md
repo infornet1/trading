@@ -197,7 +197,7 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 | ID | Item | Effort | Why | Status |
 |---|---|---|---|---|
 | M2-28 | Per-bot restart from admin UI | Medium | Nuclear stops all; no targeted restart. Crashed bot (`active=True`, `running=False`) requires direct DB+systemctl. New `POST /admin/restart/{config_id}` + button on card. | 🔲 Post-meeting |
-| M2-29 | Engine V2 toggle from admin UI | Low | Switching V1↔V2 currently requires direct DB access. Toggle on card or wallet panel — `PATCH /admin/pool/{id}` with `engine_v2`. | 🔲 Post-meeting |
+| M2-29 | Engine V2 toggle from admin UI | Low | ~~Switching V1↔V2 currently requires direct DB access.~~ **Deferred indefinitely (2026-04-22):** all active bots already on V2. 9 inactive configs last ran V1 but are out-of-range. Planned path: one-time SQL migration to mark all inactive LP configs V2, then archive `live_hedge_bot.py`. Toggle UI not needed. | ⏸ Deferred — V1 archive planned |
 | M2-30 | Force LP reconciler scan button | Low | Must wait up to 1 hour for reconciler to catch LP removals. Admin toolbar button: `POST /admin/reconcile-now` → triggers `_reconcile_all()` immediately. | 🔲 Post-meeting |
 
 **Tier B.5 — Admin card layout:**
@@ -276,4 +276,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-04-22 — M2-13 mode enforcement + M2-31 V2 stat + M2-32 CAÍDO banner + M2-12 reconnect overlay*
+*Last updated: 2026-04-22 — M2-29 deferred (V1 archive planned); monitoring session after heavy deploy day*
