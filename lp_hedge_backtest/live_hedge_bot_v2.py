@@ -710,18 +710,35 @@ class LiveHedgeBotV2:
 
             result = self.exchange.market_close("ETH")
             if result is None:
-                # M2-40: native SL fired on HL between polls — set re-arm cooldown
+                # M2-40: native SL fired between polls — set cooldown
                 self._ext_close_cooldown_until = time.time() + self._EXT_COOLDOWN_SECS
+                # M2-39: external_close is a de-facto SL hit — count toward circuit breaker
+                self._consecutive_stops += 1
+                if self._consecutive_stops >= self._CB_STOP_THRESHOLD:
+                    self._circuit_breaker_until = time.time() + self._CB_PAUSE_SECS
+                    self._consecutive_stops = 0
+                    log_event("circuit_breaker", price=price, details={
+                        "reason":  f"{self._CB_STOP_THRESHOLD} consecutive stops (external_close)",
+                        "pause_s": self._CB_PAUSE_SECS,
+                    })
+                    self.send_email(
+                        "⚠️ Circuit Breaker Activated (M2-39)",
+                        f"NFT #{NFT_ID}: {self._CB_STOP_THRESHOLD} consecutive external closes — "
+                        f"pausing re-entry for {self._CB_PAUSE_SECS // 60} min.\nLast exit: ${price:.2f}",
+                    )
+                    print(f"🔴 [M2-39] Circuit breaker — pausing {self._CB_PAUSE_SECS // 60} min", flush=True)
                 print(f"⚠️  market_close returned None — position already gone. Resetting.", flush=True)
                 self._reset_short_state(price)
                 log_event("stopped", price=price, details={
-                    "reason":   "external_close",
-                    "note":     "HL position not found — native SL fired or manual close",
-                    "cooldown": self._EXT_COOLDOWN_SECS,
+                    "reason":            "external_close",
+                    "note":              "HL position not found — native SL fired or manual close",
+                    "cooldown":          self._EXT_COOLDOWN_SECS,
+                    "consecutive_stops": self._consecutive_stops,
                 })
                 self.send_email("⚠️ Hedge Externally Closed",
                     f"NFT #{NFT_ID}: HL SHORT not found during close attempt.\n"
-                    f"Bot reset to IDLE — {self._EXT_COOLDOWN_SECS // 60} min cooldown before re-arm (M2-40).")
+                    f"Bot reset to IDLE — {self._EXT_COOLDOWN_SECS // 60} min cooldown before re-arm (M2-40).\n"
+                    f"Consecutive stops: {self._consecutive_stops}/{self._CB_STOP_THRESHOLD}")
                 if not AUTO_REARM:
                     sys.exit(0)
                 return
@@ -812,15 +829,32 @@ class LiveHedgeBotV2:
                 self._cancel_native_tp()
                 # M2-40: set cooldown before re-arm
                 self._ext_close_cooldown_until = time.time() + self._EXT_COOLDOWN_SECS
+                # M2-39: external_close is a de-facto SL hit — count toward circuit breaker
+                self._consecutive_stops += 1
+                if self._consecutive_stops >= self._CB_STOP_THRESHOLD:
+                    self._circuit_breaker_until = time.time() + self._CB_PAUSE_SECS
+                    self._consecutive_stops = 0
+                    log_event("circuit_breaker", price=price, details={
+                        "reason":  f"{self._CB_STOP_THRESHOLD} consecutive stops (external_close/sync)",
+                        "pause_s": self._CB_PAUSE_SECS,
+                    })
+                    self.send_email(
+                        "⚠️ Circuit Breaker Activated (M2-39)",
+                        f"NFT #{NFT_ID}: {self._CB_STOP_THRESHOLD} consecutive external closes — "
+                        f"pausing re-entry for {self._CB_PAUSE_SECS // 60} min.\nLast exit: ${price:.2f}",
+                    )
+                    print(f"🔴 [M2-39] Circuit breaker — pausing {self._CB_PAUSE_SECS // 60} min", flush=True)
                 self._reset_short_state(price)
                 log_event("stopped", price=price, details={
-                    "reason":   "external_close",
-                    "note":     "HL position not found during periodic sync",
-                    "cooldown": self._EXT_COOLDOWN_SECS,
+                    "reason":            "external_close",
+                    "note":              "HL position not found during periodic sync",
+                    "cooldown":          self._EXT_COOLDOWN_SECS,
+                    "consecutive_stops": self._consecutive_stops,
                 })
                 self.send_email("⚠️ Hedge Externally Closed (sync)",
                     f"NFT #{NFT_ID}: ETH SHORT disappeared during routine sync.\n"
-                    f"Bot reset to IDLE — {self._EXT_COOLDOWN_SECS // 60} min cooldown before re-arm (M2-40).")
+                    f"Bot reset to IDLE — {self._EXT_COOLDOWN_SECS // 60} min cooldown before re-arm (M2-40).\n"
+                    f"Consecutive stops: {self._consecutive_stops}/{self._CB_STOP_THRESHOLD}")
                 if not AUTO_REARM:
                     sys.exit(0)
         except Exception as e:
