@@ -1,2 +1,6 @@
 __pycache__/
 api/.env
+tg.api
+telegram_listener/.env
+telegram_listener/*.session
+telegram_listener/__pycache__/
