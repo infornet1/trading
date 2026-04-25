@@ -91,6 +91,8 @@ class BotEvent(Base):
             "lp_removed", "lp_burned",
             # V2 recovery
             "orphan_recovered",
+            # V2 circuit breaker
+            "circuit_breaker",
             # FURY events
             "fury_entry", "fury_sl", "fury_tp", "fury_circuit_breaker",
             # WHALE events

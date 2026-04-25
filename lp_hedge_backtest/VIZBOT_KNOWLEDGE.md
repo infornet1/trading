@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-04-23 (M2-39 live-validated: CB fired 20:02 UTC Config 20 + DB enum fix)
+# Last updated: 2026-04-25 (M2-6 buffer pills, M2-7 backtest link, M2-16 UI fix, T1-3 PnL label, T2-6 HL status — all frontend, no restart)
 
 ---
 

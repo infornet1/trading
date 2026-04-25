@@ -1446,7 +1446,7 @@ async function loadPositionEvents(tokenId) {
         ? `<span class="evt-price">@ $${Number(ev.price_at_event).toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>`
         : '<span class="evt-price" style="opacity:0"></span>';
       const pnl   = ev.pnl != null
-        ? `<span class="evt-pnl ${ev.pnl >= 0 ? 'evt-pnl-pos' : 'evt-pnl-neg'}">${ev.pnl >= 0 ? '+' : ''}$${Number(ev.pnl).toFixed(2)}</span>`
+        ? `<span class="evt-pnl ${ev.pnl >= 0 ? 'evt-pnl-pos' : 'evt-pnl-neg'}">${ev.pnl >= 0 ? '+' : ''}${Number(ev.pnl).toFixed(2)}%</span>`
         : '';
       return `<div class="pos-event-row${dimmed ? ' evt-dimmed' : ''}">
         <span class="evt-icon">${m.icon}</span>
@@ -1665,6 +1665,11 @@ function buildPositionCard(pos) {
 
     ${buildProtectionDrawer(pos)}
     <div id="pos-events-${tokenId}" class="pos-events-section" style="display:none"></div>
+    <div class="pc-backtest-link">
+      <a href="/" class="pc-backtest-anchor" title="Simula esta estrategia con datos históricos">
+        📊 Ver Backtester →
+      </a>
+    </div>
   `;
 
   return card;
@@ -2346,17 +2351,21 @@ function buildProtectionDrawer(pos) {
           const evtType = lastEvt.event || lastEvt.event_type || '';
           const price   = lastEvt.price ? formatPrice(lastEvt.price) : '—';
           const pnl     = lastEvt.pnl != null
-            ? (lastEvt.pnl >= 0 ? '+' : '') + '$' + Number(lastEvt.pnl).toFixed(2) : '—';
+            ? (lastEvt.pnl >= 0 ? '+' : '') + Number(lastEvt.pnl).toFixed(2) + '%' : '—';
           return `<span class="prot-evt-type">${evtType.replace(/_/g,' ')}</span>`
             + ` &middot; ${t('prot.price')}: ${price} &middot; P&L: ${pnl}`;
         })()
       : t('prot.status.checking');
 
     const hlBalActive = _hlBalanceCache?.account_value;
+    const hlConnected = hlBalActive != null;
     bodyHtml = `
       <div class="prot-hl-balance-bar">
         <span class="prot-hl-bal-label">HL Balance</span>
-        <span class="prot-hl-bal-value" id="prot-hl-bal-val-active-${bot.id}">${hlBalActive != null ? '$' + Number(hlBalActive).toFixed(2) : '—'}</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span class="prot-hl-bal-value" id="prot-hl-bal-val-active-${bot.id}">${hlConnected ? '$' + Number(hlBalActive).toFixed(2) : '—'}</span>
+          <span class="prot-hl-status ${hlConnected ? 'prot-hl-status--ok' : 'prot-hl-status--off'}">${hlConnected ? '● API Online' : '● Sin conexión'}</span>
+        </span>
       </div>
       <div class="prot-status-row" id="prot-status-${bot.id}">${statusInner}</div>
       <div class="prot-active-info">
@@ -2506,6 +2515,21 @@ function buildProtectionDrawer(pos) {
                  min="0" max="5" step="0.1" value="${trigVal}"
                  oninput="onTradingPanelChange('${tokenId}')" />
           <div class="tp-slider-range-labels"><span>0%</span><span>5% max</span></div>
+        </div>
+
+        <!-- Buffer de Capital pills (quick presets for hedge_ratio) -->
+        <div class="tp-slider-row">
+          <div class="tp-slider-header">
+            <span class="tp-slider-label">Buffer de Capital</span>
+          </div>
+          <div class="tp-buffer-pills">
+            <button class="tp-buffer-pill" onclick="setHedgePill('${tokenId}', 50)">Sin</button>
+            <button class="tp-buffer-pill" onclick="setHedgePill('${tokenId}', 110)">+10%</button>
+            <button class="tp-buffer-pill" onclick="setHedgePill('${tokenId}', 120)">+20%</button>
+            <button class="tp-buffer-pill" onclick="setHedgePill('${tokenId}', 130)">+30%</button>
+            <button class="tp-buffer-pill" onclick="setHedgePill('${tokenId}', 150)">+50%</button>
+            <button class="tp-buffer-pill" onclick="setHedgePill('${tokenId}', 200)">+100%</button>
+          </div>
         </div>
 
         <!-- Hedge Size (slider) -->
@@ -3162,6 +3186,16 @@ window.onSLChange = function (tokenId) {
     warnEl.style.display = parseFloat(slInput.value) < 0.5 ? 'block' : 'none';
   }
   window.onTradingPanelChange(tokenId);
+};
+
+window.setHedgePill = function (tokenId, value) {
+  const slider = document.getElementById(`prot-hedge-${tokenId}`);
+  if (!slider) return;
+  slider.value = value;
+  window.onTradingPanelChange(tokenId);
+  // Highlight active pill
+  const pills = slider.closest('.tp-slider-row')?.previousElementSibling?.querySelectorAll('.tp-buffer-pill');
+  if (pills) pills.forEach(p => p.classList.toggle('tp-buffer-pill--active', parseInt(p.getAttribute('onclick').match(/\d+\)$/)?.[0]) === value));
 };
 
 window.onTradingPanelChange = function (tokenId) {

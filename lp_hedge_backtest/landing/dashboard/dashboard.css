@@ -2542,3 +2542,70 @@
   border-color: rgba(255, 255, 255, 0.25);
   color: var(--color-text-primary);
 }
+
+/* ── M2-6: Buffer Capital pills ─────────────────────────────── */
+.tp-buffer-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.tp-buffer-pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--color-text-muted);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.tp-buffer-pill:hover {
+  background: rgba(0,212,255,0.1);
+  border-color: rgba(0,212,255,0.4);
+  color: var(--color-neon-cyan);
+}
+.tp-buffer-pill--active {
+  background: rgba(0,212,255,0.15);
+  border-color: var(--color-neon-cyan);
+  color: var(--color-neon-cyan);
+}
+
+/* ── M2-7: Backtester link in position card ─────────────────── */
+.pc-backtest-link {
+  text-align: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.pc-backtest-anchor {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  transition: color 0.15s;
+}
+.pc-backtest-anchor:hover {
+  color: var(--color-neon-cyan);
+}
+
+/* ── T2-6: HL API connection status chip ────────────────────── */
+.prot-hl-status {
+  font-size: 0.62rem;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+.prot-hl-status--ok {
+  background: rgba(52,211,153,0.1);
+  border: 1px solid rgba(52,211,153,0.3);
+  color: var(--color-neon-green);
+}
+.prot-hl-status--off {
+  background: rgba(248,113,113,0.1);
+  border: 1px solid rgba(248,113,113,0.3);
+  color: #f87171;
+}
