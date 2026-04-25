@@ -229,6 +229,74 @@ async def start_whale_bots(admin: str = Depends(get_current_admin)):
     return {"status": "ok", "started_count": len(started), "started_ids": started}
 
 
+# ── M2-28: Per-bot restart ─────────────────────────────────────────────────
+
+@router.post("/restart/{config_id}")
+async def restart_bot(config_id: int, admin: str = Depends(get_current_admin)):
+    """Stop a bot process (if running) and re-launch it from current DB config."""
+    from api.crypto import decrypt
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(BotConfig).where(BotConfig.id == config_id))
+        cfg = result.scalar_one_or_none()
+        if not cfg:
+            raise HTTPException(status_code=404, detail=f"Config {config_id} not found")
+
+        was_running = manager.is_running(config_id)
+        if was_running:
+            await manager.stop(config_id)
+
+        config_dict = {
+            "nft_token_id":              cfg.nft_token_id,
+            "lower_bound":               str(cfg.lower_bound),
+            "upper_bound":               str(cfg.upper_bound),
+            "trigger_pct":               str(cfg.trigger_pct),
+            "hedge_ratio":               str(cfg.hedge_ratio),
+            "hl_api_key":                decrypt(cfg.hl_api_key) if cfg.hl_api_key else "",
+            "hl_wallet_addr":            cfg.hl_wallet_addr or "",
+            "mode":                      cfg.mode,
+            "pair":                      cfg.pair,
+            "leverage":                  str(cfg.leverage   or 10),
+            "sl_pct":                    str(cfg.sl_pct     or 0.1),
+            "tp_pct":                    str(cfg.tp_pct)    if cfg.tp_pct else "",
+            "trailing_stop":             "1" if cfg.trailing_stop else "0",
+            "auto_rearm":                "1" if cfg.auto_rearm    else "0",
+            "fury_symbol":               cfg.fury_symbol          or "ETH",
+            "fury_rsi_period":           str(cfg.fury_rsi_period  or 9),
+            "fury_rsi_long_th":          str(cfg.fury_rsi_long_th or 35),
+            "fury_rsi_short_th":         str(cfg.fury_rsi_short_th or 65),
+            "fury_leverage_max":         str(cfg.fury_leverage_max or 12),
+            "fury_risk_pct":             str(cfg.fury_risk_pct    or 2.0),
+            "whale_top_n":               str(cfg.whale_top_n            or 50),
+            "whale_min_notional":        str(cfg.whale_min_notional     or 50000),
+            "whale_poll_interval":       str(cfg.whale_poll_interval    or 30),
+            "whale_custom_addresses":    cfg.whale_custom_addresses     or "",
+            "whale_watch_assets":        cfg.whale_watch_assets         or "",
+            "whale_use_websocket":       bool(cfg.whale_use_websocket),
+            "whale_oi_spike_threshold":  str(cfg.whale_oi_spike_threshold or 0.03),
+            "paper_trade":               bool(cfg.paper_trade),
+            "engine_v2":                 bool(cfg.engine_v2),
+        }
+
+        await manager.start(config_id, config_dict)
+        cfg.active = True
+        await db.commit()
+
+    print(f"[Admin] Restart config {config_id} by {admin} (was_running={was_running})", flush=True)
+    return {"status": "restarted", "config_id": config_id, "was_running": was_running}
+
+
+# ── M2-30: Force LP reconciler scan ────────────────────────────────────────
+
+@router.post("/reconcile-now")
+async def reconcile_now(admin: str = Depends(get_current_admin)):
+    """Trigger an immediate LP reconciler scan (normally runs hourly)."""
+    from api.lp_reconciler import _reconcile_all
+    print(f"[Admin] Force reconcile triggered by {admin}", flush=True)
+    await _reconcile_all()
+    return {"status": "ok", "message": "LP reconciler scan complete"}
+
+
 # ── Overview ───────────────────────────────────────────────────────────────
 
 @router.get("/overview")

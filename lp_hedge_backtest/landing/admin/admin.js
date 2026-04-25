@@ -779,9 +779,14 @@ function poolCard(p, ethPrice, isHistorical = false) {
     }</span>
   </div>` : ''}
 
-  <button class="detail-toggle" onclick="toggleDetail(${p.config_id})">
-    ${isExpanded ? '▲ Ocultar detalle' : '▼ Ver detalle HL + historial'}
-  </button>
+  <div class="card-action-row">
+    <button class="detail-toggle" onclick="toggleDetail(${p.config_id})">
+      ${isExpanded ? '▲ Ocultar detalle' : '▼ Ver detalle HL + historial'}
+    </button>
+    <button class="btn-restart" id="restart-btn-${p.config_id}" onclick="restartBot(${p.config_id})" title="Detener y relanzar este bot desde la config actual en DB">
+      ↺ Reiniciar
+    </button>
+  </div>
 
   <div class="detail-drawer ${isExpanded ? '' : 'hidden'}" id="drawer-${p.config_id}">
     <div class="detail-loading" id="hl-loading-${p.config_id}">Cargando datos HL...</div>
@@ -1334,6 +1339,34 @@ async function toggleMaintenance() {
     );
   } catch (e) {
     if (e.message !== 'Session expired') alert('Error: ' + e.message);
+  }
+}
+
+// ── M2-28: Per-bot restart ─────────────────────────────────────────────────
+async function restartBot(configId) {
+  const btn = document.getElementById(`restart-btn-${configId}`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Reiniciando…'; }
+  try {
+    const d = await apiPost(`/admin/restart/${configId}`);
+    doRefresh();
+  } catch (e) {
+    if (e.message !== 'Session expired') alert('Error al reiniciar: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '↺ Reiniciar'; }
+  }
+}
+
+// ── M2-30: Force LP reconciler scan ────────────────────────────────────────
+async function reconcileNow() {
+  const btn = document.getElementById('btn-reconcile');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Escaneando…'; }
+  try {
+    const d = await apiPost('/admin/reconcile-now');
+    alert('✅ ' + (d.message || 'Reconciler scan complete'));
+    doRefresh();
+  } catch (e) {
+    if (e.message !== 'Session expired') alert('Error: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Reconcile LP'; }
   }
 }
 

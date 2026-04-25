@@ -198,9 +198,9 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 | ID | Item | Effort | Why | Status |
 |---|---|---|---|---|
-| M2-28 | Per-bot restart from admin UI | Medium | Nuclear stops all; no targeted restart. Crashed bot (`active=True`, `running=False`) requires direct DB+systemctl. New `POST /admin/restart/{config_id}` + button on card. | 🔲 Post-meeting |
+| M2-28 | Per-bot restart from admin UI | Medium | `POST /admin/restart/{config_id}` in admin.py — stops process if running, rebuilds config_dict from DB, calls manager.start(). `↺ Reiniciar` button added to every bot card footer (card-action-row beside detail toggle). JS: `restartBot(configId)` with loading state. **Validated 2026-04-25:** Config 17 had open SHORT during restart — orphan recovery re-adopted position and placed fresh native SL (OID 397950580663). | ✅ Done 2026-04-25 |
 | M2-29 | Engine V2 toggle from admin UI | Low | ~~Switching V1↔V2 currently requires direct DB access.~~ **Deferred indefinitely (2026-04-22):** all active bots already on V2. 9 inactive configs last ran V1 but are out-of-range. Planned path: one-time SQL migration to mark all inactive LP configs V2, then archive `live_hedge_bot.py`. Toggle UI not needed. | ⏸ Deferred — V1 archive planned |
-| M2-30 | Force LP reconciler scan button | Low | Must wait up to 1 hour for reconciler to catch LP removals. Admin toolbar button: `POST /admin/reconcile-now` → triggers `_reconcile_all()` immediately. | 🔲 Post-meeting |
+| M2-30 | Force LP reconciler scan button | Low | `POST /admin/reconcile-now` in admin.py — calls `_reconcile_all()` immediately. `🔍 Reconcile LP` button added to admin refresh bar. JS: `reconcileNow()` with loading state + success alert. | ✅ Done 2026-04-25 |
 
 **Tier B.5 — Admin card layout:**
 
@@ -278,4 +278,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-04-25 — Frontend pass: M2-6 ✅ M2-7 ✅ M2-16 (UI) ✅ T1-3 ✅ T2-6 ✅ all shipped, no restart. M2-39 SQLAlchemy enum fix ✅ (api/models.py, API restarted). Previously: M2-9 ✅ M2-13 ✅ M2-21 ✅ M2-39 ✅ M2-40 ✅ all live-validated. M2-29 deferred.*
+*Last updated: 2026-04-25 — M2-28 ✅ M2-30 ✅ (admin restart + reconcile endpoints + UI). M2-28 validated live: Config 17 orphan recovery confirmed on restart. Frontend pass: M2-6 ✅ M2-7 ✅ M2-16 (UI) ✅ T1-3 ✅ T2-6 ✅. M2-39 SQLAlchemy fix ✅. Previously: M2-9 ✅ M2-13 ✅ M2-21 ✅ M2-39 ✅ M2-40 ✅ all live-validated. M2-29 deferred.*

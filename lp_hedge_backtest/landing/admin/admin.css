@@ -547,3 +547,34 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
 @keyframes spin { to { transform: rotate(360deg); } }
 .reconnect-msg  { font-size: 1rem; font-weight: 700; color: #ffd600; margin-bottom: .5rem; }
 .reconnect-sub  { font-size: .78rem; color: var(--muted, #888); }
+
+/* ── M2-28: Restart button + card-action-row ────────────────────────── */
+.card-action-row {
+  display: flex;
+  gap: .4rem;
+  margin-top: .6rem;
+}
+.card-action-row .detail-toggle {
+  flex: 1;
+  margin-top: 0;
+}
+.btn-restart {
+  padding: .35rem .7rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: .03em;
+  white-space: nowrap;
+  transition: border-color .15s, color .15s;
+}
+.btn-restart:hover:not(:disabled) {
+  border-color: var(--color-neon-cyan, #00d4ff);
+  color: var(--color-neon-cyan, #00d4ff);
+}
+.btn-restart:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
