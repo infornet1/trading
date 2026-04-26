@@ -1,0 +1,536 @@
+/* ============================================================
+   LP Signal Lab — Page Styles
+   Inherits variables from global.css
+============================================================ */
+
+/* ── Page layout ──────────────────────────────────────────── */
+
+.sl-hero {
+  margin-top: 64px;
+  background: linear-gradient(180deg, var(--color-bg-card2) 0%, var(--color-bg-deep) 100%);
+  border-bottom: 1px solid var(--color-border);
+  padding: 18px 0;
+}
+
+.sl-hero-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sl-lab-badge {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-neon-cyan);
+  text-shadow: var(--glow-cyan);
+  letter-spacing: 0.05em;
+}
+
+.sl-hero-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.sl-hero-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sl-timestamp {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.sl-main {
+  padding: 32px 0 80px;
+}
+
+.sl-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .sl-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Section ──────────────────────────────────────────────── */
+
+.sl-section {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--glow-card);
+}
+
+.sl-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sl-section-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.sl-section-header .sl-section-title { margin-bottom: 0; }
+
+.sl-count-badge {
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* ── LP Range Card ────────────────────────────────────────── */
+
+.sl-range-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.sl-price {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.sl-trend-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 20px;
+}
+.sl-trend-pill.bearish { background: rgba(248,113,113,0.15); color: #f87171; }
+.sl-trend-pill.bullish { background: rgba(0,255,179,0.12);   color: var(--color-neon-green); }
+.sl-trend-pill.ranging { background: rgba(26,143,255,0.12);  color: var(--color-neon-blue); }
+
+.sl-vol {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+/* Standard range card (highlighted) */
+.sl-range-card {
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border-glow);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 0 16px rgba(26,143,255,0.1);
+}
+
+.sl-range-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-neon-cyan);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.sl-range-bar-wrap {
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  height: 8px;
+  position: relative;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.sl-range-bar {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: linear-gradient(90deg, var(--color-neon-blue), var(--color-neon-cyan));
+  border-radius: 6px;
+}
+
+.sl-range-prices {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 10px;
+}
+
+.sl-range-params {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sl-param {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sl-param-label { font-size: 0.6rem; color: var(--color-text-muted); text-transform: uppercase; }
+.sl-param-value { font-size: 0.78rem; font-weight: 600; color: var(--color-text-primary); }
+
+.sl-range-cta {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sl-alt-toggle {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+.sl-alt-toggle:hover { color: var(--color-neon-cyan); }
+
+.sl-alt-options {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sl-alt-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sl-alt-name { font-size: 0.72rem; color: var(--color-text-secondary); font-weight: 600; }
+.sl-alt-range { font-size: 0.72rem; color: var(--color-text-primary); }
+.sl-alt-meta { font-size: 0.68rem; color: var(--color-text-muted); }
+
+.sl-btc-context {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.sl-chart-source {
+  margin-top: 10px;
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+/* ── Signal cards ─────────────────────────────────────────── */
+
+.sl-signal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sl-signal-card {
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color 0.2s;
+}
+.sl-signal-card:not(.sl-signal-card--expired):hover { border-color: var(--color-border-glow); }
+.sl-signal-card--expired { opacity: 0.45; }
+
+.sl-dir-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sl-dir-pill.short { background: rgba(248,113,113,0.15); color: #f87171; }
+.sl-dir-pill.long  { background: rgba(0,255,179,0.12);   color: var(--color-neon-green); }
+
+.sl-signal-info { flex: 1; min-width: 0; }
+.sl-signal-pair {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+.sl-signal-prices {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sl-signal-age {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.sl-signal-card .btn-sm {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  padding: 5px 12px;
+}
+
+/* ── History ──────────────────────────────────────────────── */
+
+.sl-history-toggle {
+  margin-top: 14px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+.sl-history-toggle:hover { color: var(--color-neon-cyan); }
+
+.sl-history-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sl-history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.sl-outcome-pill {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.sl-outcome-pill.tp_hit   { background: rgba(0,255,179,0.12); color: var(--color-neon-green); }
+.sl-outcome-pill.stopped  { background: rgba(248,113,113,0.12); color: #f87171; }
+.sl-outcome-pill.expired  { background: rgba(120,120,120,0.12); color: #888; }
+.sl-outcome-pill.cancelled{ background: rgba(120,120,120,0.12); color: #888; }
+
+/* ── Skeleton loader ──────────────────────────────────────── */
+
+.sl-skeleton { padding: 8px 0; }
+.sl-skeleton-bar {
+  height: 12px;
+  background: linear-gradient(90deg, var(--color-border) 25%, var(--color-border-glow) 50%, var(--color-border) 75%);
+  background-size: 200% 100%;
+  animation: sl-shimmer 1.4s infinite;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  opacity: 0.4;
+}
+@keyframes sl-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Empty state ──────────────────────────────────────────── */
+
+.sl-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+}
+.sl-empty code {
+  color: var(--color-neon-cyan);
+  font-family: monospace;
+  font-size: 0.72rem;
+}
+
+/* ── Execute Modal ────────────────────────────────────────── */
+
+.sl-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4,13,26,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+
+.sl-modal {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-glow);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--glow-card), 0 20px 60px rgba(0,0,0,0.6);
+}
+
+.sl-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 0;
+}
+
+.sl-modal-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.sl-modal-close {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.2s;
+}
+.sl-modal-close:hover { color: var(--color-text-primary); }
+
+.sl-modal-body { padding: 16px 20px; }
+
+.sl-modal-signal {
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.8rem;
+  color: var(--color-text-primary);
+}
+.sl-modal-signal strong { color: var(--color-neon-cyan); }
+
+.sl-modal-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.sl-wallet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.sl-wallet-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  font-size: 0.78rem;
+  color: var(--color-text-primary);
+}
+.sl-wallet-option:hover:not(.sl-wallet-option--locked) {
+  border-color: var(--color-border-glow);
+  background: rgba(26,143,255,0.06);
+}
+.sl-wallet-option--selected {
+  border-color: var(--color-neon-cyan);
+  background: rgba(0,212,255,0.06);
+}
+.sl-wallet-option--locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.sl-wallet-option input[type="radio"] { accent-color: var(--color-neon-cyan); flex-shrink: 0; }
+.sl-wallet-addr { font-family: monospace; font-size: 0.75rem; }
+.sl-wallet-lock { font-size: 0.68rem; color: #f87171; margin-left: auto; }
+
+.sl-modal-size {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+}
+.sl-modal-size strong { color: var(--color-text-primary); }
+.sl-size-note { font-size: 0.65rem; color: var(--color-text-muted); }
+
+.sl-modal-warn {
+  font-size: 0.7rem;
+  color: #facc15;
+  background: rgba(250,204,21,0.06);
+  border: 1px solid rgba(250,204,21,0.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.sl-modal-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 12px;
+}
+
+.sl-order-detail {
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--color-text-primary);
+  line-height: 1.8;
+}
+.sl-order-detail .od-label { color: var(--color-text-muted); }
+.sl-order-detail .od-value { color: var(--color-neon-cyan); font-weight: 700; }
+
+.sl-modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 0 20px 18px;
+}

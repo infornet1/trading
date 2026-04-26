@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIZNIAGO — LP Signal Lab</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧪</text></svg>" />
+  <link rel="stylesheet" href="../global.css" />
+  <link rel="stylesheet" href="signal_lab.css" />
+</head>
+<body>
+
+  <!-- ============================================================
+       NAVBAR
+  ============================================================ -->
+  <nav class="navbar">
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/vizniago-logo.jpeg" alt="VIZNIAGO" class="navbar-logo" />
+    </a>
+
+    <div class="navbar-links" id="navbar-links">
+      <div class="nav-item nav-dd-wrap">
+        <button class="nav-link nav-dd-btn">
+          DeFi <span class="nav-caret">▾</span>
+        </button>
+        <div class="nav-dd-menu">
+          <a href="../wallet/index.html" class="nav-dd-item">
+            <span class="nav-dd-icon">🛡️</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">Wallet Manager</span>
+              <span class="nav-dd-sub">Protección de wallets</span>
+            </div>
+          </a>
+          <a href="../dashboard/index.html" class="nav-dd-item">
+            <span class="nav-dd-icon">📊</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">LP Defensor</span>
+              <span class="nav-dd-sub">Bots LP en vivo</span>
+            </div>
+          </a>
+          <a href="../explore/index.html" class="nav-dd-item">
+            <span class="nav-dd-icon">🔍</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">Explorar</span>
+              <span class="nav-dd-sub">Busca posiciones LP</span>
+            </div>
+          </a>
+          <a href="../whale/index.html" class="nav-dd-item">
+            <span class="nav-dd-icon">🐋</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">Whale Tracker</span>
+              <span class="nav-dd-sub">Señales en tiempo real</span>
+            </div>
+          </a>
+          <a href="index.html" class="nav-dd-item nav-dd-item--active">
+            <span class="nav-dd-icon">🧪</span>
+            <div class="nav-dd-text">
+              <span class="nav-dd-label">LP Signal Lab</span>
+              <span class="nav-dd-sub">Señales + rango LP</span>
+            </div>
+          </a>
+        </div>
+      </div>
+      <a href="../whitepaper/index.html" class="nav-link">Whitepaper</a>
+      <a href="../index.html#bot-explainer" class="nav-link">Docs</a>
+      <a href="https://t.me/vizniago_bot" class="nav-link nav-link--tg" target="_blank">@vizniago_bot</a>
+    </div>
+
+    <div class="navbar-right">
+      <div class="lang-toggle">
+        <button class="lang-btn" data-lang-btn="es" onclick="window.setLanguage && window.setLanguage('es')">ES</button>
+        <button class="lang-btn" data-lang-btn="en" onclick="window.setLanguage && window.setLanguage('en')">EN</button>
+      </div>
+      <div class="wallet-dropdown-wrapper" id="wallet-dropdown-wrapper">
+        <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()">
+          🟢&nbsp; Conectar Billetera
+        </button>
+        <div id="wallet-dropdown-menu" class="wallet-dropdown-menu hidden"></div>
+      </div>
+      <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu" onclick="toggleMobileNav()">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO BAR
+  ============================================================ -->
+  <div class="sl-hero">
+    <div class="container sl-hero-inner">
+      <div class="sl-hero-left">
+        <span class="sl-lab-badge">🧪 LP Signal Lab</span>
+        <span class="sl-hero-sub">ETH/USDC · Uniswap v3 · Arbitrum · Hyperliquid</span>
+      </div>
+      <div class="sl-hero-right">
+        <span id="sl-last-update" class="sl-timestamp">—</span>
+        <button class="btn btn-outline btn-sm" onclick="refreshAll()">🔄 Actualizar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MAIN CONTENT
+  ============================================================ -->
+  <main class="sl-main">
+    <div class="container sl-grid">
+
+      <!-- ── Section 1: LP Range Advisor ────────────────────────── -->
+      <section class="sl-section" id="section-lp-range">
+        <div class="sl-section-title">📈 Rango sugerido — ETH/USDC</div>
+
+        <div id="lp-range-loading" class="sl-skeleton">
+          <div class="sl-skeleton-bar" style="width:60%"></div>
+          <div class="sl-skeleton-bar" style="width:40%"></div>
+        </div>
+
+        <div id="lp-range-content" class="hidden"></div>
+        <div id="lp-range-empty" class="sl-empty hidden">
+          Sin análisis disponible. Ejecuta <code>eth_lp_range.py --save</code> para generar uno.
+        </div>
+      </section>
+
+      <!-- ── Section 2: Signal Feed ──────────────────────────────── -->
+      <section class="sl-section" id="section-signals">
+        <div class="sl-section-header">
+          <span class="sl-section-title">🔔 Señales activas</span>
+          <span id="signal-count-badge" class="sl-count-badge hidden"></span>
+        </div>
+
+        <div id="signals-loading" class="sl-skeleton">
+          <div class="sl-skeleton-bar" style="width:80%"></div>
+          <div class="sl-skeleton-bar" style="width:55%"></div>
+          <div class="sl-skeleton-bar" style="width:70%"></div>
+        </div>
+
+        <div id="signal-feed-content" class="hidden"></div>
+        <div id="signals-empty" class="sl-empty hidden">No hay señales activas en este momento.</div>
+
+        <!-- History toggle -->
+        <div id="signal-history-toggle" class="sl-history-toggle hidden" onclick="toggleHistory()">
+          <span id="history-summary">▸ Ver historial</span>
+        </div>
+        <div id="signal-history-content" class="hidden"></div>
+      </section>
+
+    </div><!-- /container -->
+  </main>
+
+  <!-- ============================================================
+       EXECUTE MODAL
+  ============================================================ -->
+  <div id="execute-modal" class="sl-modal-overlay hidden" onclick="closeModalOnOverlay(event)">
+    <div class="sl-modal">
+      <div class="sl-modal-header">
+        <h3 class="sl-modal-title">Ejecutar señal</h3>
+        <button class="sl-modal-close" onclick="closeExecuteModal()">✕</button>
+      </div>
+
+      <div class="sl-modal-body">
+        <!-- Signal summary -->
+        <div id="modal-signal-summary" class="sl-modal-signal"></div>
+
+        <!-- Wallet selector -->
+        <div class="sl-modal-label">Wallet:</div>
+        <div id="modal-wallet-list" class="sl-wallet-list"></div>
+
+        <!-- Size preview -->
+        <div id="modal-size-row" class="sl-modal-size hidden">
+          Tamaño sugerido: <strong id="modal-size-value">2%</strong>
+          <span class="sl-size-note">(2% del balance HL — ajusta en Hyperliquid)</span>
+        </div>
+
+        <!-- Warning -->
+        <div class="sl-modal-warn">
+          ⚠️ Esta acción registra tu intención. Coloca la orden manualmente en Hyperliquid con los parámetros mostrados.
+        </div>
+      </div>
+
+      <div class="sl-modal-footer">
+        <button class="btn btn-outline" onclick="closeExecuteModal()">Cancelar</button>
+        <button class="btn btn-primary" id="modal-confirm-btn" onclick="confirmExecute()" disabled>
+          Confirmar →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order details panel (shown after confirm) -->
+  <div id="order-detail-modal" class="sl-modal-overlay hidden" onclick="closeModalOnOverlay(event)">
+    <div class="sl-modal">
+      <div class="sl-modal-header">
+        <h3 class="sl-modal-title">✅ Señal registrada</h3>
+        <button class="sl-modal-close" onclick="document.getElementById('order-detail-modal').classList.add('hidden')">✕</button>
+      </div>
+      <div class="sl-modal-body">
+        <p class="sl-modal-hint">Coloca esta orden en <strong>Hyperliquid</strong>:</p>
+        <div id="order-detail-content" class="sl-order-detail"></div>
+      </div>
+      <div class="sl-modal-footer">
+        <button class="btn btn-primary" onclick="document.getElementById('order-detail-modal').classList.add('hidden')">Entendido</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../i18n.js"></script>
+  <script src="signal_lab.js"></script>
+</body>
+</html>

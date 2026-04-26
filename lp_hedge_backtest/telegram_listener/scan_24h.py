@@ -22,10 +22,11 @@ API_ID   = int(os.getenv("TG_API_ID"))
 API_HASH = os.getenv("TG_API_HASH")
 SESSION  = os.getenv("TG_SESSION", "viznago_listener")
 
-CHANNEL_ID = 1951769926
-NOW        = datetime.now(timezone.utc)
-SINCE      = NOW - timedelta(hours=48)
-EXPIRY_H   = 4   # short-term signals: expire after 4h if no update
+CHANNEL_ID        = 1951769926
+SHORT_TERM_THREAD = 7     # Short-Term signals thread
+NOW               = datetime.now(timezone.utc)
+SINCE             = NOW - timedelta(hours=48)
+EXPIRY_H          = 4    # short-term signals: expire after 4h if no update
 
 
 async def fetch_hl_assets() -> set:
@@ -44,9 +45,9 @@ async def main():
     async with TelegramClient(SESSION, API_ID, API_HASH) as client:
         entity = await client.get_entity(PeerChannel(CHANNEL_ID))
 
-        # collect all msgs newest→oldest, stop at SINCE
+        # collect msgs from Short-Term thread only, newest→oldest, stop at SINCE
         all_msgs = []
-        async for msg in client.iter_messages(entity, offset_date=NOW):
+        async for msg in client.iter_messages(entity, offset_date=NOW, reply_to=SHORT_TERM_THREAD):
             if msg.date < SINCE:
                 break
             all_msgs.append(msg)

@@ -27,7 +27,8 @@ TG_API_ID   = int(os.getenv("TG_API_ID"))
 TG_API_HASH = os.getenv("TG_API_HASH")
 TG_SESSION  = os.getenv("TG_SESSION", "viznago_listener")
 ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY")
-CHANNEL_ID  = 1951769926
+CHANNEL_ID          = 1951769926
+BITCOIN_DAILY_THREAD = 22   # Bitcoin Daily thread — charts for LP range advisor
 
 VISION_MODEL = "claude-sonnet-4-6"   # sonnet for vision accuracy
 
@@ -160,19 +161,37 @@ def print_report(analysis: dict, ranges: dict, msg_id: int, msg_date: datetime, 
     print(f"{'='*62}\n")
 
 
-async def find_latest_eth_chart(client, entity) -> tuple:
-    """Scan back through channel to find the most recent ETH analysis chart."""
+async def find_latest_eth_chart(client, entity):
+    """Scan Bitcoin Daily thread (22) for the most recent ETH analysis chart."""
     eth_keywords = re.compile(r'\bETH\b', re.IGNORECASE)
     skip = re.compile(r'JUST IN|ETF|Deribit|options will expire', re.IGNORECASE)
 
-    async for msg in client.iter_messages(entity, limit=500):
+    async for msg in client.iter_messages(entity, limit=500, reply_to=BITCOIN_DAILY_THREAD):
         text = msg.message or ""
         if msg.media and eth_keywords.search(text) and not skip.search(text):
             return msg
     return None
 
 
-async def main(msg_id: int = None):
+def save_cache(analysis: dict, ranges: dict, msg_id: int, msg_date: datetime):
+    """Write analysis result to data_cache/lp_range_latest.json for the API to serve."""
+    import json
+    cache_dir = os.path.join(os.path.dirname(__file__), "..", "data_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    payload = {
+        "saved_at": datetime.now(timezone.utc).isoformat(),
+        "msg_id":   msg_id,
+        "msg_date": msg_date.isoformat(),
+        "analysis": analysis,
+        "ranges":   ranges,
+    }
+    cache_path = os.path.join(cache_dir, "lp_range_latest.json")
+    with open(cache_path, "w") as f:
+        json.dump(payload, f, indent=2)
+    print(f"💾 Saved to {cache_path}", flush=True)
+
+
+async def main(msg_id: int = None, save: bool = False):
     ai = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
 
     async with TelegramClient(TG_SESSION, TG_API_ID, TG_API_HASH) as client:
@@ -231,12 +250,16 @@ async def main(msg_id: int = None):
 
         print_report(analysis, ranges, msg.id, msg.date, caption)
 
+        if save:
+            save_cache(analysis, ranges, msg.id, msg.date)
+
         # cleanup downloaded image
         os.remove(img_path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--msg", type=int, default=None, help="Specific message ID to analyze")
+    parser.add_argument("--msg",  type=int,  default=None,  help="Specific message ID to analyze")
+    parser.add_argument("--save", action="store_true",      help="Save result to data_cache/lp_range_latest.json")
     args = parser.parse_args()
-    asyncio.run(main(args.msg))
+    asyncio.run(main(args.msg, save=args.save))

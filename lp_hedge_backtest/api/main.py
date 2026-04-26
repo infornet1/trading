@@ -21,6 +21,7 @@ from api.routers import ws as ws_router
 from api.routers import admin as admin_router
 from api.routers import assistant as assistant_router
 from api.routers import telegram as telegram_router
+from api.routers import signal_lab as signal_lab_router
 
 
 async def _run_column_migrations():
@@ -69,6 +70,58 @@ async def _run_column_migrations():
         "ALTER TABLE telegram_links DROP INDEX telegram_chat_id",
         # Add composite unique if not already present
         "ALTER TABLE telegram_links ADD UNIQUE KEY uq_chat_wallet (telegram_chat_id, user_address)",
+        # Signal Lab tables
+        (
+            "CREATE TABLE IF NOT EXISTS signal_sources ("
+            "  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            "  name VARCHAR(100) NOT NULL,"
+            "  channel_id BIGINT NOT NULL,"
+            "  thread_id INT NULL,"
+            "  purpose ENUM('signals','lp_range') NOT NULL,"
+            "  active TINYINT(1) NOT NULL DEFAULT 1,"
+            "  added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        ),
+        (
+            "CREATE TABLE IF NOT EXISTS signal_events ("
+            "  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            "  source_id INT NOT NULL,"
+            "  pair VARCHAR(20) NULL,"
+            "  direction ENUM('long','short') NULL,"
+            "  leverage INT NULL,"
+            "  entry DECIMAL(20,8) NULL,"
+            "  stoploss DECIMAL(20,8) NULL,"
+            "  targets JSON NULL,"
+            "  size_pct DECIMAL(5,2) NULL,"
+            "  raw_text TEXT NULL,"
+            "  status ENUM('pending','executed','expired','stopped','tp_hit','cancelled') NOT NULL DEFAULT 'pending',"
+            "  msg_id BIGINT NOT NULL,"
+            "  received_at DATETIME NOT NULL,"
+            "  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            "  FOREIGN KEY (source_id) REFERENCES signal_sources(id) ON DELETE CASCADE"
+            ")"
+        ),
+        (
+            "CREATE TABLE IF NOT EXISTS signal_executions ("
+            "  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            "  signal_id INT NOT NULL,"
+            "  user_address VARCHAR(42) NOT NULL,"
+            "  hl_wallet_addr VARCHAR(42) NULL,"
+            "  hl_order_id VARCHAR(100) NULL,"
+            "  executed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "  outcome ENUM('pending','filled','failed') NOT NULL DEFAULT 'pending',"
+            "  FOREIGN KEY (signal_id) REFERENCES signal_events(id) ON DELETE CASCADE"
+            ")"
+        ),
+        # Seed default signal sources (idempotent via INSERT IGNORE)
+        (
+            "INSERT IGNORE INTO signal_sources (id, name, channel_id, thread_id, purpose, active) "
+            "VALUES (1, 'Short-Term', 1951769926, 7, 'signals', 1)"
+        ),
+        (
+            "INSERT IGNORE INTO signal_sources (id, name, channel_id, thread_id, purpose, active) "
+            "VALUES (2, 'Bitcoin Daily', 1951769926, 22, 'lp_range', 1)"
+        ),
     ]
     async with engine.begin() as conn:
         for sql in migrations:
@@ -192,6 +245,7 @@ app.include_router(ws_router.router)
 app.include_router(admin_router.router)
 app.include_router(assistant_router.router)
 app.include_router(telegram_router.router)
+app.include_router(signal_lab_router.router)
 
 
 @app.get("/health")

@@ -138,3 +138,61 @@ class Subscription(Base):
     created_at      = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="subscriptions")
+
+
+# ── Signal Lab ────────────────────────────────────────────────────────────
+
+class SignalSource(Base):
+    """Admin-managed Telegram channel threads feeding the Signal Lab."""
+    __tablename__ = "signal_sources"
+
+    id         = Column(Integer,    primary_key=True, autoincrement=True)
+    name       = Column(String(100), nullable=False)          # "Short-Term", "Bitcoin Daily"
+    channel_id = Column(BigInteger,  nullable=False)          # 1951769926
+    thread_id  = Column(Integer,     nullable=True)           # 7 or 22
+    purpose    = Column(Enum("signals", "lp_range"), nullable=False)
+    active     = Column(Boolean, default=True)
+    added_at   = Column(DateTime, default=datetime.utcnow)
+
+    events = relationship("SignalEvent", back_populates="source", cascade="all, delete-orphan")
+
+
+class SignalEvent(Base):
+    """Every parsed trading signal from a Telegram signal source."""
+    __tablename__ = "signal_events"
+
+    id          = Column(Integer,      primary_key=True, autoincrement=True)
+    source_id   = Column(Integer,      ForeignKey("signal_sources.id"), nullable=False)
+    pair        = Column(String(20),   nullable=True)          # "ETH/USDT"
+    direction   = Column(Enum("long", "short"), nullable=True)
+    leverage    = Column(Integer,      nullable=True)
+    entry       = Column(Numeric(20,8), nullable=True)
+    stoploss    = Column(Numeric(20,8), nullable=True)
+    targets     = Column(JSON,         nullable=True)          # list[float]
+    size_pct    = Column(Numeric(5,2), nullable=True)
+    raw_text    = Column(Text,         nullable=True)
+    status      = Column(
+        Enum("pending", "executed", "expired", "stopped", "tp_hit", "cancelled"),
+        default="pending",
+    )
+    msg_id      = Column(BigInteger,   nullable=False)         # Telegram message ID
+    received_at = Column(DateTime,     nullable=False)
+    updated_at  = Column(DateTime,     default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    source     = relationship("SignalSource",   back_populates="events")
+    executions = relationship("SignalExecution", back_populates="signal", cascade="all, delete-orphan")
+
+
+class SignalExecution(Base):
+    """Records when a user executes a signal (V1: intent + conflict check)."""
+    __tablename__ = "signal_executions"
+
+    id             = Column(Integer,     primary_key=True, autoincrement=True)
+    signal_id      = Column(Integer,     ForeignKey("signal_events.id"), nullable=False)
+    user_address   = Column(String(42),  nullable=False)
+    hl_wallet_addr = Column(String(42),  nullable=True)
+    hl_order_id    = Column(String(100), nullable=True)
+    executed_at    = Column(DateTime,    default=datetime.utcnow)
+    outcome        = Column(Enum("pending", "filled", "failed"), default="pending")
+
+    signal = relationship("SignalEvent", back_populates="executions")
