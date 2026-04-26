@@ -3,6 +3,8 @@
    Inherits variables from global.css
 ============================================================ */
 
+.hidden { display: none !important; }
+
 /* ── Page layout ──────────────────────────────────────────── */
 
 .sl-hero {
