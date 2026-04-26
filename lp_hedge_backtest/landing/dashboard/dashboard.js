@@ -1666,7 +1666,7 @@ function buildPositionCard(pos) {
     ${buildProtectionDrawer(pos)}
     <div id="pos-events-${tokenId}" class="pos-events-section" style="display:none"></div>
     <div class="pc-backtest-link">
-      <a href="/" class="pc-backtest-anchor" title="Simula esta estrategia con datos históricos">
+      <a href="../index.html" class="pc-backtest-anchor" title="Simula esta estrategia con datos históricos">
         📊 Ver Backtester →
       </a>
     </div>
