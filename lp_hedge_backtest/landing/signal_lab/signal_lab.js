@@ -3,11 +3,10 @@
    LP Signal Lab — Frontend Logic
 ============================================================ */
 
-const API = window.location.origin.includes("localhost")
-  ? "http://localhost:8001"
-  : "";
+const API_BASE = '/trading/lp-hedge/api';
 
-let _token          = null;   // JWT from wallet auth
+let _token          = localStorage.getItem("vf_jwt") || null;
+let _address        = null;
 let _wallets        = [];     // [{address, active_bot_id}]
 let _signals        = [];     // current signal list
 let _historyLoaded  = false;
@@ -17,10 +16,46 @@ let _activeSignalId = null;   // signal being executed
 
 // ── Auth ───────────────────────────────────────────────────
 
-function connectWallet() {
-  // Reuse the auth flow from dashboard (siwe nonce → sign → JWT)
-  // For now: redirect to dashboard which has full wallet connect
-  window.location.href = "../dashboard/index.html";
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert("No se detectó wallet. Instala Rabby o MetaMask.");
+    return;
+  }
+  const btn = document.getElementById("wallet-btn");
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ Conectando…"; }
+
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    const signer = await provider.getSigner();
+    _address = await signer.getAddress();
+
+    const nonceRes = await fetch(`${API_BASE}/auth/nonce?address=${_address}`);
+    if (!nonceRes.ok) throw new Error("No se pudo obtener nonce");
+    const { nonce } = await nonceRes.json();
+
+    const signature = await signer.signMessage(`Sign in to VIZNIAGO FURY\nNonce: ${nonce}`);
+
+    const verRes = await fetch(`${API_BASE}/auth/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: _address, signature }),
+    });
+    if (!verRes.ok) throw new Error("Verificación fallida");
+    const { access_token } = await verRes.json();
+
+    _token = access_token;
+    localStorage.setItem("vf_jwt", _token);
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = `🟢 ${_address.slice(0,6)}…${_address.slice(-4)}`;
+    }
+    refreshAll();
+  } catch (err) {
+    if (err.code !== 4001) alert("Error: " + (err.message || err));
+    if (btn) { btn.disabled = false; btn.textContent = "🟢  Conectar Billetera"; }
+  }
 }
 
 function _authHeader() {
@@ -30,8 +65,6 @@ function _authHeader() {
 // ── Boot ───────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Try to reuse existing JWT from sessionStorage (set by dashboard auth)
-  _token = sessionStorage.getItem("viznago_jwt") || null;
   refreshAll();
 });
 
@@ -53,7 +86,7 @@ async function fetchLpRange() {
   empty.classList.add("hidden");
 
   try {
-    const res = await fetch(`${API}/signal-lab/lp-range`, {
+    const res = await fetch(`${API_BASE}/signal-lab/lp-range`, {
       headers: { "Content-Type": "application/json", ..._authHeader() },
     });
     if (!res.ok) throw new Error(res.status);
@@ -204,7 +237,7 @@ async function fetchSignals() {
   histTgl.classList.add("hidden");
 
   try {
-    const res = await fetch(`${API}/signal-lab/signals?limit=20`, {
+    const res = await fetch(`${API_BASE}/signal-lab/signals?limit=20`, {
       headers: { "Content-Type": "application/json", ..._authHeader() },
     });
     if (!res.ok) throw new Error(res.status);
@@ -308,7 +341,7 @@ async function _loadHistory() {
   el.classList.remove("hidden");
 
   try {
-    const res = await fetch(`${API}/signal-lab/history?limit=30`, {
+    const res = await fetch(`${API_BASE}/signal-lab/history?limit=30`, {
       headers: { "Content-Type": "application/json", ..._authHeader() },
     });
     const data = await res.json();
@@ -369,7 +402,7 @@ async function _loadModalWallets() {
   listEl.innerHTML = '<p style="font-size:0.72rem;color:var(--color-text-muted)">Cargando wallets...</p>';
 
   try {
-    const res = await fetch(`${API}/bots`, {
+    const res = await fetch(`${API_BASE}/bots`, {
       headers: { "Content-Type": "application/json", ..._authHeader() },
     });
     if (!res.ok) throw new Error(res.status);
@@ -438,7 +471,7 @@ async function confirmExecute() {
   btn.textContent = "Registrando...";
 
   try {
-    const res = await fetch(`${API}/signal-lab/execute`, {
+    const res = await fetch(`${API_BASE}/signal-lab/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ..._authHeader() },
       body: JSON.stringify({ signal_id: _activeSignalId, hl_wallet_addr: _selectedWallet }),
