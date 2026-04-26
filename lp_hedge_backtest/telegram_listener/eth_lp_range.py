@@ -19,16 +19,18 @@ from telethon import TelegramClient
 from telethon.tl.types import PeerChannel
 import anthropic
 
-# load both .env files
-load_dotenv()
-load_dotenv("../api/.env", override=False)
+# load both .env files using absolute paths so script works from any cwd
+_HERE = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_HERE, ".env"))
+load_dotenv(os.path.join(_HERE, "../api/.env"), override=False)
 
 TG_API_ID   = int(os.getenv("TG_API_ID"))
 TG_API_HASH = os.getenv("TG_API_HASH")
 TG_SESSION  = os.getenv("TG_SESSION", "viznago_listener")
 ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY")
-CHANNEL_ID          = 1951769926
-BITCOIN_DAILY_THREAD = 22   # Bitcoin Daily thread — charts for LP range advisor
+CHANNEL_ID           = 1951769926
+SHORT_TERM_THREAD    = 7    # Short-Term thread — ETH signal charts (entry/SL/TP with chart image)
+BITCOIN_DAILY_THREAD = 22   # Bitcoin Daily thread — BTC macro context charts
 
 VISION_MODEL = "claude-sonnet-4-6"   # sonnet for vision accuracy
 
@@ -162,13 +164,25 @@ def print_report(analysis: dict, ranges: dict, msg_id: int, msg_date: datetime, 
 
 
 async def find_latest_eth_chart(client, entity):
-    """Scan Bitcoin Daily thread (22) for the most recent ETH analysis chart."""
+    """Scan Short-Term thread (7) for the most recent ETH chart message."""
     eth_keywords = re.compile(r'\bETH\b', re.IGNORECASE)
     skip = re.compile(r'JUST IN|ETF|Deribit|options will expire', re.IGNORECASE)
 
-    async for msg in client.iter_messages(entity, limit=500, reply_to=BITCOIN_DAILY_THREAD):
+    async for msg in client.iter_messages(entity, limit=500, reply_to=SHORT_TERM_THREAD):
         text = msg.message or ""
         if msg.media and eth_keywords.search(text) and not skip.search(text):
+            return msg
+    return None
+
+
+async def find_latest_btc_chart(client, entity):
+    """Scan Bitcoin Daily thread (22) for the most recent BTC chart (macro context)."""
+    btc_keywords = re.compile(r'\bBTC\b|\bBitcoin\b', re.IGNORECASE)
+    skip = re.compile(r'JUST IN|ETF|Deribit|options will expire', re.IGNORECASE)
+
+    async for msg in client.iter_messages(entity, limit=100, reply_to=BITCOIN_DAILY_THREAD):
+        text = msg.message or ""
+        if msg.media and btc_keywords.search(text) and not skip.search(text):
             return msg
     return None
 
@@ -194,7 +208,8 @@ def save_cache(analysis: dict, ranges: dict, msg_id: int, msg_date: datetime):
 async def main(msg_id: int = None, save: bool = False):
     ai = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
 
-    async with TelegramClient(TG_SESSION, TG_API_ID, TG_API_HASH) as client:
+    session_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), TG_SESSION)
+    async with TelegramClient(session_path, TG_API_ID, TG_API_HASH) as client:
         entity = await client.get_entity(PeerChannel(CHANNEL_ID))
 
         if msg_id:

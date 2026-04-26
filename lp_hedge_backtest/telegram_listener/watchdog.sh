@@ -5,6 +5,12 @@
 PROJECT=/var/www/dev/trading/lp_hedge_backtest
 LOG=$PROJECT/telegram_listener/logs/listener.log
 PIDFILE=$PROJECT/telegram_listener/logs/listener.pid
+PAUSE_FLAG=$PROJECT/telegram_listener/logs/.pause
+
+# Honour maintenance pause (touch .pause to suppress auto-restart)
+if [ -f "$PAUSE_FLAG" ]; then
+    exit 0
+fi
 
 # Check if already running via pid file
 if [ -f "$PIDFILE" ]; then
