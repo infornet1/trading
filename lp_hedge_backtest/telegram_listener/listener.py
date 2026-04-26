@@ -15,8 +15,9 @@ import os
 import sys
 from datetime import datetime, timezone
 
-# Allow importing api.* from project root
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Allow importing api.* from project root and signal_parser from telegram_listener/
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
