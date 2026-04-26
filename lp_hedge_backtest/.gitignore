@@ -6,3 +6,5 @@ telegram_listener/*.session
 telegram_listener/__pycache__/
 telegram_listener/*.jpg
 telegram_listener/*.png
+telegram_listener/logs/
+data_cache/
