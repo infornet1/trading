@@ -390,11 +390,73 @@ async function openExecuteModal(signalId) {
     Entrada ${entry} · SL ${sl}${tps ? " · TP " + tps : ""}
   `;
 
+  // Freshness check — price drift + SL buffer
+  await _loadSignalFreshness(sig);
+
   // Load wallets (active bots list from /bots endpoint)
   await _loadModalWallets();
 
   document.getElementById("modal-confirm-btn").disabled = true;
   document.getElementById("execute-modal").classList.remove("hidden");
+}
+
+async function _loadSignalFreshness(sig) {
+  const el = document.getElementById("modal-freshness");
+  if (!el || !sig.entry || !sig.stoploss) { el && el.classList.add("hidden"); return; }
+
+  const base = (sig.pair || "").split("/")[0].toUpperCase();
+  el.innerHTML = '<div class="sl-freshness sl-freshness-loading">Verificando precio actual…</div>';
+  el.classList.remove("hidden");
+
+  try {
+    const res  = await fetch(`${API_BASE}/signal-lab/price/${base}`, { headers: _authHeader() });
+    const data = await res.json();
+
+    if (!data.available || !data.price) {
+      el.classList.add("hidden");
+      return;
+    }
+
+    const current = data.price;
+    const entry   = parseFloat(sig.entry);
+    const sl      = parseFloat(sig.stoploss);
+    const isShort = sig.direction === "short";
+
+    // Drift: positive = price above entry
+    const drift    = (current - entry) / entry * 100;
+    const driftBad = isShort ? drift > 0 : drift < 0;
+    const driftAbs = Math.abs(drift);
+
+    // SL buffer remaining (% of original)
+    const origBuffer = Math.abs(sl - entry);
+    const curBuffer  = isShort ? sl - current : current - sl;
+    const bufferPct  = Math.max(0, (curBuffer / origBuffer) * 100);
+
+    let cls = "sl-freshness-ok";
+    if (driftBad && driftAbs >= 1.0) cls = "sl-freshness-danger";
+    else if (driftBad && driftAbs >= 0.3) cls = "sl-freshness-warn";
+
+    const driftSign  = drift > 0 ? "+" : "";
+    const driftLabel = driftBad
+      ? `<span class="sl-drift-bad">${driftSign}${driftAbs.toFixed(2)}% contra la señal</span>`
+      : `<span class="sl-drift-ok">${driftSign}${driftAbs.toFixed(2)}% a favor</span>`;
+
+    const bufferWarn = bufferPct < 30 ? " — ⚠️ buffer bajo" : "";
+
+    el.innerHTML = `
+      <div class="sl-freshness ${cls}">
+        <div class="sl-freshness-row">
+          <span>Precio actual: <strong>$${_fmt(current)}</strong></span>
+          <span>Drift: ${driftLabel}</span>
+        </div>
+        <div class="sl-freshness-buffer">
+          Margen a SL restante: <strong>${bufferPct.toFixed(0)}%</strong>${bufferWarn}
+        </div>
+      </div>
+    `;
+  } catch {
+    el.classList.add("hidden");
+  }
 }
 
 async function _loadModalWallets() {

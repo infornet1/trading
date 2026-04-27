@@ -229,6 +229,21 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
+### 🧪 LP Signal Lab — Phase 5 (Signal Freshness)
+
+| ID | Item | Effort | Status |
+|---|---|---|---|
+| SL-P5a | Auto-expiry sweep | Low | ✅ Done 2026-04-27 |
+| SL-P5b | Price drift warning in Execute modal | Low | ✅ Done 2026-04-27 |
+| SL-P5c | SL buffer remaining % in Execute modal | Low | ✅ Done 2026-04-27 |
+| SL-P6 | "Usar este rango →" pre-fills LP Defensor bot config form | Medium | 🔲 Next |
+
+**SL-P5a — Auto-expiry sweep:** Background task `api/signal_expiry.py` runs every 15 min, marks `pending` signals older than 4h as `expired`. Also runs on-read: every `GET /signal-lab/signals` call sweeps expired signals first. Wired into `main.py` lifespan as `expiry_task`.
+
+**SL-P5b + SL-P5c — Freshness widget in Execute modal:** When user opens Execute modal, fetches live HL price via new `GET /signal-lab/price/{symbol}` endpoint. Computes: (1) drift % — how far current price has moved from signal entry, flagged as ok/warn/danger based on 0.3%/1.0% thresholds; (2) SL buffer remaining — what % of the original entry-to-SL gap is still intact at current price. Widget shows under signal summary with color-coded border (green/amber/red). Example: ATOM SHORT entry $1.956 with current $1.9744 → `+0.94% contra la señal`, SL buffer remaining `75%`.
+
+---
+
 #### Deferred (post investor meeting)
 
 | ID | Item | Effort | Why | Status |
@@ -278,4 +293,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-04-25 — M2-28 ✅ M2-30 ✅ (admin restart + reconcile endpoints + UI). M2-28 validated live: Config 17 orphan recovery confirmed on restart. Frontend pass: M2-6 ✅ M2-7 ✅ M2-16 (UI) ✅ T1-3 ✅ T2-6 ✅. M2-39 SQLAlchemy fix ✅. Previously: M2-9 ✅ M2-13 ✅ M2-21 ✅ M2-39 ✅ M2-40 ✅ all live-validated. M2-29 deferred.*
+*Last updated: 2026-04-27 — SL-P5a/b/c ✅ (Signal Lab Phase 5: auto-expiry + price drift warning + SL buffer remaining). API restart confirmed. Previously: M2-28 ✅ M2-30 ✅ M2-6 ✅ M2-7 ✅ M2-16 (UI) ✅ T1-3 ✅ T2-6 ✅ M2-39 SQLAlchemy fix ✅. M2-9 ✅ M2-13 ✅ M2-21 ✅ M2-39 ✅ M2-40 ✅ all live-validated. M2-29 deferred.*

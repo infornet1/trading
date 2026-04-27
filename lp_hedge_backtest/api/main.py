@@ -200,16 +200,24 @@ async def lifespan(app: FastAPI):
     # Start LP reconciler — hourly scan deactivates configs where LP is gone
     from api.lp_reconciler import run_lp_reconciler
     lp_task = asyncio.create_task(run_lp_reconciler())
+    # Start signal expiry sweeper — marks pending signals >4h as expired every 15 min
+    from api.signal_expiry import run_signal_expiry
+    expiry_task = asyncio.create_task(run_signal_expiry())
     yield
     # Graceful shutdown
     tg_task.cancel()
     lp_task.cancel()
+    expiry_task.cancel()
     try:
         await tg_task
     except asyncio.CancelledError:
         pass
     try:
         await lp_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await expiry_task
     except asyncio.CancelledError:
         pass
     from api.bot_manager import manager

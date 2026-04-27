@@ -9,17 +9,20 @@ Endpoints:
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import get_current_address
 from api.database import get_db
 from api.models import BotConfig, SignalEvent, SignalExecution, SignalSource
+
+SIGNAL_EXPIRY_HOURS = 4
 
 router = APIRouter(prefix="/signal-lab", tags=["signal-lab"])
 
@@ -36,6 +39,18 @@ class ExecuteRequest(BaseModel):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
+
+async def _expire_stale_signals(db: AsyncSession) -> int:
+    """Mark pending signals older than SIGNAL_EXPIRY_HOURS as expired."""
+    cutoff = datetime.utcnow() - timedelta(hours=SIGNAL_EXPIRY_HOURS)
+    result = await db.execute(
+        update(SignalEvent)
+        .where(SignalEvent.status == "pending", SignalEvent.received_at < cutoff)
+        .values(status="expired")
+    )
+    await db.commit()
+    return result.rowcount
+
 
 def _signal_to_dict(ev: SignalEvent) -> dict:
     age_seconds = int((datetime.utcnow() - ev.received_at).total_seconds())
@@ -67,6 +82,7 @@ async def list_signals(
     address:  str           = Depends(get_current_address),
 ):
     """Return recent signals from all active sources, newest first."""
+    await _expire_stale_signals(db)
     q = select(SignalEvent).order_by(desc(SignalEvent.received_at)).limit(limit)
     if status:
         q = q.where(SignalEvent.status == status)
@@ -169,6 +185,30 @@ async def list_sources(
             for s in sources
         ]
     }
+
+
+@router.get("/price/{symbol}")
+async def get_signal_price(
+    symbol: str,
+    address: str = Depends(get_current_address),
+):
+    """Return current mid price from Hyperliquid for a given symbol (e.g. ATOM, LTC)."""
+    sym = symbol.upper().strip()
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.post(
+                "https://api.hyperliquid.xyz/info",
+                json={"type": "allMids"},
+                headers={"Content-Type": "application/json"},
+            )
+            r.raise_for_status()
+            mids = r.json()
+        price = mids.get(sym)
+        if price is None:
+            return {"symbol": sym, "price": None, "available": False}
+        return {"symbol": sym, "price": float(price), "available": True}
+    except Exception as e:
+        return {"symbol": sym, "price": None, "available": False, "error": str(e)}
 
 
 @router.get("/history")

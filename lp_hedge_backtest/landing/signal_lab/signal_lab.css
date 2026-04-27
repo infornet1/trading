@@ -536,3 +536,45 @@
   justify-content: flex-end;
   padding: 0 20px 18px;
 }
+
+/* ── Signal freshness widget (inside execute modal) ───────── */
+
+.sl-freshness {
+  border-radius: 8px;
+  padding: 9px 13px;
+  margin-bottom: 12px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.sl-freshness-loading {
+  color: var(--color-text-muted);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--color-border);
+}
+.sl-freshness-ok {
+  background: rgba(0,255,179,0.06);
+  border: 1px solid rgba(0,255,179,0.2);
+  color: var(--color-text-secondary);
+}
+.sl-freshness-warn {
+  background: rgba(250,204,21,0.08);
+  border: 1px solid rgba(250,204,21,0.25);
+  color: var(--color-text-secondary);
+}
+.sl-freshness-danger {
+  background: rgba(248,113,113,0.09);
+  border: 1px solid rgba(248,113,113,0.3);
+  color: var(--color-text-secondary);
+}
+.sl-freshness-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+.sl-freshness-row strong { color: var(--color-text-primary); }
+.sl-freshness-buffer { font-size: 0.68rem; color: var(--color-text-muted); }
+.sl-freshness-buffer strong { color: var(--color-text-secondary); }
+.sl-drift-ok   { color: var(--color-neon-green); font-weight: 600; }
+.sl-drift-bad  { color: #f87171; font-weight: 600; }
