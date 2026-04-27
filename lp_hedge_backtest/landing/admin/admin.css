@@ -578,3 +578,99 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
   opacity: .5;
   cursor: not-allowed;
 }
+
+/* ── Signal Lab admin panel ───────────────────────────────────── */
+
+.sl-admin-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+
+.sl-admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  user-select: none;
+  transition: background 0.15s;
+}
+.sl-admin-header:hover { background: rgba(255,255,255,0.03); }
+
+.sl-admin-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.sl-admin-loading {
+  padding: 12px 16px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.sl-admin-grid {
+  padding: 0 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sl-admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.sl-admin-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 80px;
+}
+.sl-admin-group--action { justify-content: flex-end; }
+
+.sl-admin-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.sl-admin-val {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Listener status badge */
+.sl-listener-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.sl-listener--ok    { background: rgba(0,255,150,0.12); color: #00ff96; }
+.sl-listener--off   { background: rgba(248,113,113,0.12); color: #f87171; }
+.sl-listener--pause { background: rgba(250,204,21,0.12); color: #facc15; }
+
+/* M2-34: reconciler timestamp in refresh bar */
+.reconciler-ts {
+  font-size: 0.65rem;
+  color: var(--muted);
+  opacity: 0.8;
+  white-space: nowrap;
+}

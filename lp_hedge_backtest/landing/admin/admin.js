@@ -195,7 +195,7 @@ function _showReconnectOverlay(show) {
 async function doRefresh() {
   setStatus('Actualizando...');
   try {
-    await Promise.all([fetchEthPrice(), renderOverview()]);
+    await Promise.all([fetchEthPrice(), renderOverview(), fetchSignalLabStatus()]);
     _apiFails = 0;
     _showReconnectOverlay(false);
     const now = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -312,6 +312,13 @@ function renderStats(s) {
       return started?.details?.engine === 'v2';
     }).length;
     v2El.textContent = v2Count;
+  }
+
+  // M2-34: reconciler last-run timestamp in refresh bar
+  const recEl = document.getElementById('reconciler-last-run');
+  if (recEl && s.reconciler_last_run) {
+    recEl.textContent = 'Reconciler: ' + relTime(s.reconciler_last_run);
+    recEl.classList.remove('hidden');
   }
 }
 
@@ -1378,6 +1385,127 @@ async function nuclearStop() {
     doRefresh();
   } catch (e) {
     if (e.message !== 'Session expired') alert('Error: ' + e.message);
+  }
+}
+
+// ── Signal Lab admin panel ─────────────────────────────────────────────────
+
+let _slSectionOpen = true;
+
+function toggleSignalLabSection() {
+  _slSectionOpen = !_slSectionOpen;
+  document.getElementById('signal-lab-body').style.display = _slSectionOpen ? '' : 'none';
+  document.getElementById('sl-admin-toggle').textContent   = _slSectionOpen ? '▾' : '▸';
+}
+
+async function fetchSignalLabStatus() {
+  try {
+    const d = await apiGet('/admin/signal-lab-status');
+    renderSignalLab(d);
+  } catch (e) {
+    const el = document.getElementById('signal-lab-status-content');
+    if (el) el.innerHTML = `<span style="font-size:0.72rem;color:#f87171">Error: ${e.message}</span>`;
+  }
+}
+
+function renderSignalLab(d) {
+  const el = document.getElementById('signal-lab-status-content');
+  if (!el) return;
+
+  const listener  = d.listener  || {};
+  const signals   = d.signals   || {};
+  const lp        = d.lp_range_cache;
+  const rec       = d.reconciler || {};
+
+  // Listener badge (also shown in collapsed header)
+  const lRunning = listener.running;
+  const lPaused  = listener.paused;
+  const badgeEl  = document.getElementById('sl-admin-listener-badge');
+  if (badgeEl) {
+    badgeEl.textContent  = lRunning ? '● Running' : (lPaused ? '⏸ Paused' : '● Stopped');
+    badgeEl.className    = 'sl-listener-badge ' + (lRunning ? 'sl-listener--ok' : (lPaused ? 'sl-listener--pause' : 'sl-listener--off'));
+    badgeEl.classList.remove('hidden');
+  }
+
+  // LP range info
+  let lpHtml = '<span style="color:var(--muted)">No disponible</span>';
+  let lpAgeWarn = '';
+  if (lp) {
+    const ageH = lp.cache_age_hours;
+    const msgD = lp.msg_date ? new Date(lp.msg_date).toLocaleDateString('es-VE', { day:'numeric', month:'short' }) : '—';
+    lpAgeWarn = ageH > 48 ? ' ⚠️' : '';
+    lpHtml = `ETH $${lp.current_price ? Number(lp.current_price).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—'} · ${msgD} · <strong>${ageH}h${lpAgeWarn}</strong>`;
+  }
+
+  // Last signal
+  const lastSigLabel = signals.last_received ? relTime(signals.last_received) : 'Nunca';
+
+  // Reconciler
+  const recLabel = rec.last_run ? `${relTime(rec.last_run)} (${rec.configs_checked ?? '?'} configs)` : 'Sin registro';
+
+  el.innerHTML = `
+    <div class="sl-admin-grid">
+      <div class="sl-admin-row">
+        <div class="sl-admin-group">
+          <div class="sl-admin-label">Listener</div>
+          <div class="sl-admin-val">
+            <span class="sl-listener-badge ${lRunning ? 'sl-listener--ok' : (lPaused ? 'sl-listener--pause' : 'sl-listener--off')}">
+              ${lRunning ? '● Running' : (lPaused ? '⏸ Paused' : '● Stopped')}
+            </span>
+            ${listener.pid ? `<span style="font-size:0.65rem;color:var(--muted);margin-left:6px">PID ${listener.pid}</span>` : ''}
+          </div>
+        </div>
+        <div class="sl-admin-group">
+          <div class="sl-admin-label">Señales pendientes</div>
+          <div class="sl-admin-val">${signals.pending ?? '—'}</div>
+        </div>
+        <div class="sl-admin-group">
+          <div class="sl-admin-label">Expiradas hoy</div>
+          <div class="sl-admin-val">${signals.expired_24h ?? '—'}</div>
+        </div>
+        <div class="sl-admin-group">
+          <div class="sl-admin-label">Total señales</div>
+          <div class="sl-admin-val">${signals.total ?? '—'}</div>
+        </div>
+        <div class="sl-admin-group">
+          <div class="sl-admin-label">Última señal</div>
+          <div class="sl-admin-val">${lastSigLabel}</div>
+        </div>
+      </div>
+      <div class="sl-admin-row sl-admin-row--lp">
+        <div class="sl-admin-group" style="flex:2">
+          <div class="sl-admin-label">LP Range cache</div>
+          <div class="sl-admin-val">${lpHtml}</div>
+        </div>
+        <div class="sl-admin-group">
+          <div class="sl-admin-label">Reconciler</div>
+          <div class="sl-admin-val" style="font-size:0.72rem">${recLabel}</div>
+        </div>
+        <div class="sl-admin-group sl-admin-group--action">
+          <button class="btn-outline-sm" id="btn-refresh-lp-range" onclick="refreshLpRange()" title="Pausa listener → ejecuta eth_lp_range.py --save → reanuda">
+            🔄 Refrescar rango LP
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function refreshLpRange() {
+  const btn = document.getElementById('btn-refresh-lp-range');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Analizando…'; }
+  try {
+    const d = await apiPost('/admin/signal-lab/refresh-lp-range');
+    if (d.status === 'ok') {
+      alert('✅ LP Range cache actualizado.');
+    } else {
+      alert('⚠️ Error al refrescar:\n' + (d.stderr || d.stdout || 'Sin detalles'));
+    }
+    fetchSignalLabStatus();
+  } catch (e) {
+    if (e.message !== 'Session expired') alert('Error: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Refrescar rango LP'; }
   }
 }
 

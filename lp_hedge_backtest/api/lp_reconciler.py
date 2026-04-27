@@ -18,6 +18,9 @@ from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+_BASE_DIR       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_RECONCILE_STATE = os.path.join(_BASE_DIR, "data_cache", "reconciler_state.json")
+
 from sqlalchemy import select, update
 from web3 import Web3
 
@@ -84,6 +87,7 @@ async def _reconcile_all():
 
     if not configs:
         print("[LPReconciler] No active aragan/avaro configs to check", flush=True)
+        _write_reconciler_state(0)
         return
 
     print(f"[LPReconciler] Scanning {len(configs)} active config(s)…", flush=True)
@@ -94,6 +98,20 @@ async def _reconcile_all():
 
     for cfg in configs:
         await _check_config(cfg, contract, loop)
+
+    _write_reconciler_state(len(configs))
+
+
+def _write_reconciler_state(configs_checked: int):
+    try:
+        os.makedirs(os.path.dirname(_RECONCILE_STATE), exist_ok=True)
+        with open(_RECONCILE_STATE, "w") as f:
+            json.dump({
+                "last_run": datetime.now(timezone.utc).isoformat(),
+                "configs_checked": configs_checked,
+            }, f)
+    except Exception as e:
+        print(f"[LPReconciler] Could not write state file: {e}", flush=True)
 
 
 async def _check_config(cfg: BotConfig, contract, loop: asyncio.AbstractEventLoop):

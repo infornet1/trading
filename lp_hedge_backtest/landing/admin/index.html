@@ -90,6 +90,7 @@
     <span id="refresh-status">Actualizando...</span>
     <button id="btn-refresh" class="btn-outline-sm" onclick="doRefresh()">↻ Ahora</button>
     <button id="btn-reconcile" class="btn-outline-sm" onclick="reconcileNow()" title="Forzar escaneo LP reconciler ahora (normalmente cada hora)">🔍 Reconcile LP</button>
+    <span id="reconciler-last-run" class="reconciler-ts hidden"></span>
     <button id="btn-maintenance" class="btn-maintenance hidden" onclick="toggleMaintenance()">🔧 Maintenance: OFF</button>
     <button id="btn-nuclear" class="btn-nuclear hidden" onclick="nuclearStop()">☢ Stop All</button>
   </div>
@@ -107,6 +108,20 @@
   <!-- Pool health grid -->
   <section class="pools-grid" id="pools-grid">
     <div class="loading-msg">Cargando pools...</div>
+  </section>
+
+  <!-- Signal Lab health section -->
+  <section class="sl-admin-section" id="signal-lab-section">
+    <div class="sl-admin-header" onclick="toggleSignalLabSection()">
+      <span>🧪 Signal Lab</span>
+      <div class="sl-admin-header-right">
+        <span id="sl-admin-listener-badge" class="sl-listener-badge hidden"></span>
+        <span id="sl-admin-toggle">▾</span>
+      </div>
+    </div>
+    <div id="signal-lab-body">
+      <div id="signal-lab-status-content" class="sl-admin-loading">Cargando...</div>
+    </div>
   </section>
 
   <!-- Users registry section -->

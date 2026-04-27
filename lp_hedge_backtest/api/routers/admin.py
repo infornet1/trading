@@ -3,6 +3,9 @@ Admin router — emergency controls + monitoring overview. Admin-wallet only.
 """
 
 import asyncio
+import json
+import os
+import subprocess
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,7 +15,12 @@ from sqlalchemy.orm import selectinload
 from api.auth import get_current_admin
 from api.bot_manager import manager
 from api.database import AsyncSessionLocal
-from api.models import BotConfig, BotEvent, User
+from api.models import BotConfig, BotEvent, SignalEvent, User
+
+_BASE_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_CACHE_DIR   = os.path.join(_BASE_DIR, "data_cache")
+_TG_DIR      = os.path.join(_BASE_DIR, "telegram_listener")
+_VENV_PYTHON = os.path.join(_BASE_DIR, "venv", "bin", "python3")
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -297,6 +305,151 @@ async def reconcile_now(admin: str = Depends(get_current_admin)):
     return {"status": "ok", "message": "LP reconciler scan complete"}
 
 
+# ── M2-34 / Signal Lab status ──────────────────────────────────────────────
+
+@router.get("/signal-lab-status")
+async def signal_lab_status(admin: str = Depends(get_current_admin)):
+    """Signal Lab health: listener process, signal queue, LP range cache, reconciler."""
+
+    # ── Listener ──────────────────────────────────────────────────────────
+    pid_file   = os.path.join(_TG_DIR, "logs", "listener.pid")
+    pause_flag = os.path.join(_TG_DIR, "logs", ".pause")
+    listener_running = False
+    listener_pid     = None
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file) as f:
+                pid = int(f.read().strip())
+            os.kill(pid, 0)   # signal 0 = check existence only
+            listener_pid     = pid
+            listener_running = True
+        except (ProcessLookupError, ValueError, OSError):
+            pass
+
+    # ── Signal queue ──────────────────────────────────────────────────────
+    async with AsyncSessionLocal() as db:
+        last_received = (await db.execute(
+            select(func.max(SignalEvent.received_at))
+        )).scalar_one_or_none()
+
+        pending_count = (await db.execute(
+            select(func.count()).select_from(SignalEvent)
+            .where(SignalEvent.status == "pending")
+        )).scalar_one()
+
+        cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+        expired_24h = (await db.execute(
+            select(func.count()).select_from(SignalEvent)
+            .where(SignalEvent.status == "expired")
+            .where(SignalEvent.received_at >= cutoff_24h)
+        )).scalar_one()
+
+        total_signals = (await db.execute(
+            select(func.count()).select_from(SignalEvent)
+        )).scalar_one()
+
+    # ── LP range cache ────────────────────────────────────────────────────
+    lp_cache = None
+    lp_cache_path = os.path.join(_CACHE_DIR, "lp_range_latest.json")
+    if os.path.exists(lp_cache_path):
+        try:
+            with open(lp_cache_path) as f:
+                raw = json.load(f)
+            saved_at = raw.get("saved_at")
+            msg_date = raw.get("msg_date")
+            cp = raw.get("ranges", {}).get("current_price")
+            cache_age_h = None
+            if saved_at:
+                dt = datetime.fromisoformat(saved_at.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                cache_age_h = round((datetime.now(timezone.utc) - dt).total_seconds() / 3600, 1)
+            lp_cache = {
+                "saved_at":        saved_at,
+                "msg_date":        msg_date,
+                "current_price":   float(cp) if cp else None,
+                "cache_age_hours": cache_age_h,
+            }
+        except Exception:
+            pass
+
+    # ── Reconciler last run ───────────────────────────────────────────────
+    reconciler = {"last_run": None, "configs_checked": None}
+    rec_path = os.path.join(_CACHE_DIR, "reconciler_state.json")
+    if os.path.exists(rec_path):
+        try:
+            with open(rec_path) as f:
+                reconciler = json.load(f)
+        except Exception:
+            pass
+
+    return {
+        "listener": {
+            "running": listener_running,
+            "pid":     listener_pid,
+            "paused":  os.path.exists(pause_flag),
+        },
+        "signals": {
+            "pending":      pending_count,
+            "expired_24h":  expired_24h,
+            "total":        total_signals,
+            "last_received": last_received.isoformat() if last_received else None,
+        },
+        "lp_range_cache": lp_cache,
+        "reconciler":     reconciler,
+    }
+
+
+@router.post("/signal-lab/refresh-lp-range")
+async def refresh_lp_range(admin: str = Depends(get_current_admin)):
+    """
+    Pause listener → kill it → run eth_lp_range.py --save → unpause.
+    Returns stdout/stderr. Listener watchdog restarts it automatically.
+    """
+    script    = os.path.join(_TG_DIR, "eth_lp_range.py")
+    pid_file  = os.path.join(_TG_DIR, "logs", "listener.pid")
+    pause_flag = os.path.join(_TG_DIR, "logs", ".pause")
+
+    if not os.path.exists(script):
+        raise HTTPException(status_code=404, detail="eth_lp_range.py not found")
+
+    try:
+        # 1. Pause watchdog so it doesn't restart the listener mid-run
+        open(pause_flag, "w").close()
+
+        # 2. Kill listener if running (free the Telethon session)
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file) as f:
+                    pid = int(f.read().strip())
+                os.kill(pid, 15)   # SIGTERM
+                await asyncio.sleep(2)
+            except (ProcessLookupError, ValueError, OSError):
+                pass
+
+        # 3. Run eth_lp_range.py --save in thread (it calls Claude Vision — may take 30s)
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: subprocess.run(
+            [_VENV_PYTHON, script, "--save"],
+            capture_output=True, text=True, timeout=90, cwd=_BASE_DIR,
+        ))
+
+        success = result.returncode == 0
+        print(f"[Admin] LP range refresh by {admin}: rc={result.returncode}", flush=True)
+        return {
+            "status": "ok" if success else "error",
+            "stdout": result.stdout[-600:] if result.stdout else "",
+            "stderr": result.stderr[-300:] if result.stderr else "",
+        }
+
+    finally:
+        # 4. Always unpause (watchdog will restart listener automatically)
+        try:
+            os.remove(pause_flag)
+        except FileNotFoundError:
+            pass
+
+
 # ── Overview ───────────────────────────────────────────────────────────────
 
 @router.get("/overview")
@@ -453,6 +606,16 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
 
         running_count = sum(1 for p in pools if p["running"])
 
+        # M2-34: reconciler last-run timestamp
+        reconciler_last_run = None
+        rec_path = os.path.join(_CACHE_DIR, "reconciler_state.json")
+        if os.path.exists(rec_path):
+            try:
+                with open(rec_path) as f:
+                    reconciler_last_run = json.load(f).get("last_run")
+            except Exception:
+                pass
+
         return {
             "stats": {
                 # Acquisition funnel
@@ -466,6 +629,8 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                 "active_shorts":     active_shorts,
                 "whale_bots":        whale_bots,
                 "total_volume_usd":  round(total_volume, 2),
+                # Background jobs
+                "reconciler_last_run": reconciler_last_run,
             },
             "pools": pools,
         }

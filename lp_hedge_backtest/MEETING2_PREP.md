@@ -224,7 +224,7 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 | ID | Item | Effort | Why | Status |
 |---|---|---|---|---|
 | M2-33 | Override Plan / Suspend / Refund / Note actions | High | Already stubbed with `alert('Disponible en Step 8')`. Full billing management — deferred to subscription system. | 🔲 Step 8 |
-| M2-34 | Reconciler last-run timestamp in admin | Low | No visibility into when LP reconciler last scanned. Nice-to-have status indicator. | 🔲 Post-meeting |
+| M2-34 | Reconciler last-run timestamp in admin | Low | `lp_reconciler.py` now writes `data_cache/reconciler_state.json` after each scan. `/admin/overview` stats include `reconciler_last_run`. Admin refresh bar shows `Reconciler: Xh ago` label next to the Reconcile LP button. | ✅ Done 2026-04-27 |
 | M2-35 | Platform-wide cumulative P&L stat | Medium | Aggregate all bot close events — investor-facing health metric for admin overview. | 🔲 Post-meeting |
 
 ---
@@ -293,4 +293,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-04-27 — SL-P5a/b/c ✅ (Signal Lab Phase 5: auto-expiry + price drift warning + SL buffer remaining). API restart confirmed. Previously: M2-28 ✅ M2-30 ✅ M2-6 ✅ M2-7 ✅ M2-16 (UI) ✅ T1-3 ✅ T2-6 ✅ M2-39 SQLAlchemy fix ✅. M2-9 ✅ M2-13 ✅ M2-21 ✅ M2-39 ✅ M2-40 ✅ all live-validated. M2-29 deferred.*
+*Last updated: 2026-04-27 — M2-34 ✅ (reconciler timestamp) + Signal Lab admin panel ✅ (listener status, signal queue, LP cache age, Refrescar rango LP button). SL-P5a/b/c ✅. Previously: M2-28 ✅ M2-30 ✅ M2-6 ✅ M2-7 ✅ M2-16 (UI) ✅ T1-3 ✅ T2-6 ✅ M2-39 SQLAlchemy fix ✅. M2-9 ✅ M2-13 ✅ M2-21 ✅ M2-39 ✅ M2-40 ✅ all live-validated. M2-29 deferred.*
