@@ -40,8 +40,9 @@ _EVENT_MAP = {
     # LP safety events
     "lp_removed":           "lp_removed",
     "lp_burned":            "lp_burned",
-    # V2 recovery
+    # V2 recovery + circuit breaker
     "orphan_recovered":     "orphan_recovered",
+    "circuit_breaker":      "circuit_breaker",
     # FURY events
     "fury_entry":           "fury_entry",
     "fury_sl":              "fury_sl",
