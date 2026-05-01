@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-05-01 (M2-39 enhanced CB — rolling window, escalating pause, daily loss cap)
+# Last updated: 2026-05-01 (M2-39 DB enum fix — circuit_breaker added to MariaDB enum; escalating CB L1/L2/L3 live-validated)
 
 ---
 
@@ -22,6 +22,8 @@
   - **C) Daily loss cap**: if estimated session net loss (gross SL loss + round-trip fees) reaches -$5.00 USD → pause until UTC midnight.
   - Counter increments on `sl_hit`, `trailing_stop`, **and `external_close`**. Resets on `tp_hit`. Fires a `circuit_breaker` DB event (with `session_loss_usd` field) and email. Status line shows `🔴 CIRCUIT BREAKER L2 (Xs | loss≈-$X.XX)` where L indicates escalation level.
   - Original live-validation 2026-04-23 20:02 UTC: Config 20, 3 consecutive external_close hits, 20-min pause enforced.
+  - **Escalating pause live-validated 2026-05-01** (Config 20, ETH choppy ~$2,300–$2,320): L1 fired ~14:13 UTC → 20-min pause confirmed (next entry 14:33) ✅; L2 fired ~15:23 UTC → 1-hour pause confirmed (next entry 16:24) ✅; L3 fired ~17:05 UTC → 4-hour pause in effect (~21:05 re-entry) ✅.
+  - **DB enum fix 2026-05-01**: `circuit_breaker` was missing from the MariaDB `bot_events.event_type` enum. After the `_EVENT_MAP` fix in commit `891dd10`, CB events were silently dropped (write exception caught, no DB record). Fixed via `ALTER TABLE` adding `circuit_breaker` to the enum — no API restart needed. Next CB event logs with correct type.
 - **External-close cooldown (M2-40)**: when native SL fires on HL between polls (`external_close`), a 5-min cooldown blocks re-entry before the reentry guard logic runs. Prevents immediate re-entry into the same choppy conditions. Status line shows `⏸️ EXT COOLDOWN (Xs)`. **Live-validated 2026-04-22:** native SL fired at 13:57 UTC on Config 20; `stopped` event logged with `cooldown: 300`; reentry guard cleared 31s later but cooldown held until 14:02:46 UTC.
 - Identified by a **V2 (green badge)** on the admin dashboard bot card.
 - Native SL uses a 1-second settle delay after market open to allow HL to register the fill before the SL order is submitted.
