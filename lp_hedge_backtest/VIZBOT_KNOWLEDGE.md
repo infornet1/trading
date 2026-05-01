@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-04-25 (M2-6 buffer pills, M2-7 backtest link, M2-16 UI fix, T1-3 PnL label, T2-6 HL status — all frontend, no restart)
+# Last updated: 2026-05-01 (M2-39 enhanced CB — rolling window, escalating pause, daily loss cap)
 
 ---
 
@@ -16,7 +16,12 @@
 - **Native TP**: placed as a standalone trigger order on HL (`tpsl="tp"`, `grouping="na"`) at open when `TP_PCT` is configured. `limit_px = trigger * 0.97` (3% below, buys back at discount). Both native orders are cancelled before any code-path market close to prevent double-fill. **Live-validated 2026-04-22:** Config 20 `hedge_opened` at 13:48 UTC confirmed `tp_oid: 392796553319` in event details.
 - Includes **crash recovery**: on startup the bot checks for any open position on the HL wallet. If found, it re-adopts it — sets `hedge_active=True`, finds existing native SL/TP orders or places fresh ones, and continues monitoring.
 - Includes **LP reconciler**: a background job runs hourly to verify each Uniswap V3 NFT still has liquidity. If LP was removed or NFT burned while the bot was stopped, the reconciler marks the config `inactive` in DB, logs an event, stops the process, and emails the admin.
-- **Circuit breaker (M2-39)**: after 3 consecutive SL-type closes, re-entry is paused for 20 min. Counter increments on `sl_hit`, `trailing_stop`, **and `external_close`** (native HL trigger fired before software poll — the most common SL path). Resets on `tp_hit`. Fires a `circuit_breaker` DB event and email. Status line shows `🔴 CIRCUIT BREAKER (Xs)`. Bug fixed 2026-04-23: original code missed the external_close paths. **Live-validated 2026-04-23 20:02 UTC:** Config 20 hit 3 consecutive external_close hits during choppy ETH session ($2,318–$2,335); CB fired, 20-min pause enforced, next entry at 20:22 UTC (exactly 20 min). DB enum also fixed same day: `circuit_breaker` added to `bot_events.event_type` enum (was falling back to `error` type).
+- **Circuit breaker (M2-39, enhanced 2026-05-01)**: three independent triggers, all funneled through `_on_stop_event()`:
+  - **A) Escalating streak**: 3 consecutive stops → pause scales 20m → 1h → 4h depending on how many CBs fired in the prior 4-hour window (was always flat 20m).
+  - **B) Rolling-window rate**: 5 stops within any 30-minute window → 1-hour pause, regardless of whether they are consecutive.
+  - **C) Daily loss cap**: if estimated session net loss (gross SL loss + round-trip fees) reaches -$5.00 USD → pause until UTC midnight.
+  - Counter increments on `sl_hit`, `trailing_stop`, **and `external_close`**. Resets on `tp_hit`. Fires a `circuit_breaker` DB event (with `session_loss_usd` field) and email. Status line shows `🔴 CIRCUIT BREAKER L2 (Xs | loss≈-$X.XX)` where L indicates escalation level.
+  - Original live-validation 2026-04-23 20:02 UTC: Config 20, 3 consecutive external_close hits, 20-min pause enforced.
 - **External-close cooldown (M2-40)**: when native SL fires on HL between polls (`external_close`), a 5-min cooldown blocks re-entry before the reentry guard logic runs. Prevents immediate re-entry into the same choppy conditions. Status line shows `⏸️ EXT COOLDOWN (Xs)`. **Live-validated 2026-04-22:** native SL fired at 13:57 UTC on Config 20; `stopped` event logged with `cooldown: 300`; reentry guard cleared 31s later but cooldown held until 14:02:46 UTC.
 - Identified by a **V2 (green badge)** on the admin dashboard bot card.
 - Native SL uses a 1-second settle delay after market open to allow HL to register the fill before the SL order is submitted.
