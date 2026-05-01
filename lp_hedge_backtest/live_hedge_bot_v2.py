@@ -22,6 +22,8 @@ import sys
 import time
 import json
 import smtplib
+from collections import deque
+from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
@@ -176,6 +178,12 @@ class LiveHedgeBotV2:
         # ── M2-39: Circuit breaker ──────────────────────────────────────────
         self._consecutive_stops      = 0
         self._circuit_breaker_until  = 0.0
+        self._stop_timestamps        = deque()   # rolling window (rate trigger)
+        self._cb_fire_times          = deque()   # escalation history
+
+        # ── M2-39C: Daily loss cap ───────────────────────────────────────────
+        self._session_loss_usd       = 0.0
+        self._session_date           = datetime.now(timezone.utc).date()
 
         # ── M2-40: Cooldown post external_close ─────────────────────────────
         self._ext_close_cooldown_until = 0.0
@@ -453,9 +461,18 @@ class LiveHedgeBotV2:
     _MAX_MARGIN_FAILURES  = 5
     _MARGIN_BACKOFF_SECS  = 300
 
-    # M2-39: circuit breaker
-    _CB_STOP_THRESHOLD    = 3     # consecutive SL/trailing stops before pause
-    _CB_PAUSE_SECS        = 1200  # 20 minutes
+    # M2-39: circuit breaker — consecutive streak trigger
+    _CB_STOP_THRESHOLD    = 3     # consecutive stops before pause
+    _CB_PAUSE_STEPS       = [1200, 3600, 14400]  # 20m → 1h → 4h (escalating)
+    _CB_ESCALATION_WINDOW = 14400  # 4 h — window to count prior CB fires for escalation
+
+    # M2-39B: rolling-window rate trigger (independent of streak)
+    _CB_RATE_THRESHOLD    = 5     # stops in rolling window → pause
+    _CB_RATE_WINDOW_SECS  = 1800  # 30-minute window
+    _CB_RATE_PAUSE_SECS   = 3600  # 1-hour pause when rate trigger fires
+
+    # M2-39C: daily loss cap
+    _DAILY_LOSS_CAP_USD   = -5.00  # estimated net loss (fees included) to pause rest of UTC day
 
     # M2-40: cooldown after native SL fires between polls (external_close)
     _EXT_COOLDOWN_SECS    = 300   # 5 minutes
@@ -712,21 +729,8 @@ class LiveHedgeBotV2:
             if result is None:
                 # M2-40: native SL fired between polls — set cooldown
                 self._ext_close_cooldown_until = time.time() + self._EXT_COOLDOWN_SECS
-                # M2-39: external_close is a de-facto SL hit — count toward circuit breaker
-                self._consecutive_stops += 1
-                if self._consecutive_stops >= self._CB_STOP_THRESHOLD:
-                    self._circuit_breaker_until = time.time() + self._CB_PAUSE_SECS
-                    self._consecutive_stops = 0
-                    log_event("circuit_breaker", price=price, details={
-                        "reason":  f"{self._CB_STOP_THRESHOLD} consecutive stops (external_close)",
-                        "pause_s": self._CB_PAUSE_SECS,
-                    })
-                    self.send_email(
-                        "⚠️ Circuit Breaker Activated (M2-39)",
-                        f"NFT #{NFT_ID}: {self._CB_STOP_THRESHOLD} consecutive external closes — "
-                        f"pausing re-entry for {self._CB_PAUSE_SECS // 60} min.\nLast exit: ${price:.2f}",
-                    )
-                    print(f"🔴 [M2-39] Circuit breaker — pausing {self._CB_PAUSE_SECS // 60} min", flush=True)
+                # M2-39: all CB systems updated here (before state reset)
+                self._on_stop_event(price)
                 print(f"⚠️  market_close returned None — position already gone. Resetting.", flush=True)
                 self._reset_short_state(price)
                 log_event("stopped", price=price, details={
@@ -755,25 +759,9 @@ class LiveHedgeBotV2:
                     log_event("stopped", price=price, details={"reason": "auto_rearm_disabled"})
                     sys.exit(0)
 
-                # M2-39: track consecutive stops for circuit breaker
-                if reason in ("sl_hit", "trailing_stop"):
-                    self._consecutive_stops += 1
-                    if self._consecutive_stops >= self._CB_STOP_THRESHOLD:
-                        self._circuit_breaker_until = time.time() + self._CB_PAUSE_SECS
-                        self._consecutive_stops = 0
-                        log_event("circuit_breaker", price=price, details={
-                            "reason":   f"{self._CB_STOP_THRESHOLD} consecutive stops",
-                            "pause_s":  self._CB_PAUSE_SECS,
-                        })
-                        self.send_email(
-                            "⚠️ Circuit Breaker Activated (M2-39)",
-                            f"NFT #{NFT_ID}: {self._CB_STOP_THRESHOLD} consecutive stops — "
-                            f"pausing re-entry for {self._CB_PAUSE_SECS // 60} min.\n"
-                            f"Last exit: ${close_price:.2f}",
-                        )
-                        print(f"🔴 [M2-39] Circuit breaker — pausing {self._CB_PAUSE_SECS // 60} min", flush=True)
-                elif reason == "tp_hit":
-                    self._consecutive_stops = 0  # clean win resets the counter
+                # M2-39: all CB systems (win resets streak; loss feeds all three)
+                is_win = reason in ("tp_hit", "trailing_stop")
+                self._on_stop_event(close_price, is_win=is_win)
 
                 pnl_str = f"{pnl_est:.2f}%" if pnl_est is not None else "n/a"
                 cb_str  = f" | streak {self._consecutive_stops}/{self._CB_STOP_THRESHOLD}" if reason in ("sl_hit", "trailing_stop") else ""
@@ -797,6 +785,87 @@ class LiveHedgeBotV2:
         except Exception as e:
             print(f"❌ close_hedge error: {e}", flush=True)
             log_event("error", price=price, details={"msg": str(e)})
+
+    def _on_stop_event(self, price: float, is_win: bool = False) -> None:
+        """Central CB handler called after every trade close.
+
+        Updates all three circuit-breaker systems:
+          A) Consecutive-streak trigger (original M2-39, now with escalating pause)
+          B) Rolling-window rate trigger  (new)
+          C) Daily net-loss cap           (new)
+
+        Must be called BEFORE _reset_short_state so entry_price/size are still set.
+        """
+        now = time.time()
+
+        if is_win:
+            self._consecutive_stops = 0
+            return
+
+        # ── A+B: record this stop ─────────────────────────────────────────
+        self._consecutive_stops += 1
+        self._stop_timestamps.append(now)
+        while self._stop_timestamps and self._stop_timestamps[0] < now - self._CB_RATE_WINDOW_SECS:
+            self._stop_timestamps.popleft()
+
+        # ── C: accumulate estimated loss (gross SL loss + round-trip fee) ─
+        entry  = self.entry_price or price
+        size   = self.hedge_size_eth or 0.0
+        notional = entry * size
+        est_loss = -(notional * DEFAULT_SL_PCT) - (notional * 0.00045 * 2)
+        today = datetime.now(timezone.utc).date()
+        if today != self._session_date:           # new UTC day → reset counter
+            self._session_loss_usd = 0.0
+            self._session_date = today
+        self._session_loss_usd += est_loss
+
+        # ── Determine if any CB trigger fires ─────────────────────────────
+        streak_fire = self._consecutive_stops >= self._CB_STOP_THRESHOLD
+        rate_fire   = len(self._stop_timestamps) >= self._CB_RATE_THRESHOLD
+        cap_fire    = self._session_loss_usd <= self._DAILY_LOSS_CAP_USD
+
+        if not (streak_fire or rate_fire or cap_fire):
+            return
+
+        # ── Compute escalated pause (A/B share escalation; C uses fixed EOD) ─
+        if cap_fire:
+            # Pause until next UTC midnight
+            midnight = datetime.now(timezone.utc).replace(
+                hour=23, minute=59, second=59, microsecond=0
+            )
+            pause_secs = max(int(midnight.timestamp() - now), 1800)
+            reason_str = (f"Daily loss cap hit (est. ${self._session_loss_usd:.2f})")
+            self._session_loss_usd = 0.0   # reset so it doesn't re-fire immediately
+        else:
+            # Escalating pause based on how many CBs fired in the last window
+            self._cb_fire_times.append(now)
+            while self._cb_fire_times and self._cb_fire_times[0] < now - self._CB_ESCALATION_WINDOW:
+                self._cb_fire_times.popleft()
+            step = min(len(self._cb_fire_times) - 1, len(self._CB_PAUSE_STEPS) - 1)
+            if rate_fire:
+                pause_secs = self._CB_RATE_PAUSE_SECS
+                reason_str = (f"{self._CB_RATE_THRESHOLD} stops in "
+                              f"{self._CB_RATE_WINDOW_SECS // 60}min window")
+                self._stop_timestamps.clear()
+            else:
+                pause_secs = self._CB_PAUSE_STEPS[step]
+                reason_str = f"{self._CB_STOP_THRESHOLD} consecutive stops (level {step + 1})"
+            self._consecutive_stops = 0
+
+        self._circuit_breaker_until = max(self._circuit_breaker_until, now + pause_secs)
+        log_event("circuit_breaker", price=price, details={
+            "reason":  reason_str,
+            "pause_s": pause_secs,
+            "session_loss_usd": round(self._session_loss_usd, 2),
+        })
+        self.send_email(
+            "⚠️ Circuit Breaker Activated (M2-39)",
+            f"NFT #{NFT_ID}: {reason_str}\n"
+            f"Pausing re-entry for {pause_secs // 60} min.\n"
+            f"Last exit: ${price:.2f} | Session est. loss: ${self._session_loss_usd:.2f}",
+        )
+        print(f"🔴 [M2-39] Circuit breaker ({reason_str}) — pausing {pause_secs // 60} min",
+              flush=True)
 
     def _reset_short_state(self, close_price: float):
         """Reset all short-related state after a close."""
@@ -829,21 +898,8 @@ class LiveHedgeBotV2:
                 self._cancel_native_tp()
                 # M2-40: set cooldown before re-arm
                 self._ext_close_cooldown_until = time.time() + self._EXT_COOLDOWN_SECS
-                # M2-39: external_close is a de-facto SL hit — count toward circuit breaker
-                self._consecutive_stops += 1
-                if self._consecutive_stops >= self._CB_STOP_THRESHOLD:
-                    self._circuit_breaker_until = time.time() + self._CB_PAUSE_SECS
-                    self._consecutive_stops = 0
-                    log_event("circuit_breaker", price=price, details={
-                        "reason":  f"{self._CB_STOP_THRESHOLD} consecutive stops (external_close/sync)",
-                        "pause_s": self._CB_PAUSE_SECS,
-                    })
-                    self.send_email(
-                        "⚠️ Circuit Breaker Activated (M2-39)",
-                        f"NFT #{NFT_ID}: {self._CB_STOP_THRESHOLD} consecutive external closes — "
-                        f"pausing re-entry for {self._CB_PAUSE_SECS // 60} min.\nLast exit: ${price:.2f}",
-                    )
-                    print(f"🔴 [M2-39] Circuit breaker — pausing {self._CB_PAUSE_SECS // 60} min", flush=True)
+                # M2-39: all CB systems updated here (before state reset)
+                self._on_stop_event(price)
                 self._reset_short_state(price)
                 log_event("stopped", price=price, details={
                     "reason":            "external_close",
@@ -1205,7 +1261,11 @@ class LiveHedgeBotV2:
                     )
                 else:
                     if now < self._circuit_breaker_until:
-                        short_status = f"🔴 CIRCUIT BREAKER ({int(self._circuit_breaker_until - now)}s)"
+                        # show escalation level in status
+                        lvl = min(len(self._cb_fire_times), len(self._CB_PAUSE_STEPS))
+                        short_status = (f"🔴 CIRCUIT BREAKER L{lvl} "
+                                        f"({int(self._circuit_breaker_until - now)}s"
+                                        f" | loss≈${self._session_loss_usd:.2f})")
                     elif now < self._ext_close_cooldown_until:
                         short_status = f"⏸️  EXT COOLDOWN ({int(self._ext_close_cooldown_until - now)}s)"
                     else:
