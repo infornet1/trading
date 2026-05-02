@@ -49,7 +49,7 @@ async def _run_column_migrations():
             "ALTER TABLE bot_events MODIFY COLUMN event_type ENUM("
             "'started','hedge_opened','breakeven','tp_hit','sl_hit',"
             "'trailing_stop','stopped','error','reentry_guard_cleared',"
-            "'lp_removed','lp_burned','orphan_recovered',"
+            "'lp_removed','lp_burned','orphan_recovered','circuit_breaker',"
             "'fury_entry','fury_sl','fury_tp','fury_circuit_breaker',"
             "'whale_new_position','whale_closed','whale_size_increase',"
             "'whale_size_decrease','whale_flip','whale_snapshot','whale_event'"
