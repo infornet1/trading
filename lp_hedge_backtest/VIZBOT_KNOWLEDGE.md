@@ -59,6 +59,8 @@
 - **Email alerts**: new signal received, order filled (fill price + size + margin), order failed (error reason), listener crash (watchdog restart).
 - **Signal expiry**: signals older than 4h auto-marked `expired`, not executable.
 - **Safety**: wallets with active LP bots are hard-blocked from signal execution (UI + API).
+- **Admin monitor**: Signal Lab section in admin dashboard shows pool-card style wallet cards (armed/paused/inactive status, balance, last 3 executions as mini-evt rows, toggle/deactivate) + a signal feed card (last 15 signals + executions, cyan border). Registration form removed from admin — registration belongs in Wallet Manager.
+- **Dry run test**: `python -m telegram_listener.test_signal_lab` — 6-step pipeline test without real orders.
 
 ### Whale Tracker Mode (live_whale_bot.py)
 - Reads Hyperliquid leaderboard top-N traders (default 50) every poll interval (default 30s).

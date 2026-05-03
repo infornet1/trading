@@ -402,35 +402,47 @@ async def signal_lab_status(admin: str = Depends(get_current_admin)):
 
 @router.get("/signal-lab-monitor")
 async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
-    """Copy-trading wallet cards + unified signal/execution activity feed."""
+    """Copy-trading wallet cards (with per-wallet last 3 executions) + unified signal feed."""
 
     async with AsyncSessionLocal() as db:
         wallets_res = await db.execute(select(SignalWallet).order_by(SignalWallet.id))
         wallets     = wallets_res.scalars().all()
 
         events_res = await db.execute(
-            select(SignalEvent).order_by(SignalEvent.received_at.desc()).limit(25)
+            select(SignalEvent).order_by(SignalEvent.received_at.desc()).limit(20)
         )
         events = events_res.scalars().all()
 
-        exec_res = await db.execute(
+        all_exec_res = await db.execute(
             select(SignalExecution)
             .options(selectinload(SignalExecution.signal))
             .order_by(SignalExecution.executed_at.desc())
             .limit(15)
         )
-        executions = exec_res.scalars().all()
+        all_execs = all_exec_res.scalars().all()
 
-    # ── Wallet balance fetch (perp + spot + spot_usable) ──────────────────
+        # Per-wallet last 3 executions for wallet card mini-evt rows
+        wallet_execs: dict = {}
+        for w in wallets:
+            we_res = await db.execute(
+                select(SignalExecution)
+                .options(selectinload(SignalExecution.signal))
+                .where(SignalExecution.hl_wallet_addr == w.hl_wallet_addr)
+                .order_by(SignalExecution.executed_at.desc())
+                .limit(3)
+            )
+            wallet_execs[w.hl_wallet_addr] = we_res.scalars().all()
+
+    # ── Balance fetch ─────────────────────────────────────────────────────
     def _fetch(addr):
         try:
             from hyperliquid.info import Info
             from hyperliquid.utils import constants
-            info  = Info(constants.MAINNET_API_URL, skip_ws=True)
-            perp  = float(info.user_state(addr)["marginSummary"]["accountValue"])
-            spot  = 0.0
+            info = Info(constants.MAINNET_API_URL, skip_ws=True)
+            perp = float(info.user_state(addr)["marginSummary"]["accountValue"])
+            spot = 0.0
             spot_usable = False
-            ss    = info.spot_user_state(addr)
+            ss   = info.spot_user_state(addr)
             for b in ss.get("balances", []):
                 if b["coin"] == "USDC":
                     spot = float(b["total"]); break
@@ -445,48 +457,56 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
     wallet_rows = []
     for w in wallets:
         bal = await asyncio.to_thread(_fetch, w.hl_wallet_addr)
+
+        recent_execs = []
+        for ex in wallet_execs.get(w.hl_wallet_addr, []):
+            sig = ex.signal
+            recent_execs.append({
+                "outcome":    ex.outcome,
+                "fill_price": float(ex.fill_price) if ex.fill_price else None,
+                "pair":       sig.pair      if sig else "—",
+                "direction":  sig.direction if sig else "—",
+                "leverage":   sig.leverage  if sig else None,
+                "ts":         ex.executed_at.isoformat() + "Z",
+            })
+
         wallet_rows.append({
-            "id":           w.id,
-            "label":        w.label,
-            "addr_short":   w.hl_wallet_addr[:6] + "…" + w.hl_wallet_addr[-4:],
-            "hl_wallet_addr": w.hl_wallet_addr,
-            "auto_execute": w.auto_execute,
-            "active":       w.active,
-            "balance":      bal["total"],
-            "balance_perp": bal["perp"],
-            "balance_spot": bal["spot"],
-            "spot_usable":  bal["spot_usable"],
+            "id":                w.id,
+            "label":             w.label,
+            "addr_short":        w.hl_wallet_addr[:6] + "…" + w.hl_wallet_addr[-4:],
+            "hl_wallet_addr":    w.hl_wallet_addr,
+            "auto_execute":      w.auto_execute,
+            "active":            w.active,
+            "balance":           bal["total"],
+            "balance_perp":      bal["perp"],
+            "balance_spot":      bal["spot"],
+            "spot_usable":       bal["spot_usable"],
+            "recent_executions": recent_execs,
         })
 
-    # ── Unified activity feed ─────────────────────────────────────────────
+    # ── Unified activity feed (signals + executions sorted by time) ───────
     activity = []
-
     for ev in events:
         activity.append({
             "kind":      "signal",
             "pair":      ev.pair,
             "direction": ev.direction,
             "leverage":  ev.leverage,
-            "entry":     float(ev.entry)    if ev.entry    else None,
-            "stoploss":  float(ev.stoploss) if ev.stoploss else None,
+            "entry":     float(ev.entry) if ev.entry else None,
             "status":    ev.status,
             "ts":        ev.received_at.isoformat() + "Z",
         })
-
-    for ex in executions:
+    for ex in all_execs:
         sig = ex.signal
         activity.append({
             "kind":         "execution",
             "pair":         sig.pair      if sig else "—",
             "direction":    sig.direction if sig else "—",
-            "leverage":     sig.leverage  if sig else None,
             "fill_price":   float(ex.fill_price) if ex.fill_price else None,
-            "hl_order_id":  ex.hl_order_id,
             "outcome":      ex.outcome,
             "wallet_short": ex.hl_wallet_addr[:6] + "…" + ex.hl_wallet_addr[-4:] if ex.hl_wallet_addr else "—",
             "ts":           ex.executed_at.isoformat() + "Z",
         })
-
     activity.sort(key=lambda x: x["ts"], reverse=True)
 
     return {"wallets": wallet_rows, "activity": activity[:30]}

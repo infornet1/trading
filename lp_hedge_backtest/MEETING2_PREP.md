@@ -240,6 +240,7 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 | SL-P7 | Auto copy trading: signal_wallets table, real HL execution, agent key model | High | ✅ Done 2026-05-03 |
 | SL-P7b | Copy Trading card in Wallet Manager (card UX, spot_usable detection) | Medium | ✅ Done 2026-05-03 |
 | SL-P7c | Email notifications: new signal, fill, failure, listener crash | Low | ✅ Done 2026-05-03 |
+| SL-P7d | Admin Signal Lab monitor — pool-card style wallet + feed cards (matches LP Defensor UX) | Low | ✅ Done 2026-05-03 |
 
 **SL-P5a — Auto-expiry sweep:** Background task `api/signal_expiry.py` runs every 15 min, marks `pending` signals older than 4h as `expired`. Also runs on-read: every `GET /signal-lab/signals` call sweeps expired signals first. Wired into `main.py` lifespan as `expiry_task`.
 

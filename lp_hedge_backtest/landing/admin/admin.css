@@ -667,55 +667,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
 .sl-listener--off   { background: rgba(248,113,113,0.12); color: #f87171; }
 .sl-listener--pause { background: rgba(250,204,21,0.12); color: #facc15; }
 
-/* ── Signal Lab Monitor — wallet cards ───────────────────── */
-.sl-mon-wallet-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.72rem;
-}
-.sl-mon-wallet-info { display: flex; flex-direction: column; gap: 2px; min-width: 130px; }
-.sl-mon-wallet-name { font-weight: 600; font-size: 0.72rem; }
-.sl-mon-wallet-addr { font-family: monospace; font-size: 0.65rem; color: var(--muted); }
-.sl-mon-bal         { font-size: 0.72rem; font-weight: 600; }
-.sl-mon-bal--green  { color: #00ffb3; }
-.sl-mon-bal--amber  { color: #f59e0b; }
-.sl-mon-bal--red    { color: #f87171; }
-.sl-mon-tag {
-  font-size: 0.60rem; padding: 1px 5px; border-radius: 3px;
-  background: rgba(0,212,255,0.1); color: var(--color-accent);
-  margin-left: 4px; vertical-align: middle;
-}
-.sl-mon-wallet-actions { margin-left: auto; display: flex; gap: 5px; }
-
-/* ── Signal Lab Monitor — activity feed ──────────────────── */
-.sl-act-feed { display: flex; flex-direction: column; gap: 1px; }
-.sl-act-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 6px;
-  border-radius: 5px;
-  font-size: 0.72rem;
-  transition: background 0.15s;
-}
-.sl-act-row:hover          { background: rgba(255,255,255,0.03); }
-.sl-act-row--exec          { background: rgba(0,0,0,0.08); }
-.sl-act-icon               { font-size: 0.8rem; flex-shrink: 0; width: 18px; text-align: center; }
-.sl-act-main               { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sl-act-wallet             { font-family: monospace; font-size: 0.65rem; color: var(--muted); margin-left: 4px; }
-.sl-act-time               { font-size: 0.65rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
-.sl-act-pill {
-  font-size: 0.60rem; padding: 1px 7px; border-radius: 20px;
-  font-weight: 600; white-space: nowrap; flex-shrink: 0;
-}
-.sl-act-pill--new   { background: rgba(0,212,255,0.12);  color: #00d4ff; }
-.sl-act-pill--ok    { background: rgba(0,255,179,0.12);  color: #00ffb3; }
-.sl-act-pill--err   { background: rgba(248,113,113,0.12);color: #f87171; }
-.sl-act-pill--muted { background: rgba(100,100,100,0.12);color: #888; }
+/* sl-mon-* and sl-act-* removed — Signal Lab monitor now uses pool-card / mini-evt */
 
 /* M2-34: reconciler timestamp in refresh bar */
 .reconciler-ts {

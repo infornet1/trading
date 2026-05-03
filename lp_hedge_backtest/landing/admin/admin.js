@@ -1514,111 +1514,147 @@ async function refreshLpRange() {
 async function fetchSignalLabMonitor() {
   try {
     const d = await apiGet('/admin/signal-lab-monitor');
-    renderSignalLabWallets(d.wallets  || []);
-    renderSignalActivity(d.activity || []);
+    _renderSlCards(d.wallets || [], d.activity || []);
   } catch (e) {
-    const el = document.getElementById('sl-wallets-content');
+    const el = document.getElementById('sl-cards-grid');
     if (el) el.innerHTML = `<span style="font-size:0.72rem;color:#f87171">Monitor error: ${e.message}</span>`;
   }
 }
 
-function renderSignalLabWallets(wallets) {
-  const el = document.getElementById('sl-wallets-content');
+function _renderSlCards(wallets, activity) {
+  const el = document.getElementById('sl-cards-grid');
   if (!el) return;
-
-  const title = `<div class="sl-admin-label" style="margin-bottom:8px">🤖 Copy-Trade Wallets</div>`;
-
-  if (wallets.length === 0) {
-    el.innerHTML = title + '<p style="font-size:0.72rem;color:var(--muted)">No hay wallets registradas. Usa el <a href="../wallet/" style="color:var(--color-accent)">Wallet Manager</a> para registrar una.</p>';
-    return;
-  }
-
-  const rows = wallets.map(w => {
-    const armed    = w.auto_execute && w.active;
-    const badgeCls = armed ? 'sl-listener--ok' : 'sl-listener--pause';
-    const badgeTxt = armed ? '● Armado' : '⏸ En pausa';
-    const bal      = w.balance != null ? `$${Number(w.balance).toFixed(2)}` : '—';
-    const balCls   = (w.balance ?? 0) >= 20 ? 'sl-mon-bal--green' : (w.balance ?? 0) > 0 ? 'sl-mon-bal--amber' : 'sl-mon-bal--red';
-    const unified  = w.spot_usable ? `<span class="sl-mon-tag">unified</span>` : '';
-    const inactive = !w.active ? `<span style="font-size:0.65rem;color:#f87171;margin-left:4px">inactiva</span>` : '';
-
-    return `
-      <div class="sl-mon-wallet-row">
-        <div class="sl-mon-wallet-info">
-          <span class="sl-mon-wallet-name">${w.label}${inactive}</span>
-          <span class="sl-mon-wallet-addr">${w.addr_short}</span>
-        </div>
-        <span class="sl-listener-badge ${badgeCls}">${badgeTxt}</span>
-        <span class="sl-mon-bal ${balCls}">${bal} USDC ${unified}</span>
-        <div class="sl-mon-wallet-actions">
-          <button class="btn-outline-sm" onclick="toggleWalletAuto(${w.id}, ${!w.auto_execute})">
-            ${w.auto_execute ? '⏸ Pausar' : '▶ Activar'}
-          </button>
-          ${w.active ? `<button class="btn-outline-sm" style="color:#f87171" onclick="deactivateWallet(${w.id})">✕</button>` : ''}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  el.innerHTML = title + rows;
+  el.innerHTML = wallets.map(_slWalletCard).join('') + _slFeedCard(activity);
 }
 
-function renderSignalActivity(activity) {
-  const el = document.getElementById('sl-activity-content');
-  if (!el) return;
+// ── Wallet card (one per registered signal wallet) ──────────────────────────
 
-  const title = `<div class="sl-admin-label" style="margin-bottom:8px">📋 Actividad reciente</div>`;
+function _slWalletCard(w) {
+  const armed = w.auto_execute && w.active;
+  const level = armed ? 'green' : w.active ? 'yellow' : 'red';
 
-  if (activity.length === 0) {
-    el.innerHTML = title + '<p style="font-size:0.72rem;color:var(--muted)">Sin actividad registrada.</p>';
-    return;
-  }
+  const statusBadge = armed
+    ? `<span class="badge badge--green">ARMADO</span>`
+    : w.active
+      ? `<span class="badge badge--yellow">EN PAUSA</span>`
+      : `<span class="badge badge--red">INACTIVO</span>`;
 
-  const rows = activity.map(a => {
-    const age = relTime(a.ts);
+  const bal    = w.balance != null ? `$${Number(w.balance).toFixed(2)}` : '—';
+  const balCls = (w.balance ?? 0) >= 20 ? 'pool-val--green'
+               : (w.balance ?? 0) >  0  ? 'pool-val--yellow'
+               :                          'pool-val--red';
+  const unified = w.spot_usable
+    ? `<span style="font-size:.65rem;color:var(--muted);margin-left:4px">(unified)</span>` : '';
 
-    if (a.kind === 'signal') {
-      const { icon, pillCls, pillTxt } = _signalMeta(a.status);
-      const lev  = a.leverage ? `${a.leverage}x` : '';
-      const dir  = (a.direction || '').toUpperCase();
-      const entry = a.entry ? `@ $${_fmtPrice(a.entry)}` : '';
-      return `
-        <div class="sl-act-row">
-          <span class="sl-act-icon">${icon}</span>
-          <span class="sl-act-main">${a.pair || '—'} <strong>${dir}</strong> ${lev} ${entry}</span>
-          <span class="sl-act-pill ${pillCls}">${pillTxt}</span>
-          <span class="sl-act-time">${age}</span>
-        </div>`;
-    }
-
-    // execution row
-    const filled = a.outcome === 'filled';
-    const icon   = filled ? '✅' : '❌';
-    const pillCls = filled ? 'sl-act-pill--ok' : 'sl-act-pill--err';
-    const pillTxt = filled ? 'Filled' : 'Failed';
-    const fill    = a.fill_price ? `@ $${_fmtPrice(a.fill_price)}` : '';
-    const wallet  = a.wallet_short ? `<span class="sl-act-wallet">${a.wallet_short}</span>` : '';
+  // Mini-evt rows: last 3 executions for this wallet
+  const execRows = (w.recent_executions || []).map(ex => {
+    const color = ex.outcome === 'filled' ? 'green' : 'red';
+    const icon  = ex.outcome === 'filled' ? '✅' : '❌';
+    const fill  = ex.fill_price ? ` @ $${_fmtPrice(ex.fill_price)}` : '';
+    const lev   = ex.leverage ? ` ${ex.leverage}x` : '';
     return `
-      <div class="sl-act-row sl-act-row--exec">
-        <span class="sl-act-icon">${icon}</span>
-        <span class="sl-act-main">${a.pair || '—'} <strong>${(a.direction||'').toUpperCase()}</strong> ${fill} ${wallet}</span>
-        <span class="sl-act-pill ${pillCls}">${pillTxt}</span>
-        <span class="sl-act-time">${age}</span>
+      <div class="mini-evt mini-evt--${color}">
+        <span>${icon} ${ex.pair || '—'} ${(ex.direction||'').toUpperCase()}${lev}${fill}</span>
+        <span class="muted">${relTime(ex.ts)}</span>
       </div>`;
   }).join('');
 
-  el.innerHTML = title + `<div class="sl-act-feed">${rows}</div>`;
+  const noExec = !(w.recent_executions || []).length
+    ? `<div class="mini-evt mini-evt--muted"><span class="muted">Sin ejecuciones aún</span></div>`
+    : '';
+
+  return `
+    <div class="pool-card pool-card--${level}">
+      <div class="pool-card-header">
+        <div class="health-dot health-dot--${level}"></div>
+        <span class="pool-pair">🤖 ${w.label}</span>
+        ${statusBadge}
+        <span class="pool-nft">${w.addr_short}</span>
+      </div>
+      <div class="pool-row">
+        <span class="pool-label">Balance</span>
+        <span class="pool-val ${balCls}">${bal} USDC${unified}</span>
+      </div>
+      <div class="pool-row">
+        <span class="pool-label">Auto-execute</span>
+        <span class="pool-val">${w.auto_execute ? '🤖 ON' : '⏸ OFF'}</span>
+      </div>
+      <div style="margin-top:.5rem;display:flex;flex-direction:column;gap:2px">
+        ${execRows || noExec}
+      </div>
+      <div class="pool-footer">
+        <button class="btn-outline-sm" onclick="toggleWalletAuto(${w.id},${!w.auto_execute})">
+          ${w.auto_execute ? '⏸ Pausar auto' : '▶ Activar auto'}
+        </button>
+        ${w.active
+          ? `<button class="btn-outline-sm" style="color:var(--red)" onclick="deactivateWallet(${w.id})">✕ Desactivar</button>`
+          : ''}
+      </div>
+    </div>`;
 }
 
-function _signalMeta(status) {
-  return {
-    pending:   { icon: '📡', pillCls: 'sl-act-pill--new',  pillTxt: 'Nueva'    },
-    executed:  { icon: '🤖', pillCls: 'sl-act-pill--ok',   pillTxt: 'Ejecutada' },
-    expired:   { icon: '⏱',  pillCls: 'sl-act-pill--muted',pillTxt: 'Expirada' },
-    stopped:   { icon: '🛑', pillCls: 'sl-act-pill--err',  pillTxt: 'Stopped'  },
-    tp_hit:    { icon: '🎯', pillCls: 'sl-act-pill--ok',   pillTxt: 'TP Hit'   },
-    cancelled: { icon: '✖',  pillCls: 'sl-act-pill--muted',pillTxt: 'Cancelada'},
-  }[status] || { icon: '•', pillCls: 'sl-act-pill--muted', pillTxt: status };
+// ── Signal feed card (unified activity log) ─────────────────────────────────
+
+function _slFeedCard(activity) {
+  const pending = activity.filter(a => a.kind === 'signal' && a.status === 'pending').length;
+  const countBadge = pending > 0
+    ? `<span class="pools-count">${pending} activas</span>` : '';
+
+  const rows = activity.slice(0, 15).map(a => {
+    if (a.kind === 'signal') {
+      const { color, icon, label } = _slSignalMeta(a.status);
+      const lev   = a.leverage ? ` ${a.leverage}x` : '';
+      const entry = a.entry ? ` @ $${_fmtPrice(a.entry)}` : '';
+      const dir   = (a.direction || '').toUpperCase();
+      return `
+        <div class="mini-evt mini-evt--${color}">
+          <span>${icon} ${a.pair || '—'} <strong>${dir}</strong>${lev}${entry}</span>
+          <span class="badge badge--${color === 'green' ? 'green' : color === 'red' ? 'red' : color === 'yellow' ? 'yellow' : 'muted'}"
+                style="font-size:.6rem">${label}</span>
+          <span class="muted">${relTime(a.ts)}</span>
+        </div>`;
+    }
+    // execution
+    const color = a.outcome === 'filled' ? 'green' : 'red';
+    const icon  = a.outcome === 'filled' ? '✅' : '❌';
+    const fill  = a.fill_price ? ` @ $${_fmtPrice(a.fill_price)}` : '';
+    const dir   = (a.direction || '').toUpperCase();
+    return `
+      <div class="mini-evt mini-evt--${color}">
+        <span>${icon} ${a.pair || '—'} <strong>${dir}</strong>${fill}
+          <span class="muted" style="font-size:.65rem"> · ${a.wallet_short || ''}</span>
+        </span>
+        <span class="muted">${relTime(a.ts)}</span>
+      </div>`;
+  }).join('');
+
+  const empty = !activity.length
+    ? `<div class="mini-evt mini-evt--muted"><span class="muted">Sin actividad — esperando señales de Swallow Trade</span></div>`
+    : '';
+
+  return `
+    <div class="pool-card" style="border-left-color:#00d4ff">
+      <div class="pool-card-header">
+        <div class="health-dot" style="background:#00d4ff;box-shadow:0 0 6px #00d4ff"></div>
+        <span class="pool-pair" style="color:#00d4ff">🔔 Señales</span>
+        ${countBadge}
+        <span class="pool-nft">últimas ${Math.min(activity.length, 15)}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        ${rows || empty}
+      </div>
+    </div>`;
+}
+
+function _slSignalMeta(status) {
+  return ({
+    pending:   { color: 'yellow', icon: '📡', label: 'Nueva'     },
+    executed:  { color: 'green',  icon: '🤖', label: 'Ejecutada' },
+    expired:   { color: 'muted',  icon: '⏱',  label: 'Expirada'  },
+    stopped:   { color: 'red',    icon: '🛑', label: 'Stopped'   },
+    tp_hit:    { color: 'green',  icon: '🎯', label: 'TP Hit'    },
+    cancelled: { color: 'muted',  icon: '✖',  label: 'Cancelada' },
+  })[status] || { color: 'muted', icon: '•', label: status };
 }
 
 function _fmtPrice(n) {
