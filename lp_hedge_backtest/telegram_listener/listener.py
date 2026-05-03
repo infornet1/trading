@@ -157,12 +157,25 @@ async def _auto_execute_signal(signal_id: int, sig):
                     f"| order {result['hl_order_id']}",
                     flush=True,
                 )
+                sym = sig.pair.split('/')[0]
                 lev_line = (
                     f"Leverage:   {result['leverage']}x  "
-                    f"⚠️ ajustado desde {result['leverage_requested']}x (máx HL para {sig.pair.split('/')[0]})\n"
+                    f"⚠️ ajustado desde {result['leverage_requested']}x (máx HL para {sym})\n"
                     if result.get("leverage_adjusted") else
                     f"Leverage:   {result['leverage']}x\n"
                 )
+                if result.get("split_tps"):
+                    tp_lines = (
+                        f"TP1:        ${result['tp1_price']:,.4f}  ({result['tp1_size']} {sym} — 50%)\n"
+                        f"TP2:        ${result['tp2_price']:,.4f}  ({result['tp2_size']} {sym} — 50%)\n"
+                        f"SL:         ${result.get('sl_price', float(sig.stoploss)):,.4f}  (full size, reduce_only — cubre runner)\n"
+                    )
+                else:
+                    tp1 = result.get("tp1_price")
+                    tp_lines = (
+                        f"TP:         ${tp1:,.4f}  (full size)\n" if tp1 else ""
+                        f"SL:         ${float(sig.stoploss):,.4f}\n"
+                    )
                 await asyncio.to_thread(
                     send_signal_email,
                     f"✅ Orden ejecutada: {sig.pair} {sig.direction.upper()} {sig.leverage}x",
@@ -171,11 +184,11 @@ async def _auto_execute_signal(signal_id: int, sig):
                     f"Dirección:  {sig.direction.upper()}\n"
                     f"{lev_line}"
                     f"Fill price: ${result['fill_price']:,.4f}\n"
-                    f"Size:       {result['size']} {sig.pair.split('/')[0]}\n"
+                    f"Size:       {result['size']} {sym}\n"
                     f"Margen:     ${result['margin_used']:.2f} USDC\n"
                     f"Balance:    ${result['balance']:.2f} USDC\n"
                     f"Order ID:   {result['hl_order_id']}\n\n"
-                    f"SL nativo y TP colocados en HL.",
+                    f"{tp_lines}",
                 )
             else:
                 print(

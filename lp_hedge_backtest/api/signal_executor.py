@@ -68,7 +68,12 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         is_buy       = (signal.direction == "long")
         sl_price     = float(signal.stoploss)
         targets      = signal.targets or []
-        tp_price     = float(targets[0]) if targets else None
+        tp1_price    = float(targets[0]) if len(targets) >= 1 else None
+        tp2_price    = float(targets[1]) if len(targets) >= 2 else None
+        split_tps    = tp2_price is not None
+        # 50/50 split when two targets; full size when only one
+        tp1_size     = round(size / 2, 6) if split_tps else size
+        tp2_size     = round(size / 2, 6) if split_tps else None
         close_is_buy = not is_buy
 
         if dry_run:
@@ -88,7 +93,11 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
                 "perp":               round(perp, 2),
                 "spot":               round(spot_usdc, 2),
                 "sl_price":           round(sl_price, 6),
-                "tp_price":           round(tp_price, 6) if tp_price else None,
+                "tp1_price":          round(tp1_price, 6) if tp1_price else None,
+                "tp2_price":          round(tp2_price, 6) if tp2_price else None,
+                "split_tps":          split_tps,
+                "tp1_size":           round(tp1_size, 6),
+                "tp2_size":           round(tp2_size, 6) if tp2_size else None,
                 "notional":           round(size * entry, 2),
             }
 
@@ -105,18 +114,33 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         hl_order_id = str(filled.get("oid", ""))
         fill_price  = float(filled.get("avgPx", entry) or entry)
 
-        # ── Native SL order ──────────────────────────────────────────────────
+        # ── Native SL — full size, reduce_only (covers runner after TP1 partial fill)
         exchange.order(
             symbol, close_is_buy, size, sl_price,
             {"trigger": {"triggerPx": sl_price, "isMarket": True, "tpsl": "sl"}},
             reduce_only=True,
         )
 
-        # ── Native TP order (first target) ───────────────────────────────────
-        if tp_price:
+        # ── Native TP orders ─────────────────────────────────────────────────
+        if split_tps:
+            # TP1: 50% at first target
             exchange.order(
-                symbol, close_is_buy, size, tp_price,
-                {"trigger": {"triggerPx": tp_price, "isMarket": True, "tpsl": "tp"}},
+                symbol, close_is_buy, tp1_size, tp1_price,
+                {"trigger": {"triggerPx": tp1_price, "isMarket": True, "tpsl": "tp"}},
+                reduce_only=True,
+            )
+            # TP2: remaining 50% at second target
+            # After TP1 fires, SL (reduce_only) auto-scales to cover the runner
+            exchange.order(
+                symbol, close_is_buy, tp2_size, tp2_price,
+                {"trigger": {"triggerPx": tp2_price, "isMarket": True, "tpsl": "tp"}},
+                reduce_only=True,
+            )
+        elif tp1_price:
+            # Single target — close full size at TP
+            exchange.order(
+                symbol, close_is_buy, size, tp1_price,
+                {"trigger": {"triggerPx": tp1_price, "isMarket": True, "tpsl": "tp"}},
                 reduce_only=True,
             )
 
@@ -132,6 +156,11 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
             "leverage_adjusted":  leverage_adjusted,
             "symbol":             symbol,
             "balance":            round(balance, 2),
+            "tp1_price":          round(tp1_price, 6) if tp1_price else None,
+            "tp2_price":          round(tp2_price, 6) if tp2_price else None,
+            "split_tps":          split_tps,
+            "tp1_size":           round(tp1_size, 6),
+            "tp2_size":           round(tp2_size, 6) if tp2_size else None,
         }
 
     except Exception as exc:

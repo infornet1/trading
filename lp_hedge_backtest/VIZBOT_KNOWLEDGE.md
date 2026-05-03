@@ -51,7 +51,9 @@
 ### 🧪 LP Signal Lab (Copy Trading)
 - Reads Telegram signal channels (Swallow Trade - Premium) via Telethon MTProto listener.
 - Parses structured signals (pair / direction / leverage / entry / SL / TP targets) from Format A and B.
-- **Auto-execute**: when a new signal arrives, fires a real HL market order + native SL + native TP for all registered wallets with `auto_execute=ON`. No user interaction required.
+- **Auto-execute**: when a new signal arrives, fires a real HL market order + native SL + native TP(s) for all registered wallets with `auto_execute=ON`. No user interaction required.
+- **Split TP (multi-target signals)**: when a signal has 2+ targets, the position is split 50/50 — TP1 closes 50% at `targets[0]`, TP2 closes the remaining 50% at `targets[1]`. The SL is placed for the full position size with `reduce_only=True`, so after TP1 fires it auto-scales to cover only the runner. Targets[2+] are ignored (Swallow Trade uses max 2). If only one target, full size closes at TP.
+- **Leverage cap**: if signal requests leverage above HL's per-asset `maxLeverage`, executor silently caps to HL max. SL/TP prices stay unchanged; position size adjusts. Email flags the cap with `⚠️ ajustado desde Nx`.
 - **Agent key model** (same as LP Defensor): `hl_wallet_addr` = main HL account (where funds live); `hl_secret_key` = encrypted agent/API private key (different address — agent can trade but not withdraw). No address-match validation between the two.
 - **HL unified account**: Spot USDC counts as perp margin automatically (detected via `tokenToAvailableAfterMaintenance`). No Spot→Perp transfer needed.
 - **Wallet Manager**: users register copy-trading wallets via a card (🟢 ARMADO / 🟡 EN PAUSA) on the Wallet Manager page (`/wallet/`).

@@ -242,9 +242,12 @@ async def run_tests():
             _ok(f"[DRY RUN] Would open: {result['symbol']} {sig_a.direction.upper()} {result['leverage']}x{lev_note}")
             _ok(f"[DRY RUN] Fill @ ${result['fill_price']:,.4f} | Size {result['size']} {result['symbol']}")
             _ok(f"[DRY RUN] Margin: ${result['margin_used']:.2f} | Notional: ${result['notional']:.2f}")
-            _ok(f"[DRY RUN] Would place SL trigger @ ${result['sl_price']:,.4f}")
-            if result.get("tp_price"):
-                _ok(f"[DRY RUN] Would place TP trigger @ ${result['tp_price']:,.4f}")
+            _ok(f"[DRY RUN] Would place SL trigger @ ${result['sl_price']:,.4f}  (full size, reduce_only)")
+            if result.get("split_tps"):
+                _ok(f"[DRY RUN] Would place TP1 trigger @ ${result['tp1_price']:,.4f}  ({result['tp1_size']} {result['symbol']} — 50%)")
+                _ok(f"[DRY RUN] Would place TP2 trigger @ ${result['tp2_price']:,.4f}  ({result['tp2_size']} {result['symbol']} — 50%)")
+            elif result.get("tp1_price"):
+                _ok(f"[DRY RUN] Would place TP trigger @ ${result['tp1_price']:,.4f}  (full size)")
         else:
             _err(f"Executor returned failure: {result.get('error')}")
 
