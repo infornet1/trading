@@ -42,7 +42,8 @@ def _clean_price(raw: str) -> float:
 
 
 def _parse_targets(raw: str) -> list[float]:
-    parts = re.split(r"[&|,]", raw)
+    # Split only on & and | — NOT commas, which are thousand-separators in prices
+    parts = re.split(r"[&|]", raw)
     results = []
     for p in parts:
         p = p.strip()
