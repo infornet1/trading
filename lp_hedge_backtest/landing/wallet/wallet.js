@@ -639,8 +639,8 @@ function _buildCopyTradingCard(cw) {
   const balClass = total >= 20 ? 'wm2-bal-green' : total > 0 ? 'wm2-bal-amber' : 'wm2-bal-red';
   const balHtml  = `<span class="${balClass}">$${Number(total).toFixed(2)} USDC</span>`;
 
-  // Spot warning — funds present but not in perp
-  const spotWarn = (spot > 0 && perp === 0) ? `
+  // Spot warning — only when spot funds exist but are NOT usable as unified margin
+  const spotWarn = (spot > 0 && perp === 0 && !cw.spot_usable) ? `
     <div class="wm2-no-hl">
       <span class="wm2-no-hl-icon">⚠</span>
       Fondos en Spot ($${Number(spot).toFixed(2)}) — transfiere a Perp en HL para operar

@@ -26,9 +26,18 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal) ->
             account_address=hl_wallet_addr,
         )
 
-        # ── Balance check ────────────────────────────────────────────────────
+        # ── Balance check (unified account: perp + spot USDC both usable as margin)
         state   = info.user_state(hl_wallet_addr)
-        balance = float(state["marginSummary"]["accountValue"])
+        perp    = float(state["marginSummary"]["accountValue"])
+        spot_usdc = 0.0
+        try:
+            for b in info.spot_user_state(hl_wallet_addr).get("balances", []):
+                if b["coin"] == "USDC":
+                    spot_usdc = float(b["total"])
+                    break
+        except Exception:
+            pass
+        balance = perp + spot_usdc
         if balance < 10:
             return {"success": False, "error": f"Insufficient balance: ${balance:.2f} USDC (min $10)"}
 

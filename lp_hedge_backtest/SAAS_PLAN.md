@@ -746,6 +746,9 @@ A persistent left sidebar makes sense only when the dashboard grows to 8+ sectio
 | **W2** | Whale signal enrichment — leverage, liq price, margin, ROE%, funding delta in every signal row | ✅ Complete |
 | **W3** | Whale Intelligence Agent Phase 1 — HistoryStore, PatternEngine, SignalEnricher, convergence panel | 🔲 Planned |
 | **W4** | Whale Intelligence Agent Phase 2 — backtest framework, Telegram CRITICAL alerts, pinned watchlist | 🔲 Planned |
+| **SL1** | LP Signal Lab Phases 0–5 — TG listener, signal parser, dashboard, execute modal, freshness | ✅ Complete 2026-04-27 |
+| **SL2** | LP Signal Lab Phase 7 — auto copy trading, agent key model, real HL orders, email alerts | ✅ Complete 2026-05-03 |
+| **SL3** | Wallet Manager Copy Trading card — card UX, spot_usable, unified account detection | ✅ Complete 2026-05-03 |
 
 **Estimated remaining to MVP: 1–2 weeks.**
 

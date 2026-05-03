@@ -48,6 +48,18 @@
 - **Backtest results: ETH ✅ (profitable, paper trading live). BTC ❌ (do not deploy).**
 - Supports paper trade mode (no real orders, simulated balance).
 
+### 🧪 LP Signal Lab (Copy Trading)
+- Reads Telegram signal channels (Swallow Trade - Premium) via Telethon MTProto listener.
+- Parses structured signals (pair / direction / leverage / entry / SL / TP targets) from Format A and B.
+- **Auto-execute**: when a new signal arrives, fires a real HL market order + native SL + native TP for all registered wallets with `auto_execute=ON`. No user interaction required.
+- **Agent key model** (same as LP Defensor): `hl_wallet_addr` = main HL account (where funds live); `hl_secret_key` = encrypted agent/API private key (different address — agent can trade but not withdraw). No address-match validation between the two.
+- **HL unified account**: Spot USDC counts as perp margin automatically (detected via `tokenToAvailableAfterMaintenance`). No Spot→Perp transfer needed.
+- **Wallet Manager**: users register copy-trading wallets via a card (🟢 ARMADO / 🟡 EN PAUSA) on the Wallet Manager page (`/wallet/`).
+- **Signal Lab page** (`/signal_lab/`): shows armed banner, signal cards with 🤖 Auto state, manual override button, history.
+- **Email alerts**: new signal received, order filled (fill price + size + margin), order failed (error reason), listener crash (watchdog restart).
+- **Signal expiry**: signals older than 4h auto-marked `expired`, not executable.
+- **Safety**: wallets with active LP bots are hard-blocked from signal execution (UI + API).
+
 ### Whale Tracker Mode (live_whale_bot.py)
 - Reads Hyperliquid leaderboard top-N traders (default 50) every poll interval (default 30s).
 - Tracks position changes: new positions, size increases/decreases, flips, closures.

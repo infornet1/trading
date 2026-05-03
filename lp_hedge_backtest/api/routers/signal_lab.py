@@ -97,7 +97,8 @@ def _signal_to_dict(ev: SignalEvent) -> dict:
 
 
 async def _fetch_hl_balance(addr: str) -> dict:
-    """Returns {total, perp, spot} — perp is tradeable margin, spot needs transfer first."""
+    """Returns {total, perp, spot, spot_usable} where spot_usable=True means
+    HL unified account — spot USDC counts as perp margin, no transfer needed."""
     def _sync():
         try:
             from hyperliquid.info import Info
@@ -105,16 +106,29 @@ async def _fetch_hl_balance(addr: str) -> dict:
             info = Info(constants.MAINNET_API_URL, skip_ws=True)
             perp = float(info.user_state(addr)["marginSummary"]["accountValue"])
             spot = 0.0
+            spot_usable = False
             try:
-                for b in info.spot_user_state(addr).get("balances", []):
+                spot_state = info.spot_user_state(addr)
+                for b in spot_state.get("balances", []):
                     if b["coin"] == "USDC":
                         spot = float(b["total"])
                         break
+                # tokenToAvailableAfterMaintenance[[token_id, amount]] — token 0 = USDC
+                # Non-zero entry means HL unified account: spot USDC usable as perp margin
+                for entry in spot_state.get("tokenToAvailableAfterMaintenance", []):
+                    if entry[0] == 0 and float(entry[1]) > 0:
+                        spot_usable = True
+                        break
             except Exception:
                 pass
-            return {"total": round(perp + spot, 4), "perp": round(perp, 4), "spot": round(spot, 4)}
+            return {
+                "total":       round(perp + spot, 4),
+                "perp":        round(perp, 4),
+                "spot":        round(spot, 4),
+                "spot_usable": spot_usable,
+            }
         except Exception:
-            return {"total": None, "perp": None, "spot": None}
+            return {"total": None, "perp": None, "spot": None, "spot_usable": False}
     return await asyncio.to_thread(_sync)
 
 
@@ -378,6 +392,7 @@ async def get_my_wallet(
             "balance_usdc":   bal["total"],
             "balance_perp":   bal["perp"],
             "balance_spot":   bal["spot"],
+            "spot_usable":    bal["spot_usable"],
             "has_stored_key": True,
         }
 

@@ -229,7 +229,7 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-### 🧪 LP Signal Lab — Phase 5 (Signal Freshness)
+### 🧪 LP Signal Lab — Phases 5–7 (Signal Freshness + Copy Trading)
 
 | ID | Item | Effort | Status |
 |---|---|---|---|
@@ -237,6 +237,9 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 | SL-P5b | Price drift warning in Execute modal | Low | ✅ Done 2026-04-27 |
 | SL-P5c | SL buffer remaining % in Execute modal | Low | ✅ Done 2026-04-27 |
 | SL-P6 | "Usar este rango →" pre-fills LP Defensor bot config form | Medium | 🔲 Next |
+| SL-P7 | Auto copy trading: signal_wallets table, real HL execution, agent key model | High | ✅ Done 2026-05-03 |
+| SL-P7b | Copy Trading card in Wallet Manager (card UX, spot_usable detection) | Medium | ✅ Done 2026-05-03 |
+| SL-P7c | Email notifications: new signal, fill, failure, listener crash | Low | ✅ Done 2026-05-03 |
 
 **SL-P5a — Auto-expiry sweep:** Background task `api/signal_expiry.py` runs every 15 min, marks `pending` signals older than 4h as `expired`. Also runs on-read: every `GET /signal-lab/signals` call sweeps expired signals first. Wired into `main.py` lifespan as `expiry_task`.
 
@@ -293,4 +296,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-05-02 — M2-39 permanent DB enum fix: `circuit_breaker` added to startup migration in `api/main.py` (commit `4cdf0d3`) — root cause was migration overwriting the enum on every API restart. Previously: DB enum fix + escalating pause L1/L2/L3 live-validated 2026-05-01. M2-39 enhanced CB ✅ (rolling window + escalating pause + daily loss cap, commit 1c9a4b8). M2-34 ✅ Signal Lab admin panel ✅ SL-P5a/b/c ✅ M2-28 ✅ M2-30 ✅ M2-6 ✅ M2-7 ✅ M2-16 (UI) ✅ T1-3 ✅ T2-6 ✅ M2-39 SQLAlchemy fix ✅. M2-9 ✅ M2-13 ✅ M2-21 ✅ M2-39 ✅ M2-40 ✅ all live-validated. M2-29 deferred.*
+*Last updated: 2026-05-03 — SL-P7/7b/7c ✅: copy trading auto-execute live (signal_wallets, agent key model, real HL orders, email alerts, Wallet Manager card UX, HL unified account spot_usable detection). Previously: M2-39 permanent DB enum fix commit `4cdf0d3`. M2-34 ✅ Signal Lab admin panel ✅ SL-P5a/b/c ✅ M2-28 ✅ M2-30 ✅ M2-6 ✅ M2-7 ✅ M2-16 (UI) ✅ T1-3 ✅ T2-6 ✅. M2-9 ✅ M2-13 ✅ M2-21 ✅ M2-39 ✅ M2-40 ✅ all live-validated. M2-29 deferred.*
