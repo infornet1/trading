@@ -235,7 +235,11 @@ async def run_tests():
         )
 
         if result["success"] and result.get("dry_run"):
-            _ok(f"[DRY RUN] Would open: {result['symbol']} {sig_a.direction.upper()} {result['leverage']}x")
+            lev_note = (
+                f" (⚠️ capped from {result['leverage_requested']}x — HL max for {result['symbol']})"
+                if result.get("leverage_adjusted") else ""
+            )
+            _ok(f"[DRY RUN] Would open: {result['symbol']} {sig_a.direction.upper()} {result['leverage']}x{lev_note}")
             _ok(f"[DRY RUN] Fill @ ${result['fill_price']:,.4f} | Size {result['size']} {result['symbol']}")
             _ok(f"[DRY RUN] Margin: ${result['margin_used']:.2f} | Notional: ${result['notional']:.2f}")
             _ok(f"[DRY RUN] Would place SL trigger @ ${result['sl_price']:,.4f}")

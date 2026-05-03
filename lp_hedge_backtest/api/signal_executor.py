@@ -40,10 +40,24 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
                     "error": f"Insufficient balance: ${balance:.2f} USDC (min $10)"}
 
         # ── Size calculation ─────────────────────────────────────────────────
-        symbol   = (signal.pair or "").split("/")[0].upper()
-        size_pct = float(signal.size_pct) if signal.size_pct else 2.0
-        leverage = int(signal.leverage)   if signal.leverage  else 10
-        entry    = float(signal.entry)
+        symbol            = (signal.pair or "").split("/")[0].upper()
+        size_pct          = float(signal.size_pct) if signal.size_pct else 2.0
+        leverage_requested = int(signal.leverage)  if signal.leverage  else 10
+        entry             = float(signal.entry)
+
+        # Cap leverage to HL's per-asset max (silently reduced, never raised)
+        max_leverage = leverage_requested
+        try:
+            meta = info.meta()
+            for asset in meta.get("universe", []):
+                if asset.get("name", "").upper() == symbol:
+                    max_leverage = int(asset.get("maxLeverage", leverage_requested))
+                    break
+        except Exception:
+            pass  # meta fetch failed — proceed with signal leverage, update_leverage will catch it
+        leverage          = min(leverage_requested, max_leverage)
+        leverage_adjusted = leverage < leverage_requested
+
         margin   = balance * size_pct / 100
         size     = (margin * leverage) / entry   # base asset quantity
 
@@ -60,20 +74,22 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         if dry_run:
             # Return simulated fill — no real orders placed
             return {
-                "success":     True,
-                "dry_run":     True,
-                "hl_order_id": "DRY-RUN-0000",
-                "fill_price":  round(entry, 6),
-                "size":        round(size, 6),
-                "margin_used": round(margin, 2),
-                "leverage":    leverage,
-                "symbol":      symbol,
-                "balance":     round(balance, 2),
-                "perp":        round(perp, 2),
-                "spot":        round(spot_usdc, 2),
-                "sl_price":    round(sl_price, 6),
-                "tp_price":    round(tp_price, 6) if tp_price else None,
-                "notional":    round(size * entry, 2),
+                "success":            True,
+                "dry_run":            True,
+                "hl_order_id":        "DRY-RUN-0000",
+                "fill_price":         round(entry, 6),
+                "size":               round(size, 6),
+                "margin_used":        round(margin, 2),
+                "leverage":           leverage,
+                "leverage_requested": leverage_requested,
+                "leverage_adjusted":  leverage_adjusted,
+                "symbol":             symbol,
+                "balance":            round(balance, 2),
+                "perp":               round(perp, 2),
+                "spot":               round(spot_usdc, 2),
+                "sl_price":           round(sl_price, 6),
+                "tp_price":           round(tp_price, 6) if tp_price else None,
+                "notional":           round(size * entry, 2),
             }
 
         # ── Open market position ─────────────────────────────────────────────
@@ -105,15 +121,17 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
             )
 
         return {
-            "success":     True,
-            "dry_run":     False,
-            "hl_order_id": hl_order_id,
-            "fill_price":  round(fill_price, 6),
-            "size":        round(size, 6),
-            "margin_used": round(margin, 2),
-            "leverage":    leverage,
-            "symbol":      symbol,
-            "balance":     round(balance, 2),
+            "success":            True,
+            "dry_run":            False,
+            "hl_order_id":        hl_order_id,
+            "fill_price":         round(fill_price, 6),
+            "size":               round(size, 6),
+            "margin_used":        round(margin, 2),
+            "leverage":           leverage,
+            "leverage_requested": leverage_requested,
+            "leverage_adjusted":  leverage_adjusted,
+            "symbol":             symbol,
+            "balance":            round(balance, 2),
         }
 
     except Exception as exc:

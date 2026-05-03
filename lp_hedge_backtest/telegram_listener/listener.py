@@ -157,13 +157,19 @@ async def _auto_execute_signal(signal_id: int, sig):
                     f"| order {result['hl_order_id']}",
                     flush=True,
                 )
+                lev_line = (
+                    f"Leverage:   {result['leverage']}x  "
+                    f"⚠️ ajustado desde {result['leverage_requested']}x (máx HL para {sig.pair.split('/')[0]})\n"
+                    if result.get("leverage_adjusted") else
+                    f"Leverage:   {result['leverage']}x\n"
+                )
                 await asyncio.to_thread(
                     send_signal_email,
                     f"✅ Orden ejecutada: {sig.pair} {sig.direction.upper()} {sig.leverage}x",
                     f"Copy trade ejecutado automáticamente en Hyperliquid\n\n"
                     f"Par:        {sig.pair}\n"
                     f"Dirección:  {sig.direction.upper()}\n"
-                    f"Leverage:   {result['leverage']}x\n"
+                    f"{lev_line}"
                     f"Fill price: ${result['fill_price']:,.4f}\n"
                     f"Size:       {result['size']} {sig.pair.split('/')[0]}\n"
                     f"Margen:     ${result['margin_used']:.2f} USDC\n"
