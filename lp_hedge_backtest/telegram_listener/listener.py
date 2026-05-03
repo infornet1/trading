@@ -13,7 +13,7 @@ Run:
 import asyncio
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # Allow importing api.* from project root and signal_parser from telegram_listener/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -30,7 +30,13 @@ from signal_parser import parse_signal, parse_update
 
 from sqlalchemy import select, update as sql_update
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from eth_account import Account
+from hyperliquid.info import Info
+from hyperliquid.exchange import Exchange
+from hyperliquid.utils import constants as hlc
+
 from api.models import SignalEvent, SignalExecution, SignalWallet
+from api.crypto import decrypt
 from api.signal_executor import place_hl_order
 from api.signal_email import send_signal_email
 
@@ -249,8 +255,172 @@ async def apply_update_to_db(msg, update_status: str):
     return None
 
 
+# ── Startup orphan reconciliation ────────────────────────────────────────────
+
+def _fetch_orphan_report(hl_wallet_addr: str) -> list[dict]:
+    """Synchronous: return open HL positions with their native SL/TP order status."""
+    info   = Info(hlc.MAINNET_API_URL, skip_ws=True)
+    state  = info.user_state(hl_wallet_addr)
+    if not state:
+        return []
+
+    try:
+        open_orders = info.open_orders(hl_wallet_addr)
+    except Exception:
+        open_orders = []
+
+    result = []
+    for p in state.get("assetPositions", []):
+        pos = p["position"]
+        szi = float(pos.get("szi", 0))
+        if szi == 0:
+            continue
+
+        symbol   = pos["coin"]
+        entry_px = float(pos.get("entryPx", 0))
+        is_long  = szi > 0
+
+        coin_triggers = [
+            o for o in open_orders
+            if o.get("coin") == symbol and o.get("triggerPx") is not None
+        ]
+        existing_sl  = next(
+            (o for o in coin_triggers if "stop" in o.get("orderType", "").lower()), None
+        )
+        existing_tps = [
+            o for o in coin_triggers if "take profit" in o.get("orderType", "").lower()
+        ]
+        result.append({
+            "symbol":       symbol,
+            "size":         abs(szi),
+            "entry_px":     entry_px,
+            "is_long":      is_long,
+            "existing_sl":  existing_sl,
+            "existing_tps": existing_tps,
+        })
+    return result
+
+
+def _place_emergency_sl(wallet, symbol: str, is_long: bool, size: float, entry_px: float) -> float:
+    """Synchronous: place a 3% adverse SL when no native SL exists on a recovered position."""
+    secret_key   = decrypt(wallet.hl_secret_key)
+    account      = Account.from_key(secret_key)
+    exchange     = Exchange(account, hlc.MAINNET_API_URL, account_address=wallet.hl_wallet_addr)
+    sl_price     = round(entry_px * (1.03 if not is_long else 0.97), 6)
+    close_is_buy = not is_long
+    exchange.order(
+        symbol, close_is_buy, size, sl_price,
+        {"trigger": {"triggerPx": sl_price, "isMarket": True, "tpsl": "sl"}},
+        reduce_only=True,
+    )
+    return sl_price
+
+
+async def _reconcile_orphans():
+    """
+    Called once at listener startup. For each active signal_wallet, check HL for open
+    positions. Any position with no signal_executions record in the last 8h is an orphan:
+    ensure a native SL exists (place emergency SL if missing) and send an admin alert.
+    """
+    print("[Signal Lab] Startup reconciliation — checking for orphan positions…", flush=True)
+    async with AsyncSession_() as db:
+        res     = await db.execute(select(SignalWallet).where(SignalWallet.active == True))
+        wallets = res.scalars().all()
+
+    if not wallets:
+        print("[Signal Lab] Reconcile: no active wallets.", flush=True)
+        return
+
+    cutoff = datetime.utcnow() - timedelta(hours=8)
+
+    for wallet in wallets:
+        try:
+            positions = await asyncio.to_thread(_fetch_orphan_report, wallet.hl_wallet_addr)
+        except Exception as e:
+            print(f"[Signal Lab] Reconcile: could not fetch {wallet.hl_wallet_addr[:10]}…: {e}", flush=True)
+            continue
+
+        if not positions:
+            print(f"[Signal Lab] Reconcile: {wallet.hl_wallet_addr[:10]}… — no open positions ✅", flush=True)
+            continue
+
+        for pos in positions:
+            symbol    = pos["symbol"]
+            is_long   = pos["is_long"]
+            size      = pos["size"]
+            entry_px  = pos["entry_px"]
+            direction = "LONG" if is_long else "SHORT"
+
+            # Check if we have a known execution for this wallet+symbol in the last 8h
+            async with AsyncSession_() as db:
+                chk = await db.execute(
+                    select(SignalExecution)
+                    .join(SignalEvent)
+                    .where(
+                        SignalExecution.hl_wallet_addr == wallet.hl_wallet_addr,
+                        SignalEvent.pair.like(f"{symbol}/%"),
+                        SignalExecution.executed_at    >= cutoff,
+                    )
+                    .limit(1)
+                )
+                known = chk.scalar_one_or_none()
+
+            if known:
+                print(
+                    f"[Signal Lab] Reconcile: {wallet.hl_wallet_addr[:10]}… "
+                    f"{symbol} {direction} — known execution (id={known.id}), skipping ✅",
+                    flush=True,
+                )
+                continue
+
+            # Orphan confirmed
+            print(
+                f"⚠️  [Signal Lab] Orphan: {wallet.hl_wallet_addr[:10]}… "
+                f"{symbol} {direction} | size={size} | entry=${entry_px:.4f}",
+                flush=True,
+            )
+
+            sl_note = ""
+            if pos["existing_sl"]:
+                sl_oid = pos["existing_sl"]["oid"]
+                sl_px  = pos["existing_sl"].get("triggerPx", "?")
+                sl_note = f"✅ SL nativo encontrado | OID {sl_oid} | trigger ${sl_px}"
+                print(f"   {sl_note}", flush=True)
+            else:
+                try:
+                    sl_price = await asyncio.to_thread(
+                        _place_emergency_sl, wallet, symbol, is_long, size, entry_px
+                    )
+                    sl_note = f"⚠️ Sin SL — se colocó SL de emergencia @ ${sl_price:.4f} (3% adverso)"
+                    print(f"   {sl_note}", flush=True)
+                except Exception as e:
+                    sl_note = f"❌ SL de emergencia FALLÓ: {e}"
+                    print(f"   {sl_note}", flush=True)
+
+            tp_count = len(pos["existing_tps"])
+            tp_note  = f"{tp_count} TP order(s) encontrados" if tp_count else "Sin TP orders"
+
+            await asyncio.to_thread(
+                send_signal_email,
+                f"⚠️ Posición huérfana detectada al reiniciar listener",
+                f"El listener se reinició y encontró una posición sin registro en VIZNAGO.\n\n"
+                f"Wallet:    {wallet.hl_wallet_addr}\n"
+                f"Par:       {symbol}\n"
+                f"Dirección: {direction}\n"
+                f"Entrada:   ${entry_px:,.4f}\n"
+                f"Tamaño:    {size}\n\n"
+                f"SL:  {sl_note}\n"
+                f"TP:  {tp_note}\n\n"
+                f"Acción recomendada: verifica la posición en HL y ciérrala manualmente si es necesario.",
+            )
+
+    print("[Signal Lab] Startup reconciliation complete.", flush=True)
+
+
 async def main():
     session_path = os.path.join(os.path.dirname(__file__), SESSION)
+
+    await _reconcile_orphans()
 
     async with TelegramClient(session_path, API_ID, API_HASH) as client:
         me = await client.get_me()
