@@ -184,7 +184,7 @@ class SignalEvent(Base):
 
 
 class SignalExecution(Base):
-    """Records when a user executes a signal (V1: intent + conflict check)."""
+    """Records when a user executes a signal."""
     __tablename__ = "signal_executions"
 
     id             = Column(Integer,     primary_key=True, autoincrement=True)
@@ -192,7 +192,22 @@ class SignalExecution(Base):
     user_address   = Column(String(42),  nullable=False)
     hl_wallet_addr = Column(String(42),  nullable=True)
     hl_order_id    = Column(String(100), nullable=True)
+    fill_price     = Column(Numeric(20, 8), nullable=True)
     executed_at    = Column(DateTime,    default=datetime.utcnow)
     outcome        = Column(Enum("pending", "filled", "failed"), default="pending")
 
     signal = relationship("SignalEvent", back_populates="executions")
+
+
+class SignalWallet(Base):
+    """Registered wallets for signal copy trading (separate from LP bot configs)."""
+    __tablename__ = "signal_wallets"
+
+    id             = Column(Integer,    primary_key=True, autoincrement=True)
+    label          = Column(String(100), nullable=False)
+    hl_wallet_addr = Column(String(42),  unique=True, nullable=False)
+    hl_secret_key  = Column(Text,        nullable=False)   # Fernet-encrypted private key
+    user_address   = Column(String(42),  nullable=True)    # SIWE address of owner (null = admin-registered)
+    auto_execute   = Column(Boolean,     default=False)
+    active         = Column(Boolean,     default=True)
+    created_at     = Column(DateTime,    default=datetime.utcnow)

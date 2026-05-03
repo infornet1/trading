@@ -32,6 +32,20 @@ echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Listener not running — starting...
 cd "$PROJECT"
 source venv/bin/activate
 
+# Send crash alert email
+python3 -c "
+import sys; sys.path.insert(0, '.')
+from api.signal_email import send_signal_email
+send_signal_email(
+    '⚠️ Listener reiniciado por watchdog',
+    'El listener de Telegram se cayó y fue reiniciado automáticamente por el watchdog.\n\n'
+    'Si esto ocurre con frecuencia, revisa los logs:\n'
+    '  telegram_listener/logs/listener.log\n\n'
+    'Para pausar el watchdog:\n'
+    '  touch telegram_listener/logs/.pause'
+)
+" 2>/dev/null || true
+
 nohup python -m telegram_listener.listener >> "$LOG" 2>&1 &
 NEW_PID=$!
 echo $NEW_PID > "$PIDFILE"

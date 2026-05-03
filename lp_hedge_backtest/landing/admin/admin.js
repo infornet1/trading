@@ -140,9 +140,9 @@ async function apiGet(path) {
   return res.json();
 }
 
-async function apiPost(path, body) {
+async function apiPost(path, body, method = 'POST') {
   const opts = {
-    method:  'POST',
+    method,
     headers: { Authorization: `Bearer ${state.jwt}`, 'Content-Type': 'application/json' },
   };
   if (body !== undefined) opts.body = JSON.stringify(body);
@@ -195,7 +195,7 @@ function _showReconnectOverlay(show) {
 async function doRefresh() {
   setStatus('Actualizando...');
   try {
-    await Promise.all([fetchEthPrice(), renderOverview(), fetchSignalLabStatus()]);
+    await Promise.all([fetchEthPrice(), renderOverview(), fetchSignalLabStatus(), fetchSignalWallets()]);
     _apiFails = 0;
     _showReconnectOverlay(false);
     const now = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1506,6 +1506,97 @@ async function refreshLpRange() {
     if (e.message !== 'Session expired') alert('Error: ' + e.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🔄 Refrescar rango LP'; }
+  }
+}
+
+// ── Signal Wallet Management ───────────────────────────────────────────────
+
+async function fetchSignalWallets() {
+  try {
+    const d = await apiGet('/signal-lab/wallets');
+    renderSignalWallets(d.wallets || []);
+  } catch (e) {
+    const el = document.getElementById('signal-wallets-list');
+    if (el) el.innerHTML = `<span style="font-size:0.72rem;color:#f87171">Error: ${e.message}</span>`;
+  }
+}
+
+function renderSignalWallets(wallets) {
+  const el = document.getElementById('signal-wallets-list');
+  if (!el) return;
+
+  if (wallets.length === 0) {
+    el.innerHTML = '<p style="font-size:0.72rem;color:var(--muted)">No hay wallets registradas.</p>';
+    return;
+  }
+
+  el.innerHTML = wallets.map(w => {
+    const bal    = w.balance_usdc != null ? `$${Number(w.balance_usdc).toFixed(2)}` : '—';
+    const auto   = w.auto_execute
+      ? `<span style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:rgba(0,212,255,0.12);color:#00d4ff">🤖 Auto ON</span>`
+      : `<span style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:rgba(100,100,100,0.15);color:#888">Manual</span>`;
+    const status = w.active
+      ? `<span style="color:#4ade80;font-size:0.68rem">● Activa</span>`
+      : `<span style="color:#f87171;font-size:0.68rem">● Inactiva</span>`;
+    return `
+      <div class="sl-admin-row" style="align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:0.72rem;font-weight:600">${w.label}</div>
+        <div style="font-family:monospace;font-size:0.68rem;color:var(--muted)">${w.hl_wallet_addr.slice(0,10)}…${w.hl_wallet_addr.slice(-4)}</div>
+        <div style="font-size:0.72rem;color:#a3e635">${bal} USDC</div>
+        ${auto}
+        ${status}
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn-outline-sm" onclick="toggleWalletAuto(${w.id}, ${!w.auto_execute})"
+            title="${w.auto_execute ? 'Desactivar auto-execute' : 'Activar auto-execute'}">
+            ${w.auto_execute ? '⏸ Pausar auto' : '▶ Activar auto'}
+          </button>
+          ${w.active ? `<button class="btn-outline-sm" style="color:#f87171" onclick="deactivateWallet(${w.id})">Desactivar</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function toggleWalletAuto(id, newVal) {
+  try {
+    await apiPost(`/signal-lab/wallets/${id}`, { auto_execute: newVal }, 'PATCH');
+    fetchSignalWallets();
+  } catch (e) {
+    if (e.message !== 'Session expired') alert('Error: ' + e.message);
+  }
+}
+
+async function deactivateWallet(id) {
+  if (!confirm('¿Desactivar esta wallet? No se elimina — se puede reactivar desde la DB.')) return;
+  try {
+    await apiPost(`/signal-lab/wallets/${id}`, { active: false }, 'PATCH');
+    fetchSignalWallets();
+  } catch (e) {
+    if (e.message !== 'Session expired') alert('Error: ' + e.message);
+  }
+}
+
+async function registerSignalWallet() {
+  const label  = document.getElementById('sw-label').value.trim();
+  const addr   = document.getElementById('sw-addr').value.trim();
+  const key    = document.getElementById('sw-key').value.trim();
+  const auto   = document.getElementById('sw-auto').checked;
+
+  if (!label || !addr || !key) { alert('Completa todos los campos.'); return; }
+
+  const btn = document.getElementById('sw-register-btn');
+  btn.disabled = true; btn.textContent = 'Registrando…';
+  try {
+    await apiPost('/signal-lab/wallets', { label, hl_wallet_addr: addr, hl_secret_key: key, auto_execute: auto });
+    document.getElementById('sw-label').value = '';
+    document.getElementById('sw-addr').value  = '';
+    document.getElementById('sw-key').value   = '';
+    document.getElementById('sw-auto').checked = false;
+    fetchSignalWallets();
+  } catch (e) {
+    if (e.message !== 'Session expired') alert('Error al registrar: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Registrar wallet';
   }
 }
 

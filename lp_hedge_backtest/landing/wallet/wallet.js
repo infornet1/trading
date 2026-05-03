@@ -19,6 +19,7 @@ let _bots     = [];     // BotConfigOut[]
 let _balances = {};     // tokenId → { value, error }
 let _statuses = {};     // botId → { running: bool }  (only fetched for active bots)
 let _editOpen = {};     // tokenId → 'edit' | 'link' | 'remove' | null
+let _copyWallet = null; // registered copy-trading wallet (from /signal-lab/my-wallet)
 
 // ── API helper ─────────────────────────────────────────────
 async function apiFetch(path, opts = {}) {
@@ -99,7 +100,7 @@ window.wmDisconnect = function () {
   renderPage();
 };
 
-// ── Load bots ──────────────────────────────────────────────
+// ── Load bots + copy wallet ────────────────────────────────
 async function _loadBots() {
   const res = await apiFetch('/bots');
   if (!res.ok) throw new Error('Failed to load bots');
@@ -113,14 +114,26 @@ async function _loadBots() {
     } catch (_) {}
   }
 
-  // Fetch HL balances + statuses in parallel
+  // Fetch HL balances + statuses + copy-trading wallet in parallel
   const wallets    = [...new Set(_bots.map(b => b.hl_wallet_addr).filter(Boolean))];
   const activeBots = _bots.filter(b => b.active);
 
   await Promise.all([
     ...wallets.map(w => _fetchHLBalance(w)),
     ...activeBots.map(b => _fetchBotStatus(b.id)),
+    _loadCopyWallet(),
   ]);
+}
+
+async function _loadCopyWallet() {
+  try {
+    const res  = await apiFetch('/signal-lab/my-wallet');
+    const data = await res.json();
+    // Store full response — even unregistered may carry has_stored_key / stored_label
+    _copyWallet = data.registered ? data : { registered: false, has_stored_key: data.has_stored_key, stored_label: data.stored_label };
+  } catch (_) {
+    _copyWallet = { registered: false, has_stored_key: false };
+  }
 }
 
 async function _fetchHLBalance(wallet) {
@@ -196,6 +209,9 @@ function renderPage() {
     <div class="wm2-cards-grid" id="wm2-cards-grid">
       ${_bots.map(b => _buildCard(b)).join('')}
     </div>
+    <div class="wm2-cards-grid">
+      ${_buildCopyTradingSection()}
+    </div>
   `;
 
   // Re-attach inline form handlers (they live in the DOM)
@@ -224,8 +240,11 @@ function _renderNoBots() {
     </div>
     <div class="wm2-empty">
       <div class="wm2-empty-icon">🛡️</div>
-      <p class="wm2-empty-msg">No bot configurations found.</p>
+      <p class="wm2-empty-msg">No LP bot configurations found.</p>
       <p class="wm2-empty-sub">Create a bot in <a href="../dashboard/index.html">LP Defensor</a> first.</p>
+    </div>
+    <div class="wm2-cards-grid">
+      ${_buildCopyTradingSection()}
     </div>
   `;
 }
@@ -593,6 +612,190 @@ function _showError(msg) {
   el.textContent = msg;
   el.classList.remove('hidden');
   setTimeout(() => el.classList.add('hidden'), 8000);
+}
+
+// ── Copy Trading Card ──────────────────────────────────────
+
+function _buildCopyTradingSection() {
+  const cw = _copyWallet;
+
+  if (cw?.registered) {
+    return _buildCopyTradingCard(cw);
+  }
+  return _buildCopyTradingRegisterCard(cw);
+}
+
+function _buildCopyTradingCard(cw) {
+  const autoOn     = cw.auto_execute;
+  const stripClass = autoOn ? 'wm2-card--active' : 'wm2-card--paused';
+  const badge      = autoOn
+    ? `<span class="wm2-badge wm2-badge--armed">🟢 ARMADO</span>`
+    : `<span class="wm2-badge wm2-badge--paused">⏸ EN PAUSA</span>`;
+
+  // Balance display
+  const perp   = cw.balance_perp ?? 0;
+  const spot   = cw.balance_spot ?? 0;
+  const total  = cw.balance_usdc ?? 0;
+  const balClass = total >= 20 ? 'wm2-bal-green' : total > 0 ? 'wm2-bal-amber' : 'wm2-bal-red';
+  const balHtml  = `<span class="${balClass}">$${Number(total).toFixed(2)} USDC</span>`;
+
+  // Spot warning — funds present but not in perp
+  const spotWarn = (spot > 0 && perp === 0) ? `
+    <div class="wm2-no-hl">
+      <span class="wm2-no-hl-icon">⚠</span>
+      Fondos en Spot ($${Number(spot).toFixed(2)}) — transfiere a Perp en HL para operar
+    </div>` : '';
+
+  return `
+    <div class="wm2-card ${stripClass}" id="ct-card">
+      <div class="wm2-card-header">
+        <span class="wm2-card-title">🤖 ${_esc(cw.label)}</span>
+        ${badge}
+      </div>
+      <div class="wm2-detail-row">
+        <span class="wm2-detail-label">Cuenta</span>
+        <span class="wm2-detail-val">
+          <span class="wm2-mono">${cw.addr_short}</span>
+          <span class="wm2-copy-icon" onclick="wmCopyAddr('${cw.hl_wallet_addr}', this)" title="Copy">📋</span>
+        </span>
+      </div>
+      <div class="wm2-detail-row">
+        <span class="wm2-detail-label">Agent key</span>
+        <span class="wm2-detail-val wm2-muted">•••••••••• (set)</span>
+      </div>
+      <div class="wm2-detail-row">
+        <span class="wm2-detail-label">Balance</span>
+        <span class="wm2-detail-val">${balHtml}</span>
+      </div>
+      <div class="wm2-detail-row">
+        <span class="wm2-detail-label">Auto</span>
+        <span class="wm2-detail-val">${autoOn
+          ? '<span style="color:#00ffb3;font-size:0.78rem;font-weight:700">🤖 ON</span>'
+          : '<span style="color:#888;font-size:0.78rem">⏸ OFF</span>'}</span>
+      </div>
+      ${spotWarn}
+      <div class="wm2-card-actions">
+        <button class="wm2-btn ${autoOn ? 'wm2-btn--outline' : 'wm2-btn--primary'}"
+          onclick="ctToggleAuto(${!autoOn})">
+          ${autoOn ? '⏸ Pausar auto' : '▶ Activar auto'}
+        </button>
+        <a href="../signal_lab/index.html" class="wm2-btn wm2-btn--ghost">🧪 Signal Lab →</a>
+        <button class="wm2-btn wm2-btn--danger" onclick="ctDeregister()">🗑</button>
+      </div>
+      <div id="ct-card-error" class="wm2-card-error hidden"></div>
+    </div>
+  `;
+}
+
+function _buildCopyTradingRegisterCard(cw) {
+  const hasKey = cw?.has_stored_key;
+
+  return `
+    <div class="wm2-card wm2-card--idle" id="ct-card">
+      <div class="wm2-card-header">
+        <span class="wm2-card-title">🤖 Copy Trading</span>
+      </div>
+      <div class="wm2-no-hl">
+        <span class="wm2-no-hl-icon">⚠</span>
+        No hay wallet de copy trading registrada
+      </div>
+      <div class="ct-field-group">
+        <label class="ct-label">Etiqueta</label>
+        <input id="ct-label" type="text" class="ct-input" placeholder="ej: copy-trading-1"
+          value="${_esc(cw?.stored_label || 'Copy Trading Wallet')}">
+      </div>
+      <div class="ct-field-group">
+        <label class="ct-label">Dirección HL (cuenta principal)</label>
+        <input id="ct-addr" type="text" class="ct-input ct-mono" placeholder="0x…"
+          value="${_esc(_address || '')}">
+      </div>
+      <div class="ct-field-group">
+        <label class="ct-label">
+          HL API Key (agent key)
+          ${hasKey ? '<span class="ct-key-hint">🔑 Almacenada — deja vacío para reutilizar</span>' : ''}
+        </label>
+        <input id="ct-key" type="password" class="ct-input ct-mono"
+          placeholder="${hasKey ? '••••••••••••••••' : '0x… (private key del agente HL)'}">
+      </div>
+      <div class="ct-field-group ct-field-group--inline">
+        <input id="ct-auto" type="checkbox" checked>
+        <label for="ct-auto" class="ct-label">Auto-execute al recibir señal</label>
+      </div>
+      <div id="ct-register-error" class="ct-error hidden"></div>
+      <div class="wm2-card-actions">
+        <button id="ct-register-btn" class="wm2-btn wm2-btn--primary" onclick="ctRegister()">
+          ➕ Registrar para Copy Trading
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+window.ctRegister = async function () {
+  const label = document.getElementById('ct-label')?.value.trim() || 'Copy Trading Wallet';
+  const addr  = document.getElementById('ct-addr')?.value.trim();
+  const key   = document.getElementById('ct-key')?.value.trim();
+  const auto  = document.getElementById('ct-auto')?.checked ?? true;
+  const errEl = document.getElementById('ct-register-error');
+  const btn   = document.getElementById('ct-register-btn');
+
+  if (errEl) errEl.classList.add('hidden');
+  const keyRequired = !_copyWallet?.has_stored_key;
+  if (!addr || (keyRequired && !key)) {
+    _ctCardError(keyRequired ? 'Dirección y HL API Key son obligatorios.' : 'Dirección es obligatoria.');
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = '⏳ Registrando…';
+
+  try {
+    const res  = await apiFetch('/signal-lab/my-wallet', {
+      method: 'POST',
+      body:   JSON.stringify({ label, hl_wallet_addr: addr, hl_secret_key: key, auto_execute: auto }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+    _copyWallet = data;
+    renderPage();
+  } catch (err) {
+    errEl.textContent = '⚠ ' + err.message;
+    errEl.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = '🤖 Registrar para Copy Trading';
+  }
+};
+
+window.ctToggleAuto = async function (newVal) {
+  try {
+    const res  = await apiFetch('/signal-lab/my-wallet', {
+      method: 'PATCH',
+      body:   JSON.stringify({ auto_execute: newVal }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+    if (_copyWallet) _copyWallet.auto_execute = data.auto_execute;
+    renderPage();
+  } catch (err) {
+    _ctCardError('Toggle failed: ' + err.message);
+  }
+};
+
+window.ctDeregister = async function () {
+  if (!confirm('¿Eliminar esta wallet de copy trading? Se puede volver a registrar después.')) return;
+  try {
+    await apiFetch('/signal-lab/my-wallet', { method: 'DELETE' });
+    _copyWallet = { registered: false, has_stored_key: true };
+    renderPage();
+  } catch (err) {
+    _ctCardError('Deregister failed: ' + err.message);
+  }
+};
+
+function _ctCardError(msg) {
+  const el = document.getElementById('ct-card-error') || document.getElementById('ct-register-error');
+  if (!el) { _showError(msg); return; }
+  el.textContent = '⚠ ' + msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 6000);
 }
 
 // ── Bootstrap ──────────────────────────────────────────────

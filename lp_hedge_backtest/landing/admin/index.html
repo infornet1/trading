@@ -121,6 +121,34 @@
     </div>
     <div id="signal-lab-body">
       <div id="signal-lab-status-content" class="sl-admin-loading">Cargando...</div>
+
+      <!-- Copy-trade wallet management -->
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-size:0.78rem;font-weight:600;margin-bottom:10px;color:var(--text-secondary)">
+          🤖 Copy-Trade Wallets
+        </div>
+        <div id="signal-wallets-list" style="margin-bottom:14px">
+          <span style="font-size:0.72rem;color:var(--muted)">Cargando…</span>
+        </div>
+        <!-- Register new wallet form -->
+        <details style="font-size:0.75rem">
+          <summary style="cursor:pointer;color:var(--color-accent);margin-bottom:8px">+ Registrar nueva wallet</summary>
+          <div style="display:flex;flex-direction:column;gap:8px;max-width:420px;margin-top:8px">
+            <input id="sw-label" type="text" placeholder="Etiqueta (ej: test-copy-trading1)"
+              style="background:var(--input-bg,#1a1a2e);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text-primary);font-size:0.75rem">
+            <input id="sw-addr" type="text" placeholder="Dirección HL (0x…)"
+              style="background:var(--input-bg,#1a1a2e);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text-primary);font-family:monospace;font-size:0.72rem">
+            <input id="sw-key" type="password" placeholder="Private key (0x…) — nunca se muestra"
+              style="background:var(--input-bg,#1a1a2e);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text-primary);font-family:monospace;font-size:0.72rem">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input id="sw-auto" type="checkbox">
+              <span>Auto-execute (ejecuta órdenes automáticamente al recibir señal)</span>
+            </label>
+            <button id="sw-register-btn" class="btn-outline-sm" onclick="registerSignalWallet()"
+              style="width:fit-content">Registrar wallet</button>
+          </div>
+        </details>
+      </div>
     </div>
   </section>
 

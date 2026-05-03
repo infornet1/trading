@@ -122,6 +122,22 @@ async def _run_column_migrations():
             "INSERT IGNORE INTO signal_sources (id, name, channel_id, thread_id, purpose, active) "
             "VALUES (2, 'Bitcoin Daily', 1951769926, 22, 'lp_range', 1)"
         ),
+        # Signal wallets: registered wallets for copy trading
+        (
+            "CREATE TABLE IF NOT EXISTS signal_wallets ("
+            "  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            "  label VARCHAR(100) NOT NULL,"
+            "  hl_wallet_addr VARCHAR(42) NOT NULL UNIQUE,"
+            "  hl_secret_key TEXT NOT NULL,"
+            "  auto_execute TINYINT(1) NOT NULL DEFAULT 0,"
+            "  active TINYINT(1) NOT NULL DEFAULT 1,"
+            "  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        ),
+        # fill_price column on signal_executions (V1 had it nullable — safe to add)
+        "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS fill_price DECIMAL(20,8) NULL",
+        # user_address on signal_wallets — owner scoping for self-service registration
+        "ALTER TABLE signal_wallets ADD COLUMN IF NOT EXISTS user_address VARCHAR(42) NULL",
     ]
     async with engine.begin() as conn:
         for sql in migrations:

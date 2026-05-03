@@ -685,6 +685,9 @@
 .wm2-card--crashed::before {
   background: linear-gradient(90deg, #ef4444, #f59e0b);
 }
+.wm2-card--paused::before {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
 
 /* Card header */
 .wm2-card-header {
@@ -724,6 +727,16 @@
   background: rgba(239,68,68,0.12);
   color: #f87171;
   border: 1px solid rgba(239,68,68,0.3);
+}
+.wm2-badge--armed {
+  background: rgba(0,255,179,0.12);
+  color: #00ffb3;
+  border: 1px solid rgba(0,255,179,0.3);
+}
+.wm2-badge--paused {
+  background: rgba(245,158,11,0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245,158,11,0.3);
 }
 
 /* Detail rows */
@@ -913,6 +926,47 @@
 @media (max-width: 640px) {
   .wm2-cards-grid { grid-template-columns: 1fr; }
   .wm2-toolbar { flex-wrap: wrap; gap: 0.5rem; }
+}
+
+/* ── Copy Trading Card form inputs ───────────────────────── */
+/* (card shell reuses .wm2-card; only form inputs need own styles) */
+.ct-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.ct-field-group--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.ct-label { font-size: 0.72rem; color: var(--color-text-muted); }
+.ct-input {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--color-border, rgba(255,255,255,0.12));
+  border-radius: 7px;
+  padding: 8px 12px;
+  color: var(--color-text-primary);
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.ct-input:focus { border-color: rgba(0,212,255,0.5); }
+.ct-mono { font-family: monospace; font-size: 0.72rem; }
+.ct-key-hint {
+  margin-left: 6px;
+  font-size: 0.68rem;
+  color: #4ade80;
+  font-weight: 500;
+}
+.ct-error {
+  font-size: 0.72rem;
+  color: #f87171;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(248,113,113,0.08);
 }
 
 /* ── Utility ─────────────────────────────────────────────── */

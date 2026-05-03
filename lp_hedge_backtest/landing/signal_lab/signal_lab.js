@@ -13,6 +13,7 @@ let _historyLoaded  = false;
 let _historyOpen    = false;
 let _selectedWallet = null;   // wallet address chosen in modal
 let _activeSignalId = null;   // signal being executed
+let _autoStatus     = { armed: false, wallets: [] }; // auto-execute armed state
 
 // ── Auth ───────────────────────────────────────────────────
 
@@ -70,8 +71,45 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function refreshAll() {
   _setTimestamp("Actualizando...");
-  await Promise.all([fetchLpRange(), fetchSignals()]);
+  await Promise.all([fetchLpRange(), fetchAutoStatus(), fetchSignals()]);
   _setTimestamp("Actualizado " + new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" }));
+}
+
+async function fetchAutoStatus() {
+  if (!_token) return;
+  try {
+    const res = await fetch(`${API_BASE}/signal-lab/auto-status`, {
+      headers: { ..._authHeader() },
+    });
+    if (!res.ok) return;
+    _autoStatus = await res.json();
+    _renderAutoStatusBanner();
+  } catch {
+    // non-fatal — page works without it
+  }
+}
+
+function _renderAutoStatusBanner() {
+  const el = document.getElementById("auto-status-banner");
+  if (!el) return;
+
+  if (!_autoStatus.armed || _autoStatus.wallets.length === 0) {
+    el.innerHTML = "";
+    el.classList.add("hidden");
+    return;
+  }
+
+  const walletTags = _autoStatus.wallets.map(w => {
+    const bal = w.balance_usdc != null ? ` · $${Number(w.balance_usdc).toFixed(2)} USDC` : "";
+    return `<span class="sl-auto-wallet">${w.label} <code>${w.addr_short}</code>${bal}</span>`;
+  }).join("");
+
+  el.innerHTML = `
+    <span class="sl-auto-dot"></span>
+    <span class="sl-auto-label">Auto-execute armado</span>
+    ${walletTags}
+  `;
+  el.classList.remove("hidden");
 }
 
 // ── LP Range Advisor ───────────────────────────────────────
@@ -285,9 +323,26 @@ function _renderSignalCard(sig, forceExpired = false) {
   const statusLabel = _statusLabel(sig.status);
 
   const dirHtml = `<span class="sl-dir-pill ${dir}">${dir.toUpperCase()}</span>`;
-  const btnHtml = expired
-    ? `<span style="font-size:0.65rem;color:var(--color-text-muted)">${statusLabel}</span>`
-    : `<button class="btn btn-primary btn-sm" onclick="openExecuteModal(${sig.id})">Ejecutar →</button>`;
+
+  let btnHtml;
+  if (expired) {
+    // "executed" status means auto or manual trade was placed
+    if (sig.status === "executed") {
+      btnHtml = `<span class="sl-auto-exec-badge">🤖 Auto</span>`;
+    } else {
+      btnHtml = `<span style="font-size:0.65rem;color:var(--color-text-muted)">${statusLabel}</span>`;
+    }
+  } else if (_autoStatus.armed) {
+    // Auto is armed — show armed indicator + manual override button
+    btnHtml = `
+      <div class="sl-btn-group">
+        <span class="sl-auto-armed-tag">🤖 Auto</span>
+        <button class="btn btn-outline btn-sm" onclick="openExecuteModal(${sig.id})" title="Ejecutar manualmente con otra wallet">Manual →</button>
+      </div>
+    `;
+  } else {
+    btnHtml = `<button class="btn btn-primary btn-sm" onclick="openExecuteModal(${sig.id})">Ejecutar →</button>`;
+  }
 
   return `
     <div class="sl-signal-card${expired ? " sl-signal-card--expired" : ""}">
@@ -464,39 +519,76 @@ async function _loadModalWallets() {
   listEl.innerHTML = '<p style="font-size:0.72rem;color:var(--color-text-muted)">Cargando wallets...</p>';
 
   try {
-    const res = await fetch(`${API_BASE}/bots`, {
-      headers: { "Content-Type": "application/json", ..._authHeader() },
-    });
-    if (!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    const configs = data.configs || data || [];
+    // Fetch LP bot wallets + registered signal wallets in parallel
+    const [botsRes, swRes] = await Promise.allSettled([
+      fetch(`${API_BASE}/bots`, { headers: { ..._authHeader() } }),
+      fetch(`${API_BASE}/signal-lab/wallets`, { headers: { ..._authHeader() } }),
+    ]);
 
-    // Build wallet map: address → has_active_bot
-    const walletMap = {};
-    for (const cfg of configs) {
-      const addr = cfg.hl_wallet_addr;
-      if (!addr) continue;
-      if (!walletMap[addr]) walletMap[addr] = { active: false, bot_id: null };
-      if (cfg.active) { walletMap[addr].active = true; walletMap[addr].bot_id = cfg.id; }
+    // Build LP bot wallet map: address → {active, bot_id}
+    const lpMap = {};
+    if (botsRes.status === "fulfilled" && botsRes.value.ok) {
+      const data = await botsRes.value.json();
+      for (const cfg of (data.configs || data || [])) {
+        const addr = (cfg.hl_wallet_addr || "").toLowerCase();
+        if (!addr) continue;
+        if (!lpMap[addr]) lpMap[addr] = { active: false, bot_id: null };
+        if (cfg.active) { lpMap[addr].active = true; lpMap[addr].bot_id = cfg.id; }
+      }
     }
 
-    if (Object.keys(walletMap).length === 0) {
-      listEl.innerHTML = '<p style="font-size:0.72rem;color:var(--color-text-muted)">No hay wallets registradas. Configura un bot primero.</p>';
-      return;
+    // Signal wallets: auto-execute registered wallets
+    const signalWallets = [];
+    if (swRes.status === "fulfilled" && swRes.value.ok) {
+      const swData = await swRes.value.json();
+      for (const w of (swData.wallets || [])) {
+        if (w.active) signalWallets.push(w);
+      }
     }
 
-    listEl.innerHTML = Object.entries(walletMap).map(([addr, info]) => {
-      const short  = addr.slice(0,6) + "..." + addr.slice(-4);
+    const items = [];
+
+    // Signal wallets first (they can execute directly)
+    for (const w of signalWallets) {
+      const addr   = w.hl_wallet_addr.toLowerCase();
+      const short  = addr.slice(0,6) + "…" + addr.slice(-4);
+      const bal    = w.balance_usdc != null ? `$${Number(w.balance_usdc).toFixed(2)}` : "";
+      const autoTag = w.auto_execute
+        ? `<span class="sl-wallet-auto">🤖 Auto</span>`
+        : `<span class="sl-wallet-auto sl-wallet-auto--off">Manual</span>`;
+      items.push(`
+        <label class="sl-wallet-option sl-wallet-option--signal">
+          <input type="radio" name="exec-wallet" value="${addr}"
+            onchange="onWalletSelected('${addr}')">
+          <span class="sl-wallet-addr">${short}</span>
+          <span class="sl-wallet-label">${w.label}</span>
+          ${autoTag}
+          ${bal ? `<span class="sl-wallet-bal">${bal}</span>` : ""}
+        </label>
+      `);
+    }
+
+    // LP bot wallets (may be locked)
+    for (const [addr, info] of Object.entries(lpMap)) {
+      // Skip if already shown as signal wallet
+      if (signalWallets.some(w => w.hl_wallet_addr.toLowerCase() === addr)) continue;
+      const short  = addr.slice(0,6) + "…" + addr.slice(-4);
       const locked = info.active;
-      return `
+      items.push(`
         <label class="sl-wallet-option${locked ? " sl-wallet-option--locked" : ""}">
           <input type="radio" name="exec-wallet" value="${addr}" ${locked ? "disabled" : ""}
             onchange="onWalletSelected('${addr}')">
           <span class="sl-wallet-addr">${short}</span>
           ${locked ? `<span class="sl-wallet-lock">🔒 Bot #${info.bot_id} activo</span>` : ""}
         </label>
-      `;
-    }).join("");
+      `);
+    }
+
+    if (items.length === 0) {
+      listEl.innerHTML = '<p style="font-size:0.72rem;color:var(--color-text-muted)">No hay wallets disponibles.</p>';
+      return;
+    }
+    listEl.innerHTML = items.join("");
 
   } catch {
     listEl.innerHTML = '<p style="font-size:0.72rem;color:#f87171">Error al cargar wallets. ¿Estás conectado?</p>';
@@ -530,7 +622,7 @@ async function confirmExecute() {
 
   const btn = document.getElementById("modal-confirm-btn");
   btn.disabled = true;
-  btn.textContent = "Registrando...";
+  btn.textContent = "Ejecutando...";
 
   try {
     const res = await fetch(`${API_BASE}/signal-lab/execute`, {
@@ -542,7 +634,7 @@ async function confirmExecute() {
     if (!res.ok) throw new Error(data.detail || res.status);
 
     closeExecuteModal();
-    _showOrderDetails(data.order);
+    _showOrderDetails(data.order, data.fill, data.auto_executed);
   } catch (e) {
     btn.disabled = false;
     btn.textContent = "Confirmar →";
@@ -550,13 +642,33 @@ async function confirmExecute() {
   }
 }
 
-function _showOrderDetails(order) {
+function _showOrderDetails(order, fill, autoExecuted) {
   if (!order) return;
-  const dir    = (order.direction || "short").toUpperCase();
-  const entry  = order.entry    ? `$${_fmt(order.entry)}`    : "—";
-  const sl     = order.stoploss ? `$${_fmt(order.stoploss)}` : "—";
-  const tps    = (order.targets || []).map(t => `$${_fmt(t)}`).join(" / ");
-  const sizePct = order.size_pct || 2;
+  const dir      = (order.direction || "short").toUpperCase();
+  const entry    = order.entry    ? `$${_fmt(order.entry)}`    : "—";
+  const sl       = order.stoploss ? `$${_fmt(order.stoploss)}` : "—";
+  const tps      = (order.targets || []).map(t => `$${_fmt(t)}`).join(" / ");
+  const sizePct  = order.size_pct || 2;
+
+  let fillHtml = "";
+  if (fill) {
+    fillHtml = `
+      <hr style="border-color:var(--color-border);margin:8px 0">
+      <div style="font-size:0.7rem;color:var(--color-accent);font-weight:600;margin-bottom:4px">
+        ✅ Orden ejecutada en Hyperliquid
+      </div>
+      <div><span class="od-label">Fill price: </span><span class="od-value">$${_fmt(fill.fill_price)}</span></div>
+      <div><span class="od-label">Size:       </span><span class="od-value">${fill.size} ${order.symbol}</span></div>
+      <div><span class="od-label">Margen:     </span><span class="od-value">$${fill.margin_used} USDC</span></div>
+      <div><span class="od-label">Order ID:   </span><span class="od-value" style="font-size:0.65rem">${fill.hl_order_id || "—"}</span></div>
+    `;
+  } else {
+    fillHtml = `
+      <div style="font-size:0.7rem;color:var(--color-text-muted);margin-top:8px">
+        ⚠️ Coloca esta orden manualmente en Hyperliquid.
+      </div>
+    `;
+  }
 
   document.getElementById("order-detail-content").innerHTML = `
     <div><span class="od-label">Par:       </span><span class="od-value">${order.symbol || "—"}/USDC</span></div>
@@ -565,7 +677,8 @@ function _showOrderDetails(order) {
     <div><span class="od-label">Entrada:   </span><span class="od-value">${entry}</span></div>
     <div><span class="od-label">Stop Loss: </span><span class="od-value">${sl}</span></div>
     ${tps ? `<div><span class="od-label">Targets:   </span><span class="od-value">${tps}</span></div>` : ""}
-    <div><span class="od-label">Tamaño:    </span><span class="od-value">${sizePct}% de tu balance</span></div>
+    <div><span class="od-label">Tamaño:    </span><span class="od-value">${sizePct}% de balance</span></div>
+    ${fillHtml}
   `;
   document.getElementById("order-detail-modal").classList.remove("hidden");
 }
