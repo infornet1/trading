@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from api.auth import get_current_admin
 from api.bot_manager import manager
 from api.database import AsyncSessionLocal
-from api.models import BotConfig, BotEvent, SignalEvent, User
+from api.models import BotConfig, BotEvent, SignalEvent, SignalExecution, SignalWallet, User
 
 _BASE_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _CACHE_DIR   = os.path.join(_BASE_DIR, "data_cache")
@@ -398,6 +398,98 @@ async def signal_lab_status(admin: str = Depends(get_current_admin)):
         "lp_range_cache": lp_cache,
         "reconciler":     reconciler,
     }
+
+
+@router.get("/signal-lab-monitor")
+async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
+    """Copy-trading wallet cards + unified signal/execution activity feed."""
+
+    async with AsyncSessionLocal() as db:
+        wallets_res = await db.execute(select(SignalWallet).order_by(SignalWallet.id))
+        wallets     = wallets_res.scalars().all()
+
+        events_res = await db.execute(
+            select(SignalEvent).order_by(SignalEvent.received_at.desc()).limit(25)
+        )
+        events = events_res.scalars().all()
+
+        exec_res = await db.execute(
+            select(SignalExecution)
+            .options(selectinload(SignalExecution.signal))
+            .order_by(SignalExecution.executed_at.desc())
+            .limit(15)
+        )
+        executions = exec_res.scalars().all()
+
+    # ── Wallet balance fetch (perp + spot + spot_usable) ──────────────────
+    def _fetch(addr):
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+            info  = Info(constants.MAINNET_API_URL, skip_ws=True)
+            perp  = float(info.user_state(addr)["marginSummary"]["accountValue"])
+            spot  = 0.0
+            spot_usable = False
+            ss    = info.spot_user_state(addr)
+            for b in ss.get("balances", []):
+                if b["coin"] == "USDC":
+                    spot = float(b["total"]); break
+            for e in ss.get("tokenToAvailableAfterMaintenance", []):
+                if e[0] == 0 and float(e[1]) > 0:
+                    spot_usable = True; break
+            return {"total": round(perp + spot, 2), "perp": round(perp, 2),
+                    "spot": round(spot, 2), "spot_usable": spot_usable}
+        except Exception:
+            return {"total": None, "perp": None, "spot": None, "spot_usable": False}
+
+    wallet_rows = []
+    for w in wallets:
+        bal = await asyncio.to_thread(_fetch, w.hl_wallet_addr)
+        wallet_rows.append({
+            "id":           w.id,
+            "label":        w.label,
+            "addr_short":   w.hl_wallet_addr[:6] + "…" + w.hl_wallet_addr[-4:],
+            "hl_wallet_addr": w.hl_wallet_addr,
+            "auto_execute": w.auto_execute,
+            "active":       w.active,
+            "balance":      bal["total"],
+            "balance_perp": bal["perp"],
+            "balance_spot": bal["spot"],
+            "spot_usable":  bal["spot_usable"],
+        })
+
+    # ── Unified activity feed ─────────────────────────────────────────────
+    activity = []
+
+    for ev in events:
+        activity.append({
+            "kind":      "signal",
+            "pair":      ev.pair,
+            "direction": ev.direction,
+            "leverage":  ev.leverage,
+            "entry":     float(ev.entry)    if ev.entry    else None,
+            "stoploss":  float(ev.stoploss) if ev.stoploss else None,
+            "status":    ev.status,
+            "ts":        ev.received_at.isoformat() + "Z",
+        })
+
+    for ex in executions:
+        sig = ex.signal
+        activity.append({
+            "kind":         "execution",
+            "pair":         sig.pair      if sig else "—",
+            "direction":    sig.direction if sig else "—",
+            "leverage":     sig.leverage  if sig else None,
+            "fill_price":   float(ex.fill_price) if ex.fill_price else None,
+            "hl_order_id":  ex.hl_order_id,
+            "outcome":      ex.outcome,
+            "wallet_short": ex.hl_wallet_addr[:6] + "…" + ex.hl_wallet_addr[-4:] if ex.hl_wallet_addr else "—",
+            "ts":           ex.executed_at.isoformat() + "Z",
+        })
+
+    activity.sort(key=lambda x: x["ts"], reverse=True)
+
+    return {"wallets": wallet_rows, "activity": activity[:30]}
 
 
 @router.post("/signal-lab/refresh-lp-range")

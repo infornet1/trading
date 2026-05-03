@@ -195,7 +195,7 @@ function _showReconnectOverlay(show) {
 async function doRefresh() {
   setStatus('Actualizando...');
   try {
-    await Promise.all([fetchEthPrice(), renderOverview(), fetchSignalLabStatus(), fetchSignalWallets()]);
+    await Promise.all([fetchEthPrice(), renderOverview(), fetchSignalLabStatus(), fetchSignalLabMonitor()]);
     _apiFails = 0;
     _showReconnectOverlay(false);
     const now = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1509,94 +1509,141 @@ async function refreshLpRange() {
   }
 }
 
-// ── Signal Wallet Management ───────────────────────────────────────────────
+// ── Signal Lab Monitor ─────────────────────────────────────────────────────
 
-async function fetchSignalWallets() {
+async function fetchSignalLabMonitor() {
   try {
-    const d = await apiGet('/signal-lab/wallets');
-    renderSignalWallets(d.wallets || []);
+    const d = await apiGet('/admin/signal-lab-monitor');
+    renderSignalLabWallets(d.wallets  || []);
+    renderSignalActivity(d.activity || []);
   } catch (e) {
-    const el = document.getElementById('signal-wallets-list');
-    if (el) el.innerHTML = `<span style="font-size:0.72rem;color:#f87171">Error: ${e.message}</span>`;
+    const el = document.getElementById('sl-wallets-content');
+    if (el) el.innerHTML = `<span style="font-size:0.72rem;color:#f87171">Monitor error: ${e.message}</span>`;
   }
 }
 
-function renderSignalWallets(wallets) {
-  const el = document.getElementById('signal-wallets-list');
+function renderSignalLabWallets(wallets) {
+  const el = document.getElementById('sl-wallets-content');
   if (!el) return;
 
+  const title = `<div class="sl-admin-label" style="margin-bottom:8px">🤖 Copy-Trade Wallets</div>`;
+
   if (wallets.length === 0) {
-    el.innerHTML = '<p style="font-size:0.72rem;color:var(--muted)">No hay wallets registradas.</p>';
+    el.innerHTML = title + '<p style="font-size:0.72rem;color:var(--muted)">No hay wallets registradas. Usa el <a href="../wallet/" style="color:var(--color-accent)">Wallet Manager</a> para registrar una.</p>';
     return;
   }
 
-  el.innerHTML = wallets.map(w => {
-    const bal    = w.balance_usdc != null ? `$${Number(w.balance_usdc).toFixed(2)}` : '—';
-    const auto   = w.auto_execute
-      ? `<span style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:rgba(0,212,255,0.12);color:#00d4ff">🤖 Auto ON</span>`
-      : `<span style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:rgba(100,100,100,0.15);color:#888">Manual</span>`;
-    const status = w.active
-      ? `<span style="color:#4ade80;font-size:0.68rem">● Activa</span>`
-      : `<span style="color:#f87171;font-size:0.68rem">● Inactiva</span>`;
+  const rows = wallets.map(w => {
+    const armed    = w.auto_execute && w.active;
+    const badgeCls = armed ? 'sl-listener--ok' : 'sl-listener--pause';
+    const badgeTxt = armed ? '● Armado' : '⏸ En pausa';
+    const bal      = w.balance != null ? `$${Number(w.balance).toFixed(2)}` : '—';
+    const balCls   = (w.balance ?? 0) >= 20 ? 'sl-mon-bal--green' : (w.balance ?? 0) > 0 ? 'sl-mon-bal--amber' : 'sl-mon-bal--red';
+    const unified  = w.spot_usable ? `<span class="sl-mon-tag">unified</span>` : '';
+    const inactive = !w.active ? `<span style="font-size:0.65rem;color:#f87171;margin-left:4px">inactiva</span>` : '';
+
     return `
-      <div class="sl-admin-row" style="align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:0.72rem;font-weight:600">${w.label}</div>
-        <div style="font-family:monospace;font-size:0.68rem;color:var(--muted)">${w.hl_wallet_addr.slice(0,10)}…${w.hl_wallet_addr.slice(-4)}</div>
-        <div style="font-size:0.72rem;color:#a3e635">${bal} USDC</div>
-        ${auto}
-        ${status}
-        <div style="margin-left:auto;display:flex;gap:6px">
-          <button class="btn-outline-sm" onclick="toggleWalletAuto(${w.id}, ${!w.auto_execute})"
-            title="${w.auto_execute ? 'Desactivar auto-execute' : 'Activar auto-execute'}">
-            ${w.auto_execute ? '⏸ Pausar auto' : '▶ Activar auto'}
+      <div class="sl-mon-wallet-row">
+        <div class="sl-mon-wallet-info">
+          <span class="sl-mon-wallet-name">${w.label}${inactive}</span>
+          <span class="sl-mon-wallet-addr">${w.addr_short}</span>
+        </div>
+        <span class="sl-listener-badge ${badgeCls}">${badgeTxt}</span>
+        <span class="sl-mon-bal ${balCls}">${bal} USDC ${unified}</span>
+        <div class="sl-mon-wallet-actions">
+          <button class="btn-outline-sm" onclick="toggleWalletAuto(${w.id}, ${!w.auto_execute})">
+            ${w.auto_execute ? '⏸ Pausar' : '▶ Activar'}
           </button>
-          ${w.active ? `<button class="btn-outline-sm" style="color:#f87171" onclick="deactivateWallet(${w.id})">Desactivar</button>` : ''}
+          ${w.active ? `<button class="btn-outline-sm" style="color:#f87171" onclick="deactivateWallet(${w.id})">✕</button>` : ''}
         </div>
       </div>
     `;
   }).join('');
+
+  el.innerHTML = title + rows;
+}
+
+function renderSignalActivity(activity) {
+  const el = document.getElementById('sl-activity-content');
+  if (!el) return;
+
+  const title = `<div class="sl-admin-label" style="margin-bottom:8px">📋 Actividad reciente</div>`;
+
+  if (activity.length === 0) {
+    el.innerHTML = title + '<p style="font-size:0.72rem;color:var(--muted)">Sin actividad registrada.</p>';
+    return;
+  }
+
+  const rows = activity.map(a => {
+    const age = relTime(a.ts);
+
+    if (a.kind === 'signal') {
+      const { icon, pillCls, pillTxt } = _signalMeta(a.status);
+      const lev  = a.leverage ? `${a.leverage}x` : '';
+      const dir  = (a.direction || '').toUpperCase();
+      const entry = a.entry ? `@ $${_fmtPrice(a.entry)}` : '';
+      return `
+        <div class="sl-act-row">
+          <span class="sl-act-icon">${icon}</span>
+          <span class="sl-act-main">${a.pair || '—'} <strong>${dir}</strong> ${lev} ${entry}</span>
+          <span class="sl-act-pill ${pillCls}">${pillTxt}</span>
+          <span class="sl-act-time">${age}</span>
+        </div>`;
+    }
+
+    // execution row
+    const filled = a.outcome === 'filled';
+    const icon   = filled ? '✅' : '❌';
+    const pillCls = filled ? 'sl-act-pill--ok' : 'sl-act-pill--err';
+    const pillTxt = filled ? 'Filled' : 'Failed';
+    const fill    = a.fill_price ? `@ $${_fmtPrice(a.fill_price)}` : '';
+    const wallet  = a.wallet_short ? `<span class="sl-act-wallet">${a.wallet_short}</span>` : '';
+    return `
+      <div class="sl-act-row sl-act-row--exec">
+        <span class="sl-act-icon">${icon}</span>
+        <span class="sl-act-main">${a.pair || '—'} <strong>${(a.direction||'').toUpperCase()}</strong> ${fill} ${wallet}</span>
+        <span class="sl-act-pill ${pillCls}">${pillTxt}</span>
+        <span class="sl-act-time">${age}</span>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = title + `<div class="sl-act-feed">${rows}</div>`;
+}
+
+function _signalMeta(status) {
+  return {
+    pending:   { icon: '📡', pillCls: 'sl-act-pill--new',  pillTxt: 'Nueva'    },
+    executed:  { icon: '🤖', pillCls: 'sl-act-pill--ok',   pillTxt: 'Ejecutada' },
+    expired:   { icon: '⏱',  pillCls: 'sl-act-pill--muted',pillTxt: 'Expirada' },
+    stopped:   { icon: '🛑', pillCls: 'sl-act-pill--err',  pillTxt: 'Stopped'  },
+    tp_hit:    { icon: '🎯', pillCls: 'sl-act-pill--ok',   pillTxt: 'TP Hit'   },
+    cancelled: { icon: '✖',  pillCls: 'sl-act-pill--muted',pillTxt: 'Cancelada'},
+  }[status] || { icon: '•', pillCls: 'sl-act-pill--muted', pillTxt: status };
+}
+
+function _fmtPrice(n) {
+  const num = Number(n);
+  if (num >= 1000) return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (num >= 1)    return num.toFixed(3);
+  return num.toFixed(5);
 }
 
 async function toggleWalletAuto(id, newVal) {
   try {
     await apiPost(`/signal-lab/wallets/${id}`, { auto_execute: newVal }, 'PATCH');
-    fetchSignalWallets();
+    fetchSignalLabMonitor();
   } catch (e) {
     if (e.message !== 'Session expired') alert('Error: ' + e.message);
   }
 }
 
 async function deactivateWallet(id) {
-  if (!confirm('¿Desactivar esta wallet? No se elimina — se puede reactivar desde la DB.')) return;
+  if (!confirm('¿Desactivar esta wallet? No se elimina — se puede reactivar.')) return;
   try {
     await apiPost(`/signal-lab/wallets/${id}`, { active: false }, 'PATCH');
-    fetchSignalWallets();
+    fetchSignalLabMonitor();
   } catch (e) {
     if (e.message !== 'Session expired') alert('Error: ' + e.message);
-  }
-}
-
-async function registerSignalWallet() {
-  const label  = document.getElementById('sw-label').value.trim();
-  const addr   = document.getElementById('sw-addr').value.trim();
-  const key    = document.getElementById('sw-key').value.trim();
-  const auto   = document.getElementById('sw-auto').checked;
-
-  if (!label || !addr || !key) { alert('Completa todos los campos.'); return; }
-
-  const btn = document.getElementById('sw-register-btn');
-  btn.disabled = true; btn.textContent = 'Registrando…';
-  try {
-    await apiPost('/signal-lab/wallets', { label, hl_wallet_addr: addr, hl_secret_key: key, auto_execute: auto });
-    document.getElementById('sw-label').value = '';
-    document.getElementById('sw-addr').value  = '';
-    document.getElementById('sw-key').value   = '';
-    document.getElementById('sw-auto').checked = false;
-    fetchSignalWallets();
-  } catch (e) {
-    if (e.message !== 'Session expired') alert('Error al registrar: ' + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = 'Registrar wallet';
   }
 }
 
