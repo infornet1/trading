@@ -213,46 +213,175 @@ async def _auto_execute_signal(signal_id: int, sig):
         await db.commit()
 
 
-async def apply_update_to_db(msg, update_status: str):
-    """Find the most recent open signal before this msg and update its status."""
+async def apply_update_to_db(msg, update_status: str) -> dict | None:
+    """
+    Find the most recent open signal before this msg and update its status.
+    Returns {"id": signal_id, "prev_status": str, "pair": str, "direction": str}
+    or None if no match.
+    'Open' means status pending OR executed (active HL position).
+    """
+    OPEN_STATUSES = ("pending", "executed")
+
     async with AsyncSession_() as db:
-        # Check if it's a formal reply to a known signal
+        # Check if it's a formal reply to a known signal message
         parent_id = None
         if msg.reply_to:
             parent_id = getattr(msg.reply_to, "reply_to_msg_id", None)
 
+        target = None
         if parent_id:
             res = await db.execute(
                 select(SignalEvent).where(
                     SignalEvent.source_id == SOURCE_ID,
                     SignalEvent.msg_id    == parent_id,
-                    SignalEvent.status    == "pending",
+                    SignalEvent.status.in_(OPEN_STATUSES),
                 )
             )
             target = res.scalar_one_or_none()
-            if target:
-                target.status = update_status
-                await db.commit()
-                return target.id
 
-        # Standalone update — apply to most recent open signal before this msg timestamp
-        res = await db.execute(
-            select(SignalEvent)
-            .where(
-                SignalEvent.source_id   == SOURCE_ID,
-                SignalEvent.status      == "pending",
-                SignalEvent.received_at <= msg.date,
+        if not target:
+            # Standalone update — apply to most recent open signal before this msg timestamp
+            res = await db.execute(
+                select(SignalEvent)
+                .where(
+                    SignalEvent.source_id   == SOURCE_ID,
+                    SignalEvent.status.in_(OPEN_STATUSES),
+                    SignalEvent.received_at <= msg.date,
+                )
+                .order_by(SignalEvent.received_at.desc())
+                .limit(1)
             )
-            .order_by(SignalEvent.received_at.desc())
-            .limit(1)
-        )
-        target = res.scalar_one_or_none()
-        if target:
-            target.status = update_status
-            await db.commit()
-            return target.id
+            target = res.scalar_one_or_none()
 
-    return None
+        if not target:
+            return None
+
+        info = {
+            "id":          target.id,
+            "prev_status": target.status,
+            "pair":        target.pair,
+            "direction":   target.direction,
+        }
+        target.status = update_status
+        await db.commit()
+        return info
+
+
+def _close_hl_position(wallet_addr: str, secret_key_encrypted: str,
+                       symbol: str, is_long: bool) -> dict:
+    """
+    Synchronous: cancel open trigger orders then market-close the full position.
+    Call via asyncio.to_thread.
+    """
+    try:
+        secret_key = decrypt(secret_key_encrypted)
+        account    = Account.from_key(secret_key)
+        info       = Info(hlc.MAINNET_API_URL, skip_ws=True)
+        exchange   = Exchange(account, hlc.MAINNET_API_URL, account_address=wallet_addr)
+
+        # Confirm position still open
+        state = info.user_state(wallet_addr)
+        size  = 0.0
+        for p in state.get("assetPositions", []):
+            pos = p["position"]
+            if pos["coin"] == symbol:
+                size = abs(float(pos.get("szi", 0)))
+                break
+
+        if size == 0:
+            return {"success": False, "error": "No open position found — may have already closed"}
+
+        # Cancel open trigger orders (SL/TP) for this symbol
+        try:
+            for o in info.open_orders(wallet_addr):
+                if o.get("coin") == symbol and o.get("triggerPx") is not None:
+                    exchange.cancel(symbol, o["oid"])
+        except Exception:
+            pass  # best-effort; position close still proceeds
+
+        # Market close full position
+        result = exchange.market_close(symbol)
+        if not result or result.get("status") != "ok":
+            return {"success": False, "error": f"Close order failed: {result}"}
+
+        statuses   = result.get("response", {}).get("data", {}).get("statuses", [{}])
+        filled     = statuses[0].get("filled", {}) if statuses else {}
+        fill_price = float(filled.get("avgPx", 0) or 0)
+        return {"success": True, "fill_price": fill_price, "size": size}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+async def _auto_close_signal(signal_info: dict, update_status: str):
+    """
+    Fire market closes on HL for all filled executions of a signal,
+    triggered when the channel posts a close/stop/target update.
+    """
+    signal_id = signal_info["id"]
+    pair      = signal_info["pair"]
+    direction = signal_info["direction"]
+    symbol    = pair.split("/")[0].upper()
+    is_long   = direction == "long"
+
+    async with AsyncSession_() as db:
+        res = await db.execute(
+            select(SignalExecution, SignalWallet)
+            .join(SignalWallet, SignalExecution.hl_wallet_addr == SignalWallet.hl_wallet_addr)
+            .where(
+                SignalExecution.signal_id == signal_id,
+                SignalExecution.outcome   == "filled",
+            )
+        )
+        rows = res.all()
+
+    if not rows:
+        print(f"[Auto-Close] Signal {signal_id}: no filled executions to close.", flush=True)
+        return
+
+    label = "target_hit" if update_status == "target_hit" else "stopped"
+
+    for execution, wallet in rows:
+        print(
+            f"[Auto-Close] Signal {signal_id} {pair} — closing {wallet.hl_wallet_addr[:10]}… ({label})",
+            flush=True,
+        )
+        result = await asyncio.to_thread(
+            _close_hl_position,
+            wallet.hl_wallet_addr,
+            wallet.hl_secret_key,
+            symbol,
+            is_long,
+        )
+
+        if result["success"]:
+            print(
+                f"[Auto-Close] ✅ {pair} closed @ ${result['fill_price']} | size {result['size']}",
+                flush=True,
+            )
+            await asyncio.to_thread(
+                send_signal_email,
+                f"{'✅ TP alcanzado' if label == 'target_hit' else '🛑 SL hit'}: {pair} cerrado",
+                f"El canal publicó una actualización de cierre y la posición fue cerrada automáticamente.\n\n"
+                f"Par:        {pair}\n"
+                f"Dirección:  {direction.upper()}\n"
+                f"Evento:     {label}\n"
+                f"Fill close: ${result['fill_price']:,.4f}\n"
+                f"Tamaño:     {result['size']}\n"
+                f"Wallet:     {wallet.hl_wallet_addr}\n",
+            )
+        else:
+            print(f"[Auto-Close] ❌ {pair} close failed: {result['error']}", flush=True)
+            await asyncio.to_thread(
+                send_signal_email,
+                f"❌ Auto-close FALLIDO: {pair}",
+                f"El canal indicó cierre pero la orden de cierre falló.\n\n"
+                f"Par:    {pair}\n"
+                f"Evento: {label}\n"
+                f"Error:  {result['error']}\n"
+                f"Wallet: {wallet.hl_wallet_addr}\n\n"
+                f"Acción requerida: cierra la posición manualmente en Hyperliquid.",
+            )
 
 
 # ── Startup orphan reconciliation ────────────────────────────────────────────
@@ -451,12 +580,15 @@ async def main():
 
             update = parse_update(text)
             if update:
-                ev_id = await apply_update_to_db(msg, update)
-                label = ev_id or "no match"
+                info = await apply_update_to_db(msg, update)
+                label = info["id"] if info else "no match"
                 print(
                     f"[{msg.date:%H:%M:%S}] UPDATE ({update}) → signal id={label}",
                     flush=True,
                 )
+                # Auto-close HL position if channel signals exit on an executed trade
+                if info and info["prev_status"] == "executed" and update in ("target_hit", "stopped"):
+                    asyncio.create_task(_auto_close_signal(info, update))
 
         print("[Signal Lab Listener] Ready. Waiting for messages...", flush=True)
         await client.run_until_disconnected()
