@@ -449,9 +449,9 @@ async function openExecuteModal(signalId) {
   await _loadSignalFreshness(sig);
 
   // Load wallets (active bots list from /bots endpoint)
+  document.getElementById("modal-confirm-btn").disabled = true;
   await _loadModalWallets();
 
-  document.getElementById("modal-confirm-btn").disabled = true;
   document.getElementById("execute-modal").classList.remove("hidden");
 }
 
