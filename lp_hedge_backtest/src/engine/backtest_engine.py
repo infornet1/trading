@@ -721,7 +721,7 @@ class BotAvaroEngine:
 
 
 class FuryBacktestEngine:
-    """Standalone RSI perps backtest for VIZNAGO FURY mode.
+    """Standalone RSI perps backtest for VIZNIAGO FURY mode.
 
     No LP position. Trades BTC or ETH perps using a 6-gate signal stack on
     15-minute candles with 1-hour MTF confirmation.

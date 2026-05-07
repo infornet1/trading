@@ -1,5 +1,5 @@
 """
-VIZNAGO FURY — RSI Trader (Standalone Perps Bot)
+VIZNIAGO FURY — RSI Trader (Standalone Perps Bot)
 
 Strategy overview:
   - No LP position required — pure Hyperliquid perps on BTC or ETH

@@ -1,5 +1,5 @@
 /**
- * VIZBOT — VIZNAGO FURY AI Chat Widget
+ * VIZBOT — VIZNIAGO FURY AI Chat Widget
  * Self-contained: injects its own CSS, works on landing + dashboard.
  * Requires no external dependencies.
  */
@@ -20,9 +20,9 @@
   const L = {
     es: {
       title:       'VIZBOT',
-      subtitle:    'Asistente VIZNAGO FURY',
+      subtitle:    'Asistente VIZNIAGO FURY',
       placeholder: 'Pregunta sobre estrategia, configuración, soporte...',
-      greeting:    '¡Hola! Soy VIZBOT, tu asistente de VIZNAGO FURY 🛡\n\nPuedo ayudarte con:\n• Cómo funciona el bot de cobertura LP\n• Configuración de parámetros (leverage, SL, rango)\n• Estrategia LP + perps y pérdida impermanente\n• Planes de membresía y roadmap\n• Dudas de soporte\n\n¿En qué puedo ayudarte?',
+      greeting:    '¡Hola! Soy VIZBOT, tu asistente de VIZNIAGO FURY 🛡\n\nPuedo ayudarte con:\n• Cómo funciona el bot de cobertura LP\n• Configuración de parámetros (leverage, SL, rango)\n• Estrategia LP + perps y pérdida impermanente\n• Planes de membresía y roadmap\n• Dudas de soporte\n\n¿En qué puedo ayudarte?',
       errConn:     'Error al conectar con el asistente. Intenta de nuevo.',
       errRate:     'Límite alcanzado (20 mensajes/hora). Espera un momento.',
       sending:     'Enviando...',
@@ -30,9 +30,9 @@
     },
     en: {
       title:       'VIZBOT',
-      subtitle:    'VIZNAGO FURY Assistant',
+      subtitle:    'VIZNIAGO FURY Assistant',
       placeholder: 'Ask about strategy, configuration, support...',
-      greeting:    'Hi! I\'m VIZBOT, your VIZNAGO FURY assistant 🛡\n\nI can help you with:\n• How the LP hedge bot works\n• Parameter configuration (leverage, SL, range)\n• LP + perps strategy and impermanent loss\n• Membership plans and roadmap\n• Support questions\n\nWhat can I help you with?',
+      greeting:    'Hi! I\'m VIZBOT, your VIZNIAGO FURY assistant 🛡\n\nI can help you with:\n• How the LP hedge bot works\n• Parameter configuration (leverage, SL, range)\n• LP + perps strategy and impermanent loss\n• Membership plans and roadmap\n• Support questions\n\nWhat can I help you with?',
       errConn:     'Error connecting to assistant. Please try again.',
       errRate:     'Rate limit reached (20 msgs/hour). Please wait.',
       sending:     'Sending...',

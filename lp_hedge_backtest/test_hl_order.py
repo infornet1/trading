@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VIZNAGO FURY — Hyperliquid Order Dry-Run Validator
+VIZNIAGO FURY — Hyperliquid Order Dry-Run Validator
 ===================================================
 Validates that HL connectivity, sizing math, and order placement work
 without touching the live bot.
@@ -257,7 +257,7 @@ def live_round_trip(eth_price):
 # ── Main ───────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="VIZNAGO HL dry-run validator")
+    parser = argparse.ArgumentParser(description="VIZNIAGO HL dry-run validator")
     parser.add_argument("--live", action="store_true",
                         help="Run a real 0.001 ETH open+close to confirm order API works")
     parser.add_argument("--nft", type=int, default=None,
@@ -267,7 +267,7 @@ def main():
     nft_id = args.nft or int(os.getenv("UNISWAP_NFT_ID", "5364087"))
 
     print("\n" + "=" * 60)
-    print("  VIZNAGO FURY — HL Order Validator")
+    print("  VIZNIAGO FURY — HL Order Validator")
     print(f"  NFT #{nft_id}  |  Account: {HL_ADDRESS or 'NOT SET'}")
     print("=" * 60)
 

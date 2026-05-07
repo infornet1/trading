@@ -1,5 +1,5 @@
 """
-VIZNAGO WHALE — Hyperliquid Whale Position Tracker Bot
+VIZNIAGO WHALE — Hyperliquid Whale Position Tracker Bot
 
 Monitors top HL leaderboard traders + custom addresses for large position
 changes. Emits structured events for dashboard display and optional

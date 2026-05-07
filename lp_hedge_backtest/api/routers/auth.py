@@ -3,7 +3,7 @@ Auth router — wallet signature (EIP-191 personal_sign) → JWT.
 
 Flow:
   1. GET  /auth/nonce?address=0xABC  →  { nonce: "abc123" }
-  2. Wallet signs: "Sign in to VIZNAGO FURY\nNonce: abc123"
+  2. Wallet signs: "Sign in to VIZNIAGO FURY\nNonce: abc123"
   3. POST /auth/verify { address, signature }  →  { access_token, token_type }
 """
 
@@ -82,7 +82,7 @@ async def verify_signature(
 ):
     """
     Verify the wallet signature and return a JWT.
-    Expects the wallet signed: "Sign in to VIZNAGO FURY\\nNonce: <nonce>"
+    Expects the wallet signed: "Sign in to VIZNIAGO FURY\\nNonce: <nonce>"
     """
     address = body.address   # already lowercased by validator
 
@@ -96,7 +96,7 @@ async def verify_signature(
         raise HTTPException(status_code=400, detail="Nonce expired — call /auth/nonce again")
 
     # 2. Recover signer from signature
-    message  = f"Sign in to VIZNAGO FURY\nNonce: {nonce_row.nonce}"
+    message  = f"Sign in to VIZNIAGO FURY\nNonce: {nonce_row.nonce}"
     msg_hash = encode_defunct(text=message)
     try:
         recovered = Account.recover_message(msg_hash, signature=body.signature)
