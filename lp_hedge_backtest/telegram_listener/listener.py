@@ -359,6 +359,14 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
                 f"[Auto-Close] ✅ {pair} closed @ ${result['fill_price']} | size {result['size']}",
                 flush=True,
             )
+            # Record close price on the execution for real P&L tracking
+            async with AsyncSession_() as db:
+                await db.execute(
+                    sql_update(SignalExecution)
+                    .where(SignalExecution.id == execution.id)
+                    .values(close_price=result["fill_price"])
+                )
+                await db.commit()
             await asyncio.to_thread(
                 send_signal_email,
                 f"{'✅ TP alcanzado' if label == 'target_hit' else '🛑 SL hit'}: {pair} cerrado",

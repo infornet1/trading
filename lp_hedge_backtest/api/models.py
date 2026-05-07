@@ -193,6 +193,7 @@ class SignalExecution(Base):
     hl_wallet_addr = Column(String(42),  nullable=True)
     hl_order_id    = Column(String(100), nullable=True)
     fill_price     = Column(Numeric(20, 8), nullable=True)
+    close_price    = Column(Numeric(20, 8), nullable=True)
     executed_at    = Column(DateTime,    default=datetime.utcnow)
     outcome        = Column(Enum("pending", "filled", "failed"), default="pending")
 

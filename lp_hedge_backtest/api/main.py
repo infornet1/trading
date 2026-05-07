@@ -136,6 +136,8 @@ async def _run_column_migrations():
         ),
         # fill_price column on signal_executions (V1 had it nullable — safe to add)
         "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS fill_price DECIMAL(20,8) NULL",
+        # close_price: actual fill when auto-close fires (used for real P&L calculation)
+        "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS close_price DECIMAL(20,8) NULL",
         # user_address on signal_wallets — owner scoping for self-service registration
         "ALTER TABLE signal_wallets ADD COLUMN IF NOT EXISTS user_address VARCHAR(42) NULL",
     ]

@@ -355,6 +355,33 @@
 .sl-outcome-pill.expired  { background: rgba(120,120,120,0.12); color: #888; }
 .sl-outcome-pill.cancelled{ background: rgba(120,120,120,0.12); color: #888; }
 
+.sl-history-stats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+}
+.sl-history-stats strong { color: var(--color-text-primary); }
+
+.sl-history-pair  { font-size: 0.72rem; color: var(--color-text-primary); white-space: nowrap; }
+.sl-history-prices{ font-size: 0.68rem; color: var(--color-text-muted); white-space: nowrap; }
+.sl-history-date  { font-size: 0.65rem; color: var(--color-text-muted); margin-left: auto; white-space: nowrap; }
+
+.sl-pnl-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.sl-pnl-pos { background: rgba(0,255,179,0.1);  color: var(--color-neon-green); }
+.sl-pnl-neg { background: rgba(248,113,113,0.1); color: #f87171; }
+
 /* ── Skeleton loader ──────────────────────────────────────── */
 
 .sl-skeleton { padding: 8px 0; }

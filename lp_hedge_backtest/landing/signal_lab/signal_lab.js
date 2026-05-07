@@ -303,7 +303,14 @@ async function fetchSignals() {
     }
     content.classList.remove("hidden");
 
-    _buildHistorySummary(closed);
+    // Build a basic summary from what's visible; will be replaced with accurate stats on history open
+    _buildHistorySummary({
+      tp:       closed.filter(s => s.status === "tp_hit").length,
+      sl:       closed.filter(s => s.status === "stopped").length,
+      expired:  closed.filter(s => s.status === "expired" || s.status === "cancelled").length,
+      win_rate: null,
+      decided:  0,
+    });
     histTgl.classList.remove("hidden");
 
   } catch {
@@ -357,18 +364,16 @@ function _renderSignalCard(sig, forceExpired = false) {
   `;
 }
 
-function _buildHistorySummary(closed) {
-  const tpCount  = closed.filter(s => s.status === "tp_hit").length;
-  const slCount  = closed.filter(s => s.status === "stopped").length;
-  const expCount = closed.filter(s => s.status === "expired" || s.status === "cancelled").length;
-
+function _buildHistorySummary(stats) {
   const parts = [];
-  if (tpCount)  parts.push(`TP ✅ ${tpCount}`);
-  if (slCount)  parts.push(`SL ❌ ${slCount}`);
-  if (expCount) parts.push(`Expiradas ${expCount}`);
+  if (stats.tp)      parts.push(`TP ✅ ${stats.tp}`);
+  if (stats.sl)      parts.push(`SL ❌ ${stats.sl}`);
+  if (stats.expired) parts.push(`Expiradas ${stats.expired}`);
+  if (stats.win_rate != null) parts.push(`Win rate ${stats.win_rate}%`);
 
   const summary = document.getElementById("history-summary");
-  summary.textContent = `▸ Ver historial (${parts.join(" · ")})`;
+  const arrow   = _historyOpen ? "▴" : "▸";
+  summary.textContent = `${arrow} Ver historial (${parts.join(" · ") || "vacío"})`;
 }
 
 function toggleHistory() {
@@ -401,11 +406,31 @@ async function _loadHistory() {
     });
     const data = await res.json();
     const history = data.history || [];
+    const stats   = data.stats   || {};
+
+    // Refresh summary bar with real stats from API
+    _buildHistorySummary(stats);
+
     if (history.length === 0) {
       el.innerHTML = '<p style="font-size:0.72rem;color:var(--color-text-muted);padding-top:8px">Sin historial aún.</p>';
+      _historyLoaded = true;
       return;
     }
-    el.innerHTML = `<div class="sl-history-list">${history.map(_renderHistoryRow).join("")}</div>`;
+
+    // Win rate stats bar (only if there are decided trades)
+    let statsBar = "";
+    if (stats.decided > 0) {
+      const wrColor = stats.win_rate >= 50 ? "var(--color-neon-green)" : "#f87171";
+      statsBar = `
+        <div class="sl-history-stats">
+          <span>Ejecutadas: <strong>${stats.decided}</strong></span>
+          <span>✅ TP: <strong>${stats.tp}</strong></span>
+          <span>❌ SL: <strong>${stats.sl}</strong></span>
+          <span>Win rate: <strong style="color:${wrColor}">${stats.win_rate}%</strong></span>
+        </div>`;
+    }
+
+    el.innerHTML = statsBar + `<div class="sl-history-list">${history.map(_renderHistoryRow).join("")}</div>`;
     _historyLoaded = true;
   } catch {
     el.innerHTML = '<p style="font-size:0.72rem;color:#f87171;padding-top:8px">Error al cargar historial.</p>';
@@ -413,15 +438,35 @@ async function _loadHistory() {
 }
 
 function _renderHistoryRow(sig) {
-  const dir   = (sig.direction || "").toUpperCase();
-  const entry = sig.entry ? `$${_fmt(sig.entry)}` : "—";
-  const age   = sig.received_at ? new Date(sig.received_at).toLocaleDateString("es-VE",{month:"short",day:"numeric"}) : "—";
+  const dir  = (sig.direction || "").toUpperCase();
+  const age  = sig.received_at
+    ? new Date(sig.received_at).toLocaleDateString("es-VE", { month: "short", day: "numeric" })
+    : "—";
+
+  // Price columns — only show when executed
+  let priceBlock = "";
+  if (sig.fill_price) {
+    const fillStr  = `E $${_fmt(sig.fill_price)}`;
+    const closeStr = sig.close_price ? ` → $${_fmt(sig.close_price)}` : "";
+    priceBlock = `<span class="sl-history-prices">${fillStr}${closeStr}</span>`;
+  }
+
+  // P&L badge
+  let pnlBadge = "";
+  if (sig.pnl_pct != null) {
+    const pos     = sig.pnl_pct >= 0;
+    const sign    = pos ? "+" : "";
+    const est     = sig.estimated_pnl ? " ~" : "";
+    pnlBadge = `<span class="sl-pnl-badge ${pos ? "sl-pnl-pos" : "sl-pnl-neg"}">${est}${sign}${sig.pnl_pct.toFixed(1)}%</span>`;
+  }
+
   return `
     <div class="sl-history-row">
       <span class="sl-outcome-pill ${sig.status}">${_statusLabel(sig.status)}</span>
-      <span>${sig.pair || "—"} ${dir}</span>
-      <span>E ${entry}</span>
-      <span style="margin-left:auto">${age}</span>
+      <span class="sl-history-pair">${sig.pair || "—"} ${dir} ${sig.leverage || ""}x</span>
+      ${priceBlock}
+      ${pnlBadge}
+      <span class="sl-history-date">${age}</span>
     </div>
   `;
 }

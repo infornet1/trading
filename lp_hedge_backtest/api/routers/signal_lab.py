@@ -345,20 +345,72 @@ async def get_signal_price(
         return {"symbol": sym, "price": None, "available": False, "error": str(e)}
 
 
+def _calc_pnl(direction: str, leverage: int, fill_price: float,
+              close_price: float | None, status: str,
+              stoploss: float | None, targets: list) -> float | None:
+    """Estimate P&L % using actual close price when available, else signal levels."""
+    is_long    = direction == "long"
+    actual_close = close_price
+    if not actual_close:
+        if status == "tp_hit" and targets:
+            actual_close = float(targets[0])
+        elif status == "stopped" and stoploss:
+            actual_close = float(stoploss)
+        else:
+            return None
+    raw = (actual_close - fill_price) / fill_price if is_long else (fill_price - actual_close) / fill_price
+    return round(raw * leverage * 100, 2)
+
+
 @router.get("/history")
 async def signal_history(
     limit:   int          = Query(50, ge=1, le=200),
     db:      AsyncSession = Depends(get_db),
     address: str          = Depends(get_current_address),
 ):
-    q = (
+    events_res = await db.execute(
         select(SignalEvent)
         .where(SignalEvent.status.in_(["stopped", "tp_hit", "expired", "cancelled", "executed"]))
         .order_by(desc(SignalEvent.received_at))
         .limit(limit)
     )
-    result = await db.execute(q)
-    return {"history": [_signal_to_dict(e) for e in result.scalars().all()]}
+    events = events_res.scalars().all()
+
+    history = []
+    for ev in events:
+        d = _signal_to_dict(ev)
+        # Most recent filled execution for this signal
+        exc_res = await db.execute(
+            select(SignalExecution)
+            .where(SignalExecution.signal_id == ev.id, SignalExecution.outcome == "filled")
+            .order_by(desc(SignalExecution.executed_at))
+            .limit(1)
+        )
+        exc = exc_res.scalar_one_or_none()
+        fill  = float(exc.fill_price)  if exc and exc.fill_price  else None
+        close = float(exc.close_price) if exc and exc.close_price else None
+        d["fill_price"]  = fill
+        d["close_price"] = close
+        d["pnl_pct"]     = _calc_pnl(
+            ev.direction, int(ev.leverage or 1), fill, close,
+            ev.status, float(ev.stoploss) if ev.stoploss else None, ev.targets or [],
+        ) if fill else None
+        d["estimated_pnl"] = close is None and d["pnl_pct"] is not None
+        history.append(d)
+
+    tp_n      = sum(1 for s in history if s["status"] == "tp_hit")
+    sl_n      = sum(1 for s in history if s["status"] == "stopped")
+    exp_n     = sum(1 for s in history if s["status"] in ("expired", "cancelled"))
+    decided   = tp_n + sl_n
+    win_rate  = round(tp_n / decided * 100) if decided else None
+
+    return {
+        "history": history,
+        "stats": {
+            "tp": tp_n, "sl": sl_n, "expired": exp_n,
+            "win_rate": win_rate, "decided": decided,
+        },
+    }
 
 
 # ── User self-service copy-trading wallet routes ───────────────────────────
