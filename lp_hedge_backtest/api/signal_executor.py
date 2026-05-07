@@ -45,13 +45,15 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         leverage_requested = int(signal.leverage)  if signal.leverage  else 10
         entry             = float(signal.entry)
 
-        # Cap leverage to HL's per-asset max (silently reduced, never raised)
+        # Cap leverage to HL's per-asset max; also grab szDecimals for size rounding
         max_leverage = leverage_requested
+        sz_decimals  = 4  # safe default; HL rejects sizes with too many decimal places
         try:
             meta = info.meta()
             for asset in meta.get("universe", []):
                 if asset.get("name", "").upper() == symbol:
                     max_leverage = int(asset.get("maxLeverage", leverage_requested))
+                    sz_decimals  = int(asset.get("szDecimals", sz_decimals))
                     break
         except Exception:
             pass  # meta fetch failed — proceed with signal leverage, update_leverage will catch it
@@ -59,7 +61,7 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         leverage_adjusted = leverage < leverage_requested
 
         margin   = balance * size_pct / 100
-        size     = (margin * leverage) / entry   # base asset quantity
+        size     = round((margin * leverage) / entry, sz_decimals)  # must satisfy szDecimals
 
         if size * entry < 10:
             return {"success": False, "dry_run": dry_run,
@@ -72,8 +74,8 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         tp2_price    = float(targets[1]) if len(targets) >= 2 else None
         split_tps    = tp2_price is not None
         # 50/50 split when two targets; full size when only one
-        tp1_size     = round(size / 2, 6) if split_tps else size
-        tp2_size     = round(size / 2, 6) if split_tps else None
+        tp1_size     = round(size / 2, sz_decimals) if split_tps else size
+        tp2_size     = round(size / 2, sz_decimals) if split_tps else None
         close_is_buy = not is_buy
 
         if dry_run:
