@@ -590,6 +590,18 @@ async function _loadModalWallets() {
     }
     listEl.innerHTML = items.join("");
 
+    // Auto-select if only one wallet is available (not locked)
+    const selectableWallets = [
+      ...signalWallets.map(w => w.hl_wallet_addr.toLowerCase()),
+      ...Object.entries(lpMap)
+        .filter(([addr, info]) => !info.active && !signalWallets.some(w => w.hl_wallet_addr.toLowerCase() === addr))
+        .map(([addr]) => addr),
+    ];
+    if (selectableWallets.length === 1) {
+      const radio = listEl.querySelector(`input[name="exec-wallet"][value="${selectableWallets[0]}"]`);
+      if (radio) { radio.checked = true; onWalletSelected(selectableWallets[0]); }
+    }
+
   } catch {
     listEl.innerHTML = '<p style="font-size:0.72rem;color:#f87171">Error al cargar wallets. ¿Estás conectado?</p>';
   }
