@@ -182,10 +182,16 @@ async def _auto_execute_signal(signal_id: int, sig):
                         f"TP:         ${tp1:,.4f}  (full size)\n" if tp1 else ""
                         f"SL:         ${float(sig.stoploss):,.4f}\n"
                     )
+                scaled_note = (
+                    f"⚠️  Nota: tamaño escalado al mínimo de $10 USDC (señal pedía "
+                    f"{float(sig.size_pct):.1f}% = ${float(sig.size_pct)/100 * result['balance']:.2f})\n\n"
+                    if result.get("size_scaled") else ""
+                )
                 await asyncio.to_thread(
                     send_signal_email,
                     f"✅ Orden ejecutada: {sig.pair} {sig.direction.upper()} {sig.leverage}x",
                     f"Copy trade ejecutado automáticamente en Hyperliquid\n\n"
+                    f"{scaled_note}"
                     f"Par:        {sig.pair}\n"
                     f"Dirección:  {sig.direction.upper()}\n"
                     f"{lev_line}"

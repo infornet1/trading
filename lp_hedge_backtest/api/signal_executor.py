@@ -63,9 +63,14 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         margin   = balance * size_pct / 100
         size     = round((margin * leverage) / entry, sz_decimals)  # must satisfy szDecimals
 
+        size_scaled = False
         if size * entry < 10:
-            return {"success": False, "dry_run": dry_run,
-                    "error": f"Notional too small: ${size*entry:.2f} (min $10)"}
+            min_size = round(10.0 / entry, sz_decimals)
+            if min_size * entry / leverage > balance:
+                return {"success": False, "dry_run": dry_run,
+                        "error": f"Notional too small and insufficient margin: ${balance:.2f} balance (need ${10/leverage:.2f} margin for $10 notional)"}
+            size = min_size
+            size_scaled = True
 
         is_buy       = (signal.direction == "long")
         sl_price     = float(signal.stoploss)
@@ -90,6 +95,7 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
                 "leverage":           leverage,
                 "leverage_requested": leverage_requested,
                 "leverage_adjusted":  leverage_adjusted,
+                "size_scaled":        size_scaled,
                 "symbol":             symbol,
                 "balance":            round(balance, 2),
                 "perp":               round(perp, 2),
@@ -156,6 +162,7 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
             "leverage":           leverage,
             "leverage_requested": leverage_requested,
             "leverage_adjusted":  leverage_adjusted,
+            "size_scaled":        size_scaled,
             "symbol":             symbol,
             "balance":            round(balance, 2),
             "tp1_price":          round(tp1_price, 6) if tp1_price else None,
