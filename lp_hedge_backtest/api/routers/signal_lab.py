@@ -197,11 +197,12 @@ async def execute_signal(
             detail=f"LP Bot #{active_bot.id} is active on this wallet. Pause it first.",
         )
 
-    # 3. Look up registered signal wallet
+    # 3. Look up registered signal wallet — must belong to the requesting user
     sw_res = await db.execute(
         select(SignalWallet).where(
             SignalWallet.hl_wallet_addr == wallet_addr,
-            SignalWallet.active == True,
+            SignalWallet.user_address   == address.lower(),
+            SignalWallet.active         == True,
         )
     )
     signal_wallet = sw_res.scalar_one_or_none()
@@ -282,6 +283,7 @@ async def get_auto_status(
     """Return auto-execute armed state for the Signal Lab page (no secret keys)."""
     res = await db.execute(
         select(SignalWallet).where(
+            SignalWallet.user_address == address.lower(),
             SignalWallet.active       == True,
             SignalWallet.auto_execute == True,
         )

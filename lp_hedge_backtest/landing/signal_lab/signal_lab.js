@@ -564,10 +564,10 @@ async function _loadModalWallets() {
   listEl.innerHTML = '<p style="font-size:0.72rem;color:var(--color-text-muted)">Cargando wallets...</p>';
 
   try {
-    // Fetch LP bot wallets + registered signal wallets in parallel
+    // Fetch LP bot wallets + the current user's own copy-trading wallet in parallel
     const [botsRes, swRes] = await Promise.allSettled([
       fetch(`${API_BASE}/bots`, { headers: { ..._authHeader() } }),
-      fetch(`${API_BASE}/signal-lab/wallets`, { headers: { ..._authHeader() } }),
+      fetch(`${API_BASE}/signal-lab/my-wallet`, { headers: { ..._authHeader() } }),
     ]);
 
     // Build LP bot wallet map: address → {active, bot_id}
@@ -582,12 +582,12 @@ async function _loadModalWallets() {
       }
     }
 
-    // Signal wallets: auto-execute registered wallets
+    // Signal wallet: only the wallet registered to the connected user
     const signalWallets = [];
     if (swRes.status === "fulfilled" && swRes.value.ok) {
       const swData = await swRes.value.json();
-      for (const w of (swData.wallets || [])) {
-        if (w.active) signalWallets.push(w);
+      if (swData.registered && swData.hl_wallet_addr) {
+        signalWallets.push({ ...swData, active: true });
       }
     }
 

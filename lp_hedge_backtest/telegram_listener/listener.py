@@ -182,9 +182,10 @@ async def _auto_execute_signal(signal_id: int, sig):
                         f"TP:         ${tp1:,.4f}  (full size)\n" if tp1 else ""
                         f"SL:         ${float(sig.stoploss):,.4f}\n"
                     )
+                _size_pct_display = float(sig.size_pct or 2.0)
                 scaled_note = (
                     f"⚠️  Nota: tamaño escalado al mínimo de $10 USDC (señal pedía "
-                    f"{float(sig.size_pct):.1f}% = ${float(sig.size_pct)/100 * result['balance']:.2f})\n\n"
+                    f"{_size_pct_display:.1f}% = ${_size_pct_display / 100 * result['balance']:.2f})\n\n"
                     if result.get("size_scaled") else ""
                 )
                 await asyncio.to_thread(

@@ -2,6 +2,8 @@
 HL order placement helper for signal copy trading.
 Synchronous — wrap with asyncio.to_thread() in async contexts.
 """
+import math
+
 from eth_account import Account
 from hyperliquid.exchange import Exchange
 from hyperliquid.info import Info
@@ -65,7 +67,9 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
 
         size_scaled = False
         if size * entry < 10:
-            min_size = round(10.0 / entry, sz_decimals)
+            # ceil to nearest valid lot to guarantee notional >= $10 (round() can round down)
+            factor   = 10 ** sz_decimals
+            min_size = math.ceil((10.0 / entry) * factor) / factor
             if min_size * entry / leverage > balance:
                 return {"success": False, "dry_run": dry_run,
                         "error": f"Notional too small and insufficient margin: ${balance:.2f} balance (need ${10/leverage:.2f} margin for $10 notional)"}
@@ -117,8 +121,22 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         if not order or order.get("status") != "ok":
             return {"success": False, "dry_run": False, "error": f"Order failed: {order}"}
 
-        statuses    = order.get("response", {}).get("data", {}).get("statuses", [{}])
-        filled      = statuses[0].get("filled", {}) if statuses else {}
+        statuses = order.get("response", {}).get("data", {}).get("statuses", [{}])
+        first    = statuses[0] if statuses else {}
+        filled   = first.get("filled", {})
+        resting  = first.get("resting", {})
+
+        if not filled or not filled.get("oid"):
+            # Order was not filled immediately — cancel the resting entry to avoid orphans
+            resting_oid = resting.get("oid") if resting else None
+            if resting_oid:
+                try:
+                    exchange.cancel(symbol, resting_oid)
+                except Exception:
+                    pass
+            return {"success": False, "dry_run": False,
+                    "error": "Order was not filled (resting) — price may have moved. Entry cancelled."}
+
         hl_order_id = str(filled.get("oid", ""))
         fill_price  = float(filled.get("avgPx", entry) or entry)
 
@@ -165,6 +183,7 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
             "size_scaled":        size_scaled,
             "symbol":             symbol,
             "balance":            round(balance, 2),
+            "sl_price":           round(sl_price, 6),
             "tp1_price":          round(tp1_price, 6) if tp1_price else None,
             "tp2_price":          round(tp2_price, 6) if tp2_price else None,
             "split_tps":          split_tps,
