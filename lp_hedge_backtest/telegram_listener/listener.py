@@ -522,14 +522,16 @@ async def _check_breakeven_moves():
             symbol, is_long, entry_px, execution.sl_order_id,
         )
 
+        # Always mark breakeven_applied=True — prevents infinite retry loop on any outcome
+        async with AsyncSession_() as db:
+            await db.execute(
+                sql_update(SignalExecution)
+                .where(SignalExecution.id == execution.id)
+                .values(breakeven_applied=True)
+            )
+            await db.commit()
+
         if result["success"]:
-            async with AsyncSession_() as db:
-                await db.execute(
-                    sql_update(SignalExecution)
-                    .where(SignalExecution.id == execution.id)
-                    .values(breakeven_applied=True)
-                )
-                await db.commit()
             print(
                 f"[Breakeven] ✅ {signal.pair} SL → breakeven ${result['breakeven_px']:,.4f} "
                 f"(size {result['size']})",
@@ -545,6 +547,12 @@ async def _check_breakeven_moves():
                 f"Tamaño:    {result['size']}\n"
                 f"Wallet:    {wallet.hl_wallet_addr}\n\n"
                 f"El runner (50% restante) está protegido a costo cero.",
+            )
+        elif result["error"] == "No remaining position to protect":
+            # Both halves already closed (SL or TP2 fired) — no action needed
+            print(
+                f"[Breakeven] ℹ️ {signal.pair}: position fully closed before breakeven — no action needed",
+                flush=True,
             )
         else:
             print(f"[Breakeven] ❌ {signal.pair}: {result['error']}", flush=True)
