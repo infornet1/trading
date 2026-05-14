@@ -19,6 +19,7 @@ Admin endpoints (admin JWT required):
 import asyncio
 import json
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -31,10 +32,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.auth import get_current_address, get_current_admin
 from api.crypto import encrypt, decrypt
 from api.database import get_db
-from api.models import BotConfig, SignalEvent, SignalExecution, SignalSource, SignalWallet
+from api.models import BotConfig, SignalEvent, SignalExecution, SignalSource, SignalUserDefault, SignalWallet
 from api.signal_executor import place_hl_order
 
 SIGNAL_EXPIRY_HOURS = 7
+_HL_ASSETS_CACHE: list | None = None
+_HL_ASSETS_TS:    float       = 0.0
+_HL_ASSETS_TTL:   int         = 3600  # refresh every hour
 
 router = APIRouter(prefix="/signal-lab", tags=["signal-lab"])
 
@@ -46,8 +50,18 @@ _LP_RANGE_CACHE = os.path.join(
 # ── Schemas ────────────────────────────────────────────────────────────────
 
 class ExecuteRequest(BaseModel):
-    signal_id:      int
-    hl_wallet_addr: str
+    signal_id:          int
+    hl_wallet_addr:     str
+    override_leverage:  Optional[int]   = None
+    override_size_usdt: Optional[float] = None
+    override_sl:        Optional[float] = None
+    override_tp1:       Optional[float] = None
+    override_tp2:       Optional[float] = None
+
+
+class UserDefaultRequest(BaseModel):
+    leverage:  Optional[int]   = None
+    size_usdt: Optional[float] = None
 
 
 class RegisterWalletRequest(BaseModel):
@@ -240,11 +254,23 @@ async def execute_signal(
 
     if signal_wallet:
         # ── Registered wallet → place real HL order ──────────────────────────
+        _overrides: dict | None = None
+        if any([body.override_leverage, body.override_size_usdt,
+                body.override_sl, body.override_tp1, body.override_tp2]):
+            _overrides = {
+                "leverage":  body.override_leverage,
+                "size_usdt": body.override_size_usdt,
+                "sl":        body.override_sl,
+                "tp1":       body.override_tp1,
+                "tp2":       body.override_tp2,
+            }
         result = await asyncio.to_thread(
             place_hl_order,
             signal_wallet.hl_wallet_addr,
             signal_wallet.hl_secret_key,
             signal,
+            False,
+            _overrides,
         )
         if not result["success"]:
             raise HTTPException(status_code=502, detail=f"HL order failed: {result['error']}")
@@ -695,6 +721,113 @@ async def patch_signal_wallet(
 
     await db.commit()
     return {"id": wallet.id, "auto_execute": wallet.auto_execute, "active": wallet.active, "label": wallet.label}
+
+
+@router.get("/hl-assets")
+async def get_hl_assets(address: str = Depends(get_current_address)):
+    """Return HL perpetual asset metadata (max leverage, sz decimals). Cached 1h."""
+    global _HL_ASSETS_CACHE, _HL_ASSETS_TS
+    if _HL_ASSETS_CACHE is not None and (time.time() - _HL_ASSETS_TS) < _HL_ASSETS_TTL:
+        return {"assets": _HL_ASSETS_CACHE, "cached": True}
+
+    def _fetch():
+        from hyperliquid.info import Info
+        from hyperliquid.utils import constants
+        info = Info(constants.MAINNET_API_URL, skip_ws=True)
+        meta = info.meta()
+        return sorted(
+            [
+                {
+                    "coin":         a["name"],
+                    "max_leverage": int(a.get("maxLeverage", 10)),
+                    "sz_decimals":  int(a.get("szDecimals", 4)),
+                }
+                for a in meta.get("universe", [])
+                if a.get("name")
+            ],
+            key=lambda x: x["coin"],
+        )
+
+    assets = await asyncio.to_thread(_fetch)
+    _HL_ASSETS_CACHE = assets
+    _HL_ASSETS_TS    = time.time()
+    return {"assets": assets, "cached": False}
+
+
+@router.get("/user-defaults")
+async def get_user_defaults(
+    db:      AsyncSession = Depends(get_db),
+    address: str          = Depends(get_current_address),
+):
+    """Return the connected user's saved per-coin execution defaults."""
+    res = await db.execute(
+        select(SignalUserDefault).where(SignalUserDefault.user_address == address.lower())
+    )
+    rows = res.scalars().all()
+    return {
+        "defaults": {
+            r.coin: {
+                "leverage":  r.leverage,
+                "size_usdt": float(r.size_usdt) if r.size_usdt else None,
+            }
+            for r in rows
+        }
+    }
+
+
+@router.put("/user-defaults/{coin}", status_code=200)
+async def upsert_user_default(
+    coin:    str,
+    body:    UserDefaultRequest,
+    db:      AsyncSession = Depends(get_db),
+    address: str          = Depends(get_current_address),
+):
+    """Upsert a per-coin execution default (leverage + size_usdt)."""
+    coin = coin.upper().strip()
+    res  = await db.execute(
+        select(SignalUserDefault).where(
+            SignalUserDefault.user_address == address.lower(),
+            SignalUserDefault.coin         == coin,
+        )
+    )
+    row = res.scalar_one_or_none()
+    if row:
+        if body.leverage  is not None: row.leverage  = body.leverage
+        if body.size_usdt is not None: row.size_usdt = body.size_usdt
+    else:
+        row = SignalUserDefault(
+            user_address = address.lower(),
+            coin         = coin,
+            leverage     = body.leverage,
+            size_usdt    = body.size_usdt,
+        )
+        db.add(row)
+    await db.commit()
+    return {
+        "coin":      coin,
+        "leverage":  row.leverage,
+        "size_usdt": float(row.size_usdt) if row.size_usdt else None,
+    }
+
+
+@router.delete("/user-defaults/{coin}", status_code=204)
+async def delete_user_default(
+    coin:    str,
+    db:      AsyncSession = Depends(get_db),
+    address: str          = Depends(get_current_address),
+):
+    """Delete a per-coin execution default."""
+    coin = coin.upper().strip()
+    res  = await db.execute(
+        select(SignalUserDefault).where(
+            SignalUserDefault.user_address == address.lower(),
+            SignalUserDefault.coin         == coin,
+        )
+    )
+    row = res.scalar_one_or_none()
+    if row:
+        await db.delete(row)
+        await db.commit()
 
 
 @router.get("/hl-positions")

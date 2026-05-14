@@ -164,6 +164,30 @@
         </div>
       </section>
 
+      <!-- ── Section 4: Mi Config ───────────────────────────── -->
+      <section class="sl-section sl-section--full" id="section-config">
+        <div class="sl-section-header sl-config-header" onclick="toggleConfigPanel()">
+          <span class="sl-section-title">⚙️ Mi Config de Ejecución</span>
+          <span id="config-panel-badge" class="sl-count-badge hidden"></span>
+          <span id="config-panel-chevron" class="sl-config-chevron">▸ Configurar defaults por par</span>
+        </div>
+        <div id="config-panel-body" class="hidden">
+          <p class="sl-config-desc">
+            Guarda tu leverage y tamaño preferido por par. Se pre-cargan en el modal al ejecutar manualmente.
+          </p>
+          <div id="config-saved-section" class="hidden">
+            <div class="sl-config-saved-header">📌 Mis configuraciones guardadas</div>
+            <div id="config-saved-list"></div>
+          </div>
+          <div class="sl-config-search-row">
+            <input type="text" id="config-search" class="sl-config-search"
+                   placeholder="🔍 Buscar par — BTC, ETH, SOL…" oninput="_filterConfigAssets(this.value)">
+          </div>
+          <div id="config-asset-results" class="hidden"></div>
+          <p id="config-loading" class="sl-config-desc" style="display:none">Cargando activos…</p>
+        </div>
+      </section>
+
     </div><!-- /container -->
   </main>
 
@@ -188,14 +212,48 @@
         <div class="sl-modal-label">Wallet:</div>
         <div id="modal-wallet-list" class="sl-wallet-list"></div>
 
-        <!-- Size preview -->
-        <div id="modal-size-row" class="sl-modal-size hidden">
-          Tamaño sugerido: <strong id="modal-size-value">2%</strong>
-          <span class="sl-size-note">(2% del balance HL — ajusta en Hyperliquid)</span>
+        <!-- Override params (shown after wallet selection) -->
+        <div id="modal-override-wrap" class="hidden">
+          <div class="sl-override-toggle" onclick="toggleOverrides()">
+            <span>⚙️ Personalizar parámetros</span>
+            <span id="modal-override-chevron">▸</span>
+          </div>
+          <div id="modal-override-body" class="sl-override-body hidden">
+            <div class="sl-override-grid">
+              <div class="sl-override-field">
+                <label class="sl-override-label">Leverage</label>
+                <input type="number" id="ovr-leverage" class="sl-override-input"
+                       min="1" max="200" step="1" placeholder="ej. 20" oninput="_updateNotional()">
+              </div>
+              <div class="sl-override-field">
+                <label class="sl-override-label">Tamaño (USDT)</label>
+                <input type="number" id="ovr-size" class="sl-override-input"
+                       min="10" step="1" placeholder="ej. 25" oninput="_updateNotional()">
+              </div>
+              <div class="sl-override-field">
+                <label class="sl-override-label">Stop Loss $</label>
+                <input type="number" id="ovr-sl" class="sl-override-input" step="any" placeholder="precio SL">
+              </div>
+              <div class="sl-override-field">
+                <label class="sl-override-label">TP1 $</label>
+                <input type="number" id="ovr-tp1" class="sl-override-input" step="any" placeholder="primer target">
+              </div>
+              <div class="sl-override-field">
+                <label class="sl-override-label">TP2 $</label>
+                <input type="number" id="ovr-tp2" class="sl-override-input" step="any" placeholder="segundo target">
+              </div>
+            </div>
+            <div id="modal-notional" class="sl-notional-helper"></div>
+            <div class="sl-override-actions">
+              <button class="sl-reset-btn" onclick="_resetToSignalDefaults()">↺ Señal original</button>
+              <button class="sl-reset-btn sl-reset-btn--star" id="modal-reset-mydefaults-btn"
+                      onclick="_resetToMyDefaults()" style="display:none">⭐ Mis defaults</button>
+            </div>
+          </div>
         </div>
 
         <!-- Warning -->
-        <div class="sl-modal-warn">
+        <div id="modal-warn-text" class="sl-modal-warn">
           ⚠️ Esta acción registra tu intención. Coloca la orden manualmente en Hyperliquid con los parámetros mostrados.
         </div>
       </div>

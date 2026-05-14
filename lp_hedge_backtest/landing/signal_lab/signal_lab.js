@@ -12,8 +12,16 @@ let _signals        = [];     // current signal list
 let _historyLoaded  = false;
 let _historyOpen    = false;
 let _selectedWallet = null;   // wallet address chosen in modal
+let _signalWalletAddr = null; // registered signal wallet addr (for warning text)
 let _activeSignalId = null;   // signal being executed
+let _overrideSig    = null;   // signal data saved for modal reset
 let _autoStatus     = { armed: false, wallets: [] }; // auto-execute armed state
+
+// Per-pair defaults (loaded once, updated on save/delete)
+let _userDefaults     = null;   // {COIN: {leverage, size_usdt}} — null until loaded
+let _hlAssets         = null;   // [{coin, max_leverage, sz_decimals}] — null until loaded
+let _configPanelOpen  = false;
+let _configPanelReady = false;
 
 // ── Auth ───────────────────────────────────────────────────
 
@@ -71,8 +79,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function refreshAll() {
   _setTimestamp("Actualizando...");
-  await Promise.all([fetchLpRange(), fetchAutoStatus(), fetchSignals(), fetchHlPositions()]);
+  await Promise.all([fetchLpRange(), fetchAutoStatus(), fetchSignals(), fetchHlPositions(), _loadUserDefaults()]);
   _setTimestamp("Actualizado " + new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" }));
+}
+
+async function _loadUserDefaults() {
+  if (!_token) { _userDefaults = {}; return; }
+  try {
+    const res = await fetch(`${API_BASE}/signal-lab/user-defaults`, { headers: _authHeader() });
+    if (res.ok) {
+      const data = await res.json();
+      _userDefaults = data.defaults || {};
+    } else {
+      _userDefaults = {};
+    }
+  } catch {
+    _userDefaults = {};
+  }
 }
 
 async function fetchAutoStatus() {
@@ -581,11 +604,14 @@ function _renderPositionCard(p) {
 // ── Execute Modal ──────────────────────────────────────────
 
 async function openExecuteModal(signalId) {
-  _activeSignalId = signalId;
-  _selectedWallet = null;
+  _activeSignalId   = signalId;
+  _selectedWallet   = null;
+  _overrideSig      = null;
+  _signalWalletAddr = null;
 
   const sig = _signals.find(s => s.id === signalId);
   if (!sig) return;
+  _overrideSig = sig;
 
   // Signal summary
   const dir   = (sig.direction || "short").toUpperCase();
@@ -602,6 +628,11 @@ async function openExecuteModal(signalId) {
 
   // Load wallets (active bots list from /bots endpoint)
   document.getElementById("modal-confirm-btn").disabled = true;
+  document.getElementById("modal-override-wrap").classList.add("hidden");
+  document.getElementById("modal-override-body").classList.add("hidden");
+  document.getElementById("modal-override-chevron").textContent = "▸";
+  // Ensure user defaults are loaded (no-op if already done)
+  if (_userDefaults === null) await _loadUserDefaults();
   await _loadModalWallets();
 
   document.getElementById("execute-modal").classList.remove("hidden");
@@ -695,6 +726,7 @@ async function _loadModalWallets() {
       const swData = await swRes.value.json();
       if (swData.registered && swData.hl_wallet_addr) {
         signalWallets.push({ ...swData, active: true });
+        _signalWalletAddr = swData.hl_wallet_addr.toLowerCase();
       }
     }
 
@@ -766,7 +798,81 @@ function onWalletSelected(addr) {
   const radio = document.querySelector(`input[name="exec-wallet"][value="${addr}"]`);
   if (radio) radio.closest(".sl-wallet-option").classList.add("sl-wallet-option--selected");
   document.getElementById("modal-confirm-btn").disabled = false;
-  document.getElementById("modal-size-row").classList.remove("hidden");
+
+  // Show and pre-fill override section
+  _fillOverrideFields(_overrideSig);
+  document.getElementById("modal-override-wrap").classList.remove("hidden");
+
+  // Update warning based on whether this is a registered signal wallet
+  const warnEl = document.getElementById("modal-warn-text");
+  if (warnEl) {
+    const isSignalWallet = _signalWalletAddr && addr === _signalWalletAddr;
+    warnEl.textContent = isSignalWallet
+      ? "⚠️ Se colocará una orden real en Hyperliquid con estos parámetros."
+      : "⚠️ Esta acción registra tu intención. Coloca la orden manualmente en Hyperliquid con los parámetros mostrados.";
+  }
+}
+
+function _fillOverrideFields(sig) {
+  if (!sig) return;
+  const coin  = (sig.pair || "").split("/")[0].toUpperCase();
+  const saved = _userDefaults && _userDefaults[coin];
+
+  document.getElementById("ovr-leverage").value = saved?.leverage  || sig.leverage || "";
+  document.getElementById("ovr-size").value      = saved?.size_usdt || "";
+  document.getElementById("ovr-sl").value        = sig.stoploss    || "";
+  document.getElementById("ovr-tp1").value       = sig.targets?.[0] || "";
+  document.getElementById("ovr-tp2").value       = sig.targets?.[1] || "";
+
+  const myDefaultsBtn = document.getElementById("modal-reset-mydefaults-btn");
+  if (myDefaultsBtn) myDefaultsBtn.style.display = saved ? "inline-flex" : "none";
+
+  _updateNotional();
+}
+
+function toggleOverrides() {
+  const body    = document.getElementById("modal-override-body");
+  const chevron = document.getElementById("modal-override-chevron");
+  const open    = !body.classList.contains("hidden");
+  body.classList.toggle("hidden", open);
+  if (chevron) chevron.textContent = open ? "▸" : "▾";
+}
+
+function _updateNotional() {
+  const el = document.getElementById("modal-notional");
+  if (!el || !_overrideSig) return;
+  const entry = parseFloat(_overrideSig.entry);
+  const coin  = (_overrideSig.pair || "").split("/")[0].toUpperCase();
+  const lev   = parseFloat(document.getElementById("ovr-leverage")?.value) || 0;
+  const usdt  = parseFloat(document.getElementById("ovr-size")?.value)     || 0;
+  if (!entry || !lev || !usdt) { el.textContent = ""; return; }
+  const coins  = usdt / entry;
+  const margin = usdt / lev;
+  el.innerHTML = `≈ <strong>${coins.toFixed(4)} ${coin}</strong> · $${usdt.toFixed(2)} notional · Margin <strong>$${margin.toFixed(2)}</strong>`;
+}
+
+function _resetToSignalDefaults() {
+  if (!_overrideSig) return;
+  document.getElementById("ovr-leverage").value = _overrideSig.leverage   || "";
+  document.getElementById("ovr-size").value      = "";
+  document.getElementById("ovr-sl").value        = _overrideSig.stoploss  || "";
+  document.getElementById("ovr-tp1").value       = _overrideSig.targets?.[0] || "";
+  document.getElementById("ovr-tp2").value       = _overrideSig.targets?.[1] || "";
+  _updateNotional();
+}
+
+function _resetToMyDefaults() {
+  if (!_overrideSig) return;
+  const coin  = (_overrideSig.pair || "").split("/")[0].toUpperCase();
+  const saved = _userDefaults && _userDefaults[coin];
+  if (!saved) return;
+  document.getElementById("ovr-leverage").value = saved.leverage  || "";
+  document.getElementById("ovr-size").value      = saved.size_usdt || "";
+  // Keep signal's SL/TP
+  document.getElementById("ovr-sl").value  = _overrideSig.stoploss     || "";
+  document.getElementById("ovr-tp1").value = _overrideSig.targets?.[0] || "";
+  document.getElementById("ovr-tp2").value = _overrideSig.targets?.[1] || "";
+  _updateNotional();
 }
 
 function closeExecuteModal() {
@@ -788,11 +894,28 @@ async function confirmExecute() {
   btn.disabled = true;
   btn.textContent = "Ejecutando...";
 
+  // Collect override fields (only include non-empty values)
+  const ovrLev  = parseInt(document.getElementById("ovr-leverage")?.value);
+  const ovrSize = parseFloat(document.getElementById("ovr-size")?.value);
+  const ovrSl   = parseFloat(document.getElementById("ovr-sl")?.value);
+  const ovrTp1  = parseFloat(document.getElementById("ovr-tp1")?.value);
+  const ovrTp2  = parseFloat(document.getElementById("ovr-tp2")?.value);
+
+  const body = {
+    signal_id:     _activeSignalId,
+    hl_wallet_addr: _selectedWallet,
+    ...(ovrLev  && !isNaN(ovrLev)  ? { override_leverage:  ovrLev  } : {}),
+    ...(ovrSize && !isNaN(ovrSize) ? { override_size_usdt: ovrSize } : {}),
+    ...(ovrSl   && !isNaN(ovrSl)  ? { override_sl:        ovrSl   } : {}),
+    ...(ovrTp1  && !isNaN(ovrTp1) ? { override_tp1:       ovrTp1  } : {}),
+    ...(ovrTp2  && !isNaN(ovrTp2) ? { override_tp2:       ovrTp2  } : {}),
+  };
+
   try {
     const res = await fetch(`${API_BASE}/signal-lab/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ..._authHeader() },
-      body: JSON.stringify({ signal_id: _activeSignalId, hl_wallet_addr: _selectedWallet }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || res.status);
@@ -845,6 +968,169 @@ function _showOrderDetails(order, fill, autoExecuted) {
     ${fillHtml}
   `;
   document.getElementById("order-detail-modal").classList.remove("hidden");
+}
+
+// ── Mi Config Panel ────────────────────────────────────────
+
+async function toggleConfigPanel() {
+  const body    = document.getElementById("config-panel-body");
+  const chevron = document.getElementById("config-panel-chevron");
+  _configPanelOpen = !_configPanelOpen;
+  body.classList.toggle("hidden", !_configPanelOpen);
+  if (chevron) chevron.textContent = _configPanelOpen
+    ? "▾ Configurar defaults por par"
+    : "▸ Configurar defaults por par";
+
+  if (_configPanelOpen && !_configPanelReady) {
+    await _loadConfigPanel();
+  }
+}
+
+async function _loadConfigPanel() {
+  const loadingEl = document.getElementById("config-loading");
+  if (loadingEl) loadingEl.style.display = "block";
+
+  await Promise.all([
+    _fetchHlAssets(),
+    _userDefaults === null ? _loadUserDefaults() : Promise.resolve(),
+  ]);
+  _configPanelReady = true;
+
+  if (loadingEl) loadingEl.style.display = "none";
+  _renderConfigSaved();
+  _updateConfigBadge();
+}
+
+async function _fetchHlAssets() {
+  if (_hlAssets !== null) return;
+  if (!_token) { _hlAssets = []; return; }
+  try {
+    const res = await fetch(`${API_BASE}/signal-lab/hl-assets`, { headers: _authHeader() });
+    if (res.ok) {
+      const data = await res.json();
+      _hlAssets = data.assets || [];
+    } else {
+      _hlAssets = [];
+    }
+  } catch {
+    _hlAssets = [];
+  }
+}
+
+function _renderConfigSaved() {
+  const section = document.getElementById("config-saved-section");
+  const list    = document.getElementById("config-saved-list");
+  if (!section || !list) return;
+
+  const entries = Object.entries(_userDefaults || {});
+  if (entries.length === 0) {
+    section.classList.add("hidden");
+    return;
+  }
+  section.classList.remove("hidden");
+  list.innerHTML = entries.map(([coin, def]) => {
+    const asset  = (_hlAssets || []).find(a => a.coin === coin);
+    return _renderConfigRow(coin, asset?.max_leverage || "—", def);
+  }).join("");
+}
+
+function _updateConfigBadge() {
+  const badge   = document.getElementById("config-panel-badge");
+  const count   = Object.keys(_userDefaults || {}).length;
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = count;
+    badge.classList.remove("hidden");
+  } else {
+    badge.classList.add("hidden");
+  }
+}
+
+function _filterConfigAssets(query) {
+  const resultsEl = document.getElementById("config-asset-results");
+  if (!resultsEl) return;
+  const q = (query || "").trim().toUpperCase();
+  if (!q) { resultsEl.classList.add("hidden"); return; }
+
+  const filtered = (_hlAssets || []).filter(a => a.coin.startsWith(q) || a.coin.includes(q)).slice(0, 12);
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = `<div class="sl-config-empty">Sin resultados para "${query}"</div>`;
+  } else {
+    resultsEl.innerHTML = filtered.map(a => {
+      const saved = _userDefaults && _userDefaults[a.coin];
+      return _renderConfigRow(a.coin, a.max_leverage, saved);
+    }).join("");
+  }
+  resultsEl.classList.remove("hidden");
+}
+
+function _renderConfigRow(coin, maxLev, saved) {
+  const savedLev  = saved?.leverage  || "";
+  const savedSize = saved?.size_usdt || "";
+  const hasSaved  = !!saved;
+  return `
+    <div class="sl-config-row${hasSaved ? " sl-config-row--saved" : ""}" id="cfg-row-${coin}">
+      <span class="sl-config-coin">${coin}</span>
+      <span class="sl-config-maxlev">Max ${maxLev}×</span>
+      <input type="number" class="sl-config-input" id="cfg-lev-${coin}"
+             value="${savedLev}" min="1" max="${maxLev}" step="1" placeholder="Lev×" title="Leverage">
+      <span class="sl-config-sep">×  $</span>
+      <input type="number" class="sl-config-input" id="cfg-size-${coin}"
+             value="${savedSize}" min="10" step="1" placeholder="USDT" title="Tamaño USDT">
+      <button class="sl-config-save-btn" onclick="saveDefault('${coin}')" title="Guardar">💾</button>
+      ${hasSaved
+        ? `<button class="sl-config-del-btn" onclick="deleteDefault('${coin}')" title="Eliminar">✕</button>`
+        : `<span class="sl-config-del-placeholder"></span>`}
+    </div>
+  `;
+}
+
+async function saveDefault(coin) {
+  if (!_token) { alert("Conecta tu wallet primero."); return; }
+  const levEl  = document.getElementById(`cfg-lev-${coin}`);
+  const sizeEl = document.getElementById(`cfg-size-${coin}`);
+  const lev    = parseInt(levEl?.value);
+  const size   = parseFloat(sizeEl?.value);
+  if (!lev || !size || lev < 1 || size < 10) {
+    alert("Leverage ≥ 1× y tamaño ≥ $10 USDT requeridos."); return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/signal-lab/user-defaults/${coin}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ..._authHeader() },
+      body: JSON.stringify({ leverage: lev, size_usdt: size }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+
+    if (!_userDefaults) _userDefaults = {};
+    _userDefaults[coin] = { leverage: lev, size_usdt: size };
+
+    _renderConfigSaved();
+    _updateConfigBadge();
+    const q = document.getElementById("config-search")?.value || "";
+    if (q) _filterConfigAssets(q);
+
+    // Flash row green briefly
+    const row = document.getElementById(`cfg-row-${coin}`);
+    if (row) {
+      row.style.borderColor = "var(--color-neon-green)";
+      setTimeout(() => { const r = document.getElementById(`cfg-row-${coin}`); if (r) r.style.borderColor = ""; }, 1500);
+    }
+  } catch (e) { alert(`Error: ${e.message}`); }
+}
+
+async function deleteDefault(coin) {
+  if (!_token) return;
+  try {
+    await fetch(`${API_BASE}/signal-lab/user-defaults/${coin}`, {
+      method: "DELETE", headers: _authHeader(),
+    });
+    if (_userDefaults) delete _userDefaults[coin];
+    _renderConfigSaved();
+    _updateConfigBadge();
+    const q = document.getElementById("config-search")?.value || "";
+    if (q) _filterConfigAssets(q);
+  } catch (e) { console.error("deleteDefault failed:", e); }
 }
 
 // ── Utils ──────────────────────────────────────────────────

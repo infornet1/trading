@@ -29,7 +29,7 @@ def _extract_oid(resp) -> Optional[str]:
 
 
 def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
-                   dry_run: bool = False) -> dict:
+                   dry_run: bool = False, overrides: dict | None = None) -> dict:
     """
     Place market order + native SL/TP on Hyperliquid for a parsed signal.
     signal: any object with .pair .direction .leverage .entry .stoploss .targets .size_pct
@@ -61,6 +61,8 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         symbol            = (signal.pair or "").split("/")[0].upper()
         size_pct          = float(signal.size_pct) if signal.size_pct else 2.0
         leverage_requested = int(signal.leverage)  if signal.leverage  else 10
+        if overrides and overrides.get("leverage"):
+            leverage_requested = int(overrides["leverage"])
         entry             = float(signal.entry)
 
         # Cap leverage to HL's per-asset max; also grab szDecimals for size rounding
@@ -80,7 +82,11 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
 
         size_scaled = False
         factor      = 10 ** sz_decimals
-        if SIGNAL_TEST_NOTIONAL_USDC:
+        if overrides and overrides.get("size_usdt") and float(overrides["size_usdt"]) >= 10:
+            notional = float(overrides["size_usdt"])
+            size     = math.ceil((notional / entry) * factor) / factor
+            margin   = size * entry / leverage
+        elif SIGNAL_TEST_NOTIONAL_USDC:
             # Testing phase: ignore size_pct, use fixed notional
             notional = SIGNAL_TEST_NOTIONAL_USDC
             size     = math.ceil((notional / entry) * factor) / factor
@@ -102,6 +108,10 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         targets      = signal.targets or []
         tp1_price    = float(targets[0]) if len(targets) >= 1 else None
         tp2_price    = float(targets[1]) if len(targets) >= 2 else None
+        if overrides:
+            if overrides.get("sl"):  sl_price  = float(overrides["sl"])
+            if overrides.get("tp1"): tp1_price = float(overrides["tp1"])
+            if overrides.get("tp2"): tp2_price = float(overrides["tp2"])
         split_tps    = tp2_price is not None
         # 50/50 split when two targets; full size when only one
         tp1_size     = round(size / 2, sz_decimals) if split_tps else size

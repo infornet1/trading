@@ -140,6 +140,24 @@ async def _run_column_migrations():
         "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS close_price DECIMAL(20,8) NULL",
         # user_address on signal_wallets — owner scoping for self-service registration
         "ALTER TABLE signal_wallets ADD COLUMN IF NOT EXISTS user_address VARCHAR(42) NULL",
+        # signal_executions: order IDs + breakeven tracking (2026-05-14)
+        "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS sl_order_id VARCHAR(100) NULL",
+        "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS tp1_order_id VARCHAR(100) NULL",
+        "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS tp2_order_id VARCHAR(100) NULL",
+        "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS breakeven_applied TINYINT(1) NOT NULL DEFAULT 0",
+        # signal_user_defaults: per-user per-coin execution preferences
+        (
+            "CREATE TABLE IF NOT EXISTS signal_user_defaults ("
+            "  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            "  user_address VARCHAR(42) NOT NULL,"
+            "  coin VARCHAR(20) NOT NULL,"
+            "  leverage INT NULL,"
+            "  size_usdt DECIMAL(12,2) NULL,"
+            "  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            "  UNIQUE KEY uq_sud_user_coin (user_address, coin)"
+            ")"
+        ),
     ]
     async with engine.begin() as conn:
         for sql in migrations:

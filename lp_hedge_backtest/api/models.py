@@ -216,3 +216,19 @@ class SignalWallet(Base):
     auto_execute   = Column(Boolean,     default=False)
     active         = Column(Boolean,     default=True)
     created_at     = Column(DateTime,    default=datetime.utcnow)
+
+
+class SignalUserDefault(Base):
+    """Per-user per-coin execution defaults for Signal Lab (leverage + size)."""
+    __tablename__ = "signal_user_defaults"
+    __table_args__ = (
+        UniqueConstraint("user_address", "coin", name="uq_sud_user_coin"),
+    )
+
+    id           = Column(Integer,      primary_key=True, autoincrement=True)
+    user_address = Column(String(42),   nullable=False)
+    coin         = Column(String(20),   nullable=False)
+    leverage     = Column(Integer,      nullable=True)
+    size_usdt    = Column(Numeric(12,2), nullable=True)
+    created_at   = Column(DateTime,     default=datetime.utcnow)
+    updated_at   = Column(DateTime,     default=datetime.utcnow, onupdate=datetime.utcnow)
