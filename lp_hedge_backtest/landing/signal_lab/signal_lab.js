@@ -287,8 +287,9 @@ async function fetchSignals() {
     loading.classList.add("hidden");
 
     const CLOSED_STATUSES = ["stopped", "tp_hit", "cancelled"];
-    const active  = _signals.filter(s => !CLOSED_STATUSES.includes(s.status));
-    const closed  = _signals.filter(s =>  CLOSED_STATUSES.includes(s.status));
+    const ACTIVE_MAX_AGE  = 7 * 3600;
+    const active  = _signals.filter(s => !CLOSED_STATUSES.includes(s.status) && s.age_seconds < ACTIVE_MAX_AGE);
+    const closed  = _signals.filter(s =>  CLOSED_STATUSES.includes(s.status) || s.age_seconds >= ACTIVE_MAX_AGE);
 
     if (active.length === 0 && closed.length === 0) {
       empty.classList.remove("hidden");

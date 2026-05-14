@@ -34,7 +34,7 @@ from api.database import get_db
 from api.models import BotConfig, SignalEvent, SignalExecution, SignalSource, SignalWallet
 from api.signal_executor import place_hl_order
 
-SIGNAL_EXPIRY_HOURS = 4
+SIGNAL_EXPIRY_HOURS = 7
 
 router = APIRouter(prefix="/signal-lab", tags=["signal-lab"])
 
