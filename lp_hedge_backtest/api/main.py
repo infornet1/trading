@@ -145,6 +145,9 @@ async def _run_column_migrations():
         "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS tp1_order_id VARCHAR(100) NULL",
         "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS tp2_order_id VARCHAR(100) NULL",
         "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS breakeven_applied TINYINT(1) NOT NULL DEFAULT 0",
+        # exec override params stored at execution time (enhancement #2)
+        "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS exec_leverage INT NULL",
+        "ALTER TABLE signal_executions ADD COLUMN IF NOT EXISTS exec_size_usdt DECIMAL(12,2) NULL",
         # signal_user_defaults: per-user per-coin execution preferences
         (
             "CREATE TABLE IF NOT EXISTS signal_user_defaults ("

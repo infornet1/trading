@@ -1522,23 +1522,28 @@ async function refreshLpRange() {
 
 async function fetchSignalLabMonitor() {
   try {
-    const [monRes, posRes] = await Promise.allSettled([
+    const [monRes, posRes, defRes] = await Promise.allSettled([
       apiGet('/admin/signal-lab-monitor'),
       apiGet('/admin/hl-positions'),
+      apiGet('/admin/signal-lab-user-defaults'),
     ]);
-    const d = monRes.status === 'fulfilled' ? monRes.value : { wallets: [], activity: [] };
-    const p = posRes.status === 'fulfilled' ? posRes.value : null;
-    _renderSlCards(d.wallets || [], d.activity || [], p);
+    const d    = monRes.status === 'fulfilled' ? monRes.value : { wallets: [], activity: [] };
+    const p    = posRes.status === 'fulfilled' ? posRes.value : null;
+    const defs = defRes.status === 'fulfilled' ? defRes.value : null;
+    _renderSlCards(d.wallets || [], d.activity || [], p, defs);
   } catch (e) {
     const el = document.getElementById('sl-cards-grid');
     if (el) el.innerHTML = `<span style="font-size:0.72rem;color:#f87171">Monitor error: ${e.message}</span>`;
   }
 }
 
-function _renderSlCards(wallets, activity, posData) {
+function _renderSlCards(wallets, activity, posData, defsData) {
   const el = document.getElementById('sl-cards-grid');
   if (!el) return;
-  el.innerHTML = wallets.map(_slWalletCard).join('') + _slFeedCard(activity) + _slPositionsCard(posData);
+  el.innerHTML = wallets.map(_slWalletCard).join('')
+    + _slFeedCard(activity)
+    + _slPositionsCard(posData)
+    + _slUserDefaultsCard(defsData);
 }
 
 // ── Wallet card (one per registered signal wallet) ──────────────────────────
@@ -1566,7 +1571,15 @@ function _slWalletCard(w) {
     const color   = ex.outcome === 'filled' ? 'green' : 'red';
     const icon    = ex.outcome === 'filled' ? (isOpen ? '🟢' : '✅') : '❌';
     const fill    = ex.fill_price ? ` @ $${_fmtPrice(ex.fill_price)}` : '';
-    const lev     = ex.leverage ? ` ${ex.leverage}x` : '';
+    // Enhancement #2: show effective leverage (exec override if set, else signal default)
+    const dispLev = ex.exec_leverage || ex.leverage;
+    const lev     = dispLev ? ` ${dispLev}×` : '';
+    // Enhancement #3: show actual notional when override was used
+    const notional = ex.exec_size_usdt
+      ? ` <span style="color:#a3e635;font-size:.62rem">$${ex.exec_size_usdt.toFixed(0)}</span>` : '';
+    // Enhancement #2: override flag
+    const ovrTag  = ex.has_overrides
+      ? ` <span title="Parámetros personalizados" style="color:#f97316;font-size:.6rem">✏️</span>` : '';
     const beTag   = ex.breakeven_applied
       ? ` <span title="Breakeven SL activo" style="color:#00d4ff;font-size:.6rem">🛡️BE</span>` : '';
     let closeStr  = '';
@@ -1577,7 +1590,7 @@ function _slWalletCard(w) {
     }
     return `
       <div class="mini-evt mini-evt--${color}">
-        <span>${icon} ${ex.pair || '—'} ${(ex.direction||'').toUpperCase()}${lev}${fill}${closeStr}${beTag}</span>
+        <span>${icon} ${ex.pair || '—'} ${(ex.direction||'').toUpperCase()}${lev}${fill}${notional}${closeStr}${beTag}${ovrTag}</span>
         <span class="muted">${relTime(ex.ts)}</span>
       </div>`;
   }).join('');
@@ -1651,13 +1664,19 @@ function _slFeedCard(activity) {
         </div>`;
     }
     // execution
-    const color = a.outcome === 'filled' ? 'green' : 'red';
-    const icon  = a.outcome === 'filled' ? '✅' : '❌';
-    const fill  = a.fill_price ? ` @ $${_fmtPrice(a.fill_price)}` : '';
-    const dir   = (a.direction || '').toUpperCase();
+    const color   = a.outcome === 'filled' ? 'green' : 'red';
+    const icon    = a.outcome === 'filled' ? '✅' : '❌';
+    const fill    = a.fill_price ? ` @ $${_fmtPrice(a.fill_price)}` : '';
+    const dir     = (a.direction || '').toUpperCase();
+    // Enhancement #3: notional if override used
+    const notional = a.exec_size_usdt
+      ? ` <span style="color:#a3e635;font-size:.62rem">$${a.exec_size_usdt.toFixed(0)}</span>` : '';
+    // Enhancement #4: override badge
+    const ovrTag  = a.has_overrides
+      ? ` <span title="Ejecutado con parámetros personalizados" style="color:#f97316;font-size:.62rem">✏️</span>` : '';
     return `
       <div class="mini-evt mini-evt--${color}">
-        <span>${icon} ${a.pair || '—'} <strong>${dir}</strong>${fill}
+        <span>${icon} ${a.pair || '—'} <strong>${dir}</strong>${fill}${notional}${ovrTag}
           <span class="muted" style="font-size:.65rem"> · ${a.wallet_short || ''}</span>
         </span>
         <span class="muted">${relTime(a.ts)}</span>
@@ -1737,6 +1756,46 @@ function _slPositionsCard(posData) {
         <span class="pool-nft" style="color:${totalCol};font-weight:700">P&L ${totalSign}$${Math.abs(totalPnl).toFixed(2)}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
+        ${rows}
+      </div>
+    </div>`;
+}
+
+// ── User Defaults card (per-user per-coin execution configs) ────────────────
+
+function _slUserDefaultsCard(data) {
+  const accentColor = '#06b6d4';
+  if (!data || !data.users || data.users.length === 0) {
+    return `
+      <div class="pool-card" style="border-left-color:${accentColor}">
+        <div class="pool-card-header">
+          <div class="health-dot" style="background:${accentColor};box-shadow:0 0 6px ${accentColor}"></div>
+          <span class="pool-pair" style="color:${accentColor}">⚙️ Defaults por usuario</span>
+          <span class="pool-nft muted">Sin configuraciones guardadas</span>
+        </div>
+      </div>`;
+  }
+
+  const rows = data.users.map(u => {
+    const chips = (u.defaults || []).map(d => {
+      const size = d.size_usdt ? ` $${d.size_usdt.toFixed(0)}` : '';
+      return `<span style="font-size:.65rem;background:rgba(6,182,212,.1);color:${accentColor};padding:1px 6px;border-radius:4px;margin-right:4px">${d.coin} <strong>${d.leverage}×</strong>${size}</span>`;
+    }).join('');
+    return `
+      <div class="mini-evt mini-evt--muted" style="flex-wrap:wrap;gap:3px;align-items:center">
+        <span class="muted" style="font-family:monospace;font-size:.66rem;min-width:78px">${u.addr_short}</span>
+        <span style="flex:1">${chips}</span>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="pool-card" style="border-left-color:${accentColor}">
+      <div class="pool-card-header">
+        <div class="health-dot" style="background:${accentColor};box-shadow:0 0 6px ${accentColor}"></div>
+        <span class="pool-pair" style="color:${accentColor}">⚙️ Defaults por usuario</span>
+        <span class="pools-count">${data.total_entries} config${data.total_entries !== 1 ? 's' : ''}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
         ${rows}
       </div>
     </div>`;

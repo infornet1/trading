@@ -295,6 +295,8 @@ async def execute_signal(
         sl_order_id    = order_result.get("sl_order_id")  if order_result else None,
         tp1_order_id   = order_result.get("tp1_order_id") if order_result else None,
         tp2_order_id   = order_result.get("tp2_order_id") if order_result else None,
+        exec_leverage  = body.override_leverage,
+        exec_size_usdt = body.override_size_usdt,
     )
     db.add(execution)
     await db.commit()

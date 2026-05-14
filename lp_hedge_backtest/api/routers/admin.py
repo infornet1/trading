@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from api.auth import get_current_admin
 from api.bot_manager import manager
 from api.database import AsyncSessionLocal
-from api.models import BotConfig, BotEvent, SignalEvent, SignalExecution, SignalWallet, User
+from api.models import BotConfig, BotEvent, SignalEvent, SignalExecution, SignalUserDefault, SignalWallet, User
 
 _BASE_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _CACHE_DIR   = os.path.join(_BASE_DIR, "data_cache")
@@ -498,6 +498,9 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
                 is_short = (sig.direction or "").lower() == "short"
                 raw_pct  = ((fp - cp) / fp * 100) if is_short else ((cp - fp) / fp * 100)
                 pnl_pct  = round(raw_pct * (sig.leverage or 1), 2)
+            exec_size  = float(ex.exec_size_usdt) if ex.exec_size_usdt else None
+            exec_lev   = ex.exec_leverage
+            notional   = round(exec_size, 2) if exec_size else (round(float(fp) * abs(float(sig.size_pct or 2) / 100), 2) if fp and sig and sig.size_pct else None)
             recent_execs.append({
                 "outcome":           ex.outcome,
                 "fill_price":        fp,
@@ -507,6 +510,9 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
                 "pair":              sig.pair      if sig else "—",
                 "direction":         sig.direction if sig else "—",
                 "leverage":          sig.leverage  if sig else None,
+                "exec_leverage":     exec_lev,
+                "exec_size_usdt":    exec_size,
+                "has_overrides":     bool(exec_lev or exec_size),
                 "ts":                ex.executed_at.isoformat() + "Z",
             })
 
@@ -542,13 +548,16 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
     for ex in all_execs:
         sig = ex.signal
         activity.append({
-            "kind":         "execution",
-            "pair":         sig.pair      if sig else "—",
-            "direction":    sig.direction if sig else "—",
-            "fill_price":   float(ex.fill_price) if ex.fill_price else None,
-            "outcome":      ex.outcome,
-            "wallet_short": ex.hl_wallet_addr[:6] + "…" + ex.hl_wallet_addr[-4:] if ex.hl_wallet_addr else "—",
-            "ts":           ex.executed_at.isoformat() + "Z",
+            "kind":          "execution",
+            "pair":          sig.pair      if sig else "—",
+            "direction":     sig.direction if sig else "—",
+            "fill_price":    float(ex.fill_price)     if ex.fill_price     else None,
+            "exec_size_usdt":float(ex.exec_size_usdt) if ex.exec_size_usdt else None,
+            "exec_leverage": ex.exec_leverage,
+            "has_overrides": bool(ex.exec_leverage or ex.exec_size_usdt),
+            "outcome":       ex.outcome,
+            "wallet_short":  ex.hl_wallet_addr[:6] + "…" + ex.hl_wallet_addr[-4:] if ex.hl_wallet_addr else "—",
+            "ts":            ex.executed_at.isoformat() + "Z",
         })
     activity.sort(key=lambda x: x["ts"], reverse=True)
 
@@ -639,6 +648,36 @@ async def admin_hl_positions(admin: str = Depends(get_current_admin)):
     all_positions = [p for wpos in results for p in wpos]
     total_pnl     = round(sum(p["unrealized_pnl"] for p in all_positions), 4)
     return {"positions": all_positions, "total_pnl": total_pnl}
+
+
+@router.get("/signal-lab-user-defaults")
+async def signal_lab_user_defaults(admin: str = Depends(get_current_admin)):
+    """All users' saved per-coin execution defaults (leverage + size)."""
+    async with AsyncSessionLocal() as db:
+        res  = await db.execute(
+            select(SignalUserDefault).order_by(SignalUserDefault.user_address, SignalUserDefault.coin)
+        )
+        rows = res.scalars().all()
+
+    by_user: dict = {}
+    for r in rows:
+        by_user.setdefault(r.user_address, []).append({
+            "coin":      r.coin,
+            "leverage":  r.leverage,
+            "size_usdt": float(r.size_usdt) if r.size_usdt else None,
+        })
+
+    return {
+        "users": [
+            {
+                "user_address": addr,
+                "addr_short":   addr[:6] + "…" + addr[-4:],
+                "defaults":     defs,
+            }
+            for addr, defs in by_user.items()
+        ],
+        "total_entries": len(rows),
+    }
 
 
 @router.post("/signal-lab/refresh-lp-range")

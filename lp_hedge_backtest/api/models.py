@@ -194,11 +194,13 @@ class SignalExecution(Base):
     hl_order_id       = Column(String(100), nullable=True)
     fill_price        = Column(Numeric(20, 8), nullable=True)
     close_price       = Column(Numeric(20, 8), nullable=True)
-    sl_order_id       = Column(String(100), nullable=True)
-    tp1_order_id      = Column(String(100), nullable=True)
-    tp2_order_id      = Column(String(100), nullable=True)
-    breakeven_applied = Column(Boolean,     default=False)
-    executed_at       = Column(DateTime,    default=datetime.utcnow)
+    sl_order_id       = Column(String(100),  nullable=True)
+    tp1_order_id      = Column(String(100),  nullable=True)
+    tp2_order_id      = Column(String(100),  nullable=True)
+    breakeven_applied = Column(Boolean,      default=False)
+    exec_leverage     = Column(Integer,      nullable=True)   # override used at execute time
+    exec_size_usdt    = Column(Numeric(12,2), nullable=True)  # override used at execute time
+    executed_at       = Column(DateTime,     default=datetime.utcnow)
     outcome           = Column(Enum("pending", "filled", "failed"), default="pending")
 
     signal = relationship("SignalEvent", back_populates="executions")
