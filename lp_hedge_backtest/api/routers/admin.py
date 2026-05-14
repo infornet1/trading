@@ -337,6 +337,16 @@ async def signal_lab_status(admin: str = Depends(get_current_admin)):
             .where(SignalEvent.status == "pending")
         )).scalar_one()
 
+        pending_s1 = (await db.execute(
+            select(func.count()).select_from(SignalEvent)
+            .where(SignalEvent.status == "pending", SignalEvent.source_id == 1)
+        )).scalar_one()
+
+        pending_s2 = (await db.execute(
+            select(func.count()).select_from(SignalEvent)
+            .where(SignalEvent.status == "pending", SignalEvent.source_id == 2)
+        )).scalar_one()
+
         cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
         expired_24h = (await db.execute(
             select(func.count()).select_from(SignalEvent)
@@ -346,6 +356,12 @@ async def signal_lab_status(admin: str = Depends(get_current_admin)):
 
         total_signals = (await db.execute(
             select(func.count()).select_from(SignalEvent)
+        )).scalar_one()
+
+        live_exec_count = (await db.execute(
+            select(func.count(func.distinct(SignalExecution.signal_id)))
+            .select_from(SignalExecution)
+            .where(SignalExecution.outcome == "filled", SignalExecution.close_price.is_(None))
         )).scalar_one()
 
     # ── LP range cache ────────────────────────────────────────────────────
@@ -390,9 +406,12 @@ async def signal_lab_status(admin: str = Depends(get_current_admin)):
             "paused":  os.path.exists(pause_flag),
         },
         "signals": {
-            "pending":      pending_count,
-            "expired_24h":  expired_24h,
-            "total":        total_signals,
+            "pending":       pending_count,
+            "pending_s1":    pending_s1,
+            "pending_s2":    pending_s2,
+            "expired_24h":   expired_24h,
+            "total":         total_signals,
+            "live_execs":    live_exec_count,
             "last_received": last_received.isoformat() if last_received else None,
         },
         "lp_range_cache": lp_cache,
@@ -421,8 +440,9 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
         )
         all_execs = all_exec_res.scalars().all()
 
-        # Per-wallet last 3 executions for wallet card mini-evt rows
-        wallet_execs: dict = {}
+        # Per-wallet last 3 executions + open count for wallet card mini-evt rows
+        wallet_execs: dict     = {}
+        wallet_open_count: dict = {}
         for w in wallets:
             we_res = await db.execute(
                 select(SignalExecution)
@@ -432,6 +452,16 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
                 .limit(3)
             )
             wallet_execs[w.hl_wallet_addr] = we_res.scalars().all()
+
+            open_res = await db.execute(
+                select(func.count()).select_from(SignalExecution)
+                .where(
+                    SignalExecution.hl_wallet_addr == w.hl_wallet_addr,
+                    SignalExecution.outcome        == "filled",
+                    SignalExecution.close_price.is_(None),
+                )
+            )
+            wallet_open_count[w.hl_wallet_addr] = open_res.scalar_one()
 
     # ── Balance fetch ─────────────────────────────────────────────────────
     def _fetch(addr):
@@ -460,14 +490,24 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
 
         recent_execs = []
         for ex in wallet_execs.get(w.hl_wallet_addr, []):
-            sig = ex.signal
+            sig     = ex.signal
+            fp      = float(ex.fill_price)  if ex.fill_price  else None
+            cp      = float(ex.close_price) if ex.close_price else None
+            pnl_pct = None
+            if fp and cp and sig:
+                is_short = (sig.direction or "").lower() == "short"
+                raw_pct  = ((fp - cp) / fp * 100) if is_short else ((cp - fp) / fp * 100)
+                pnl_pct  = round(raw_pct * (sig.leverage or 1), 2)
             recent_execs.append({
-                "outcome":    ex.outcome,
-                "fill_price": float(ex.fill_price) if ex.fill_price else None,
-                "pair":       sig.pair      if sig else "—",
-                "direction":  sig.direction if sig else "—",
-                "leverage":   sig.leverage  if sig else None,
-                "ts":         ex.executed_at.isoformat() + "Z",
+                "outcome":           ex.outcome,
+                "fill_price":        fp,
+                "close_price":       cp,
+                "pnl_pct":           pnl_pct,
+                "breakeven_applied": ex.breakeven_applied,
+                "pair":              sig.pair      if sig else "—",
+                "direction":         sig.direction if sig else "—",
+                "leverage":          sig.leverage  if sig else None,
+                "ts":                ex.executed_at.isoformat() + "Z",
             })
 
         wallet_rows.append({
@@ -475,12 +515,14 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
             "label":             w.label,
             "addr_short":        w.hl_wallet_addr[:6] + "…" + w.hl_wallet_addr[-4:],
             "hl_wallet_addr":    w.hl_wallet_addr,
+            "user_address":      w.user_address,
             "auto_execute":      w.auto_execute,
             "active":            w.active,
             "balance":           bal["total"],
             "balance_perp":      bal["perp"],
             "balance_spot":      bal["spot"],
             "spot_usable":       bal["spot_usable"],
+            "open_count":        wallet_open_count.get(w.hl_wallet_addr, 0),
             "recent_executions": recent_execs,
         })
 
@@ -494,6 +536,7 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
             "leverage":  ev.leverage,
             "entry":     float(ev.entry) if ev.entry else None,
             "status":    ev.status,
+            "source_id": ev.source_id,
             "ts":        ev.received_at.isoformat() + "Z",
         })
     for ex in all_execs:
@@ -510,6 +553,92 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
     activity.sort(key=lambda x: x["ts"], reverse=True)
 
     return {"wallets": wallet_rows, "activity": activity[:30]}
+
+
+@router.get("/hl-positions")
+async def admin_hl_positions(admin: str = Depends(get_current_admin)):
+    """Live HL positions + SL/TP for ALL active copy-trade wallets (admin view)."""
+    async with AsyncSessionLocal() as db:
+        res     = await db.execute(select(SignalWallet).where(SignalWallet.active == True))
+        wallets = res.scalars().all()
+
+    if not wallets:
+        return {"positions": [], "total_pnl": 0.0}
+
+    def _fetch_one(wallet):
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+            info        = Info(constants.MAINNET_API_URL, skip_ws=True)
+            state       = info.user_state(wallet.hl_wallet_addr)
+            open_orders = info.open_orders(wallet.hl_wallet_addr)
+
+            orders_by_coin: dict = {}
+            for o in open_orders:
+                orders_by_coin.setdefault(o["coin"], []).append(o)
+
+            result = []
+            for ap in state.get("assetPositions", []):
+                pos      = ap["position"]
+                coin     = pos["coin"]
+                szi      = float(pos.get("szi", 0))
+                if szi == 0:
+                    continue
+                side     = "short" if szi < 0 else "long"
+                size     = abs(szi)
+                entry_px = float(pos.get("entryPx", 0))
+                upnl     = float(pos.get("unrealizedPnl", 0))
+                roe      = float(pos.get("returnOnEquity", 0))
+                pos_val  = float(pos.get("positionValue", 0))
+                margin   = float(pos.get("marginUsed", 0))
+                liq_raw  = pos.get("liquidationPx")
+                lev      = pos.get("leverage", {})
+                lev_val  = int(lev.get("value", 1)) if isinstance(lev, dict) else 1
+                lev_type = lev.get("type", "cross")  if isinstance(lev, dict) else "cross"
+
+                reduce_orders = [o for o in orders_by_coin.get(coin, []) if o.get("reduceOnly")]
+                sl_price: float | None = None
+                tp_prices: list        = []
+                if side == "short":
+                    sl_cands = [o for o in reduce_orders if float(o["limitPx"]) > entry_px]
+                    tp_cands = sorted([o for o in reduce_orders if float(o["limitPx"]) < entry_px],
+                                      key=lambda o: float(o["limitPx"]), reverse=True)
+                    if sl_cands:
+                        sl_price = float(max(sl_cands, key=lambda o: float(o["limitPx"]))["limitPx"])
+                else:
+                    sl_cands = [o for o in reduce_orders if float(o["limitPx"]) < entry_px]
+                    tp_cands = sorted([o for o in reduce_orders if float(o["limitPx"]) > entry_px],
+                                      key=lambda o: float(o["limitPx"]))
+                    if sl_cands:
+                        sl_price = float(min(sl_cands, key=lambda o: float(o["limitPx"]))["limitPx"])
+                tp_prices = [float(o["limitPx"]) for o in tp_cands]
+
+                result.append({
+                    "wallet_addr":    wallet.hl_wallet_addr,
+                    "wallet_label":   wallet.label,
+                    "user_address":   wallet.user_address,
+                    "coin":           coin,
+                    "side":           side,
+                    "size":           size,
+                    "entry_px":       entry_px,
+                    "pos_value":      round(pos_val, 4),
+                    "unrealized_pnl": round(upnl, 4),
+                    "roe_pct":        round(roe * 100, 2),
+                    "leverage":       lev_val,
+                    "leverage_type":  lev_type,
+                    "margin_used":    round(margin, 4),
+                    "liq_px":         round(float(liq_raw), 4) if liq_raw else None,
+                    "sl_price":       sl_price,
+                    "tp_prices":      tp_prices,
+                })
+            return result
+        except Exception:
+            return []
+
+    results      = await asyncio.gather(*[asyncio.to_thread(_fetch_one, w) for w in wallets])
+    all_positions = [p for wpos in results for p in wpos]
+    total_pnl     = round(sum(p["unrealized_pnl"] for p in all_positions), 4)
+    return {"positions": all_positions, "total_pnl": total_pnl}
 
 
 @router.post("/signal-lab/refresh-lp-range")

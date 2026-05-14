@@ -1456,8 +1456,17 @@ function renderSignalLab(d) {
           </div>
         </div>
         <div class="sl-admin-group">
-          <div class="sl-admin-label">Señales pendientes</div>
-          <div class="sl-admin-val">${signals.pending ?? '—'}</div>
+          <div class="sl-admin-label">Pendientes</div>
+          <div class="sl-admin-val">
+            ${signals.pending ?? '—'}
+            ${(signals.pending_s1 != null) ? `<span style="font-size:.64rem;color:var(--muted);margin-left:5px">📡 ${signals.pending_s1} · 📊 ${signals.pending_s2 ?? 0}</span>` : ''}
+          </div>
+        </div>
+        <div class="sl-admin-group">
+          <div class="sl-admin-label">En vivo (HL)</div>
+          <div class="sl-admin-val" style="${(signals.live_execs ?? 0) > 0 ? 'color:#4ade80' : ''}">
+            ${signals.live_execs ?? '—'}
+          </div>
         </div>
         <div class="sl-admin-group">
           <div class="sl-admin-label">Expiradas hoy</div>
@@ -1513,18 +1522,23 @@ async function refreshLpRange() {
 
 async function fetchSignalLabMonitor() {
   try {
-    const d = await apiGet('/admin/signal-lab-monitor');
-    _renderSlCards(d.wallets || [], d.activity || []);
+    const [monRes, posRes] = await Promise.allSettled([
+      apiGet('/admin/signal-lab-monitor'),
+      apiGet('/admin/hl-positions'),
+    ]);
+    const d = monRes.status === 'fulfilled' ? monRes.value : { wallets: [], activity: [] };
+    const p = posRes.status === 'fulfilled' ? posRes.value : null;
+    _renderSlCards(d.wallets || [], d.activity || [], p);
   } catch (e) {
     const el = document.getElementById('sl-cards-grid');
     if (el) el.innerHTML = `<span style="font-size:0.72rem;color:#f87171">Monitor error: ${e.message}</span>`;
   }
 }
 
-function _renderSlCards(wallets, activity) {
+function _renderSlCards(wallets, activity, posData) {
   const el = document.getElementById('sl-cards-grid');
   if (!el) return;
-  el.innerHTML = wallets.map(_slWalletCard).join('') + _slFeedCard(activity);
+  el.innerHTML = wallets.map(_slWalletCard).join('') + _slFeedCard(activity) + _slPositionsCard(posData);
 }
 
 // ── Wallet card (one per registered signal wallet) ──────────────────────────
@@ -1548,13 +1562,22 @@ function _slWalletCard(w) {
 
   // Mini-evt rows: last 3 executions for this wallet
   const execRows = (w.recent_executions || []).map(ex => {
-    const color = ex.outcome === 'filled' ? 'green' : 'red';
-    const icon  = ex.outcome === 'filled' ? '✅' : '❌';
-    const fill  = ex.fill_price ? ` @ $${_fmtPrice(ex.fill_price)}` : '';
-    const lev   = ex.leverage ? ` ${ex.leverage}x` : '';
+    const isOpen  = ex.outcome === 'filled' && !ex.close_price;
+    const color   = ex.outcome === 'filled' ? 'green' : 'red';
+    const icon    = ex.outcome === 'filled' ? (isOpen ? '🟢' : '✅') : '❌';
+    const fill    = ex.fill_price ? ` @ $${_fmtPrice(ex.fill_price)}` : '';
+    const lev     = ex.leverage ? ` ${ex.leverage}x` : '';
+    const beTag   = ex.breakeven_applied
+      ? ` <span title="Breakeven SL activo" style="color:#00d4ff;font-size:.6rem">🛡️BE</span>` : '';
+    let closeStr  = '';
+    if (ex.close_price) {
+      const pSign = (ex.pnl_pct ?? 0) >= 0 ? '+' : '';
+      const pCol  = (ex.pnl_pct ?? 0) >= 0 ? '#4ade80' : '#f87171';
+      closeStr = ` → <span style="color:${pCol};font-size:.65rem">${pSign}${(ex.pnl_pct || 0).toFixed(1)}%</span>`;
+    }
     return `
       <div class="mini-evt mini-evt--${color}">
-        <span>${icon} ${ex.pair || '—'} ${(ex.direction||'').toUpperCase()}${lev}${fill}</span>
+        <span>${icon} ${ex.pair || '—'} ${(ex.direction||'').toUpperCase()}${lev}${fill}${closeStr}${beTag}</span>
         <span class="muted">${relTime(ex.ts)}</span>
       </div>`;
   }).join('');
@@ -1579,6 +1602,16 @@ function _slWalletCard(w) {
         <span class="pool-label">Auto-execute</span>
         <span class="pool-val">${w.auto_execute ? '🤖 ON' : '⏸ OFF'}</span>
       </div>
+      ${w.user_address ? `
+      <div class="pool-row">
+        <span class="pool-label">Owner</span>
+        <span class="pool-val" style="font-family:monospace;font-size:.68rem;color:var(--muted)">${w.user_address.slice(0,6)}…${w.user_address.slice(-4)}</span>
+      </div>` : ''}
+      ${(w.open_count ?? 0) > 0 ? `
+      <div class="pool-row">
+        <span class="pool-label">Trades abiertos</span>
+        <span class="pool-val pool-val--green">${w.open_count}</span>
+      </div>` : ''}
       <div style="margin-top:.5rem;display:flex;flex-direction:column;gap:2px">
         ${execRows || noExec}
       </div>
@@ -1603,12 +1636,15 @@ function _slFeedCard(activity) {
   const rows = activity.slice(0, 15).map(a => {
     if (a.kind === 'signal') {
       const { color, icon, label } = _slSignalMeta(a.status);
-      const lev   = a.leverage ? ` ${a.leverage}x` : '';
-      const entry = a.entry ? ` @ $${_fmtPrice(a.entry)}` : '';
-      const dir   = (a.direction || '').toUpperCase();
+      const lev     = a.leverage ? ` ${a.leverage}x` : '';
+      const entry   = a.entry ? ` @ $${_fmtPrice(a.entry)}` : '';
+      const dir     = (a.direction || '').toUpperCase();
+      const srcBadge = a.source_id === 2
+        ? `<span class="badge" style="font-size:.56rem;background:rgba(251,191,36,.15);color:#fbbf24;margin-left:3px">📊 BTC</span>`
+        : '';
       return `
         <div class="mini-evt mini-evt--${color}">
-          <span>${icon} ${a.pair || '—'} <strong>${dir}</strong>${lev}${entry}</span>
+          <span>${icon} ${a.pair || '—'} <strong>${dir}</strong>${lev}${entry}${srcBadge}</span>
           <span class="badge badge--${color === 'green' ? 'green' : color === 'red' ? 'red' : color === 'yellow' ? 'yellow' : 'muted'}"
                 style="font-size:.6rem">${label}</span>
           <span class="muted">${relTime(a.ts)}</span>
@@ -1642,6 +1678,66 @@ function _slFeedCard(activity) {
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
         ${rows || empty}
+      </div>
+    </div>`;
+}
+
+// ── HL Open Positions card (admin — all wallets) ────────────────────────────
+
+function _slPositionsCard(posData) {
+  if (!posData) return '';
+  const positions = posData.positions || [];
+  const totalPnl  = posData.total_pnl || 0;
+
+  if (positions.length === 0) {
+    return `
+      <div class="pool-card" style="border-left-color:#a855f7">
+        <div class="pool-card-header">
+          <div class="health-dot" style="background:#a855f7;box-shadow:0 0 6px #a855f7"></div>
+          <span class="pool-pair" style="color:#a855f7">📊 Posiciones HL</span>
+          <span class="pool-nft muted">Sin posiciones abiertas</span>
+        </div>
+      </div>`;
+  }
+
+  const totalSign = totalPnl >= 0 ? '+' : '';
+  const totalCol  = totalPnl >= 0 ? '#4ade80' : '#f87171';
+
+  const rows = positions.map(p => {
+    const dir      = (p.side || 'short').toUpperCase();
+    const pnl      = p.unrealized_pnl || 0;
+    const roe      = p.roe_pct || 0;
+    const pnlPos   = pnl >= 0;
+    const pnlSign  = pnlPos ? '+' : '';
+    const pnlCol   = pnlPos ? '#4ade80' : '#f87171';
+    const slStr    = p.sl_price ? ` SL $${_fmtPrice(p.sl_price)}` : '';
+    const tpStr    = (p.tp_prices || []).length
+      ? ` TP ${p.tp_prices.map(t => `$${_fmtPrice(t)}`).join('/')}`
+      : '';
+    const walletSh = p.wallet_addr ? p.wallet_addr.slice(0,6) + '…' + p.wallet_addr.slice(-4) : '—';
+
+    return `
+      <div class="mini-evt mini-evt--${pnlPos ? 'green' : 'red'}">
+        <span>
+          <strong>${p.coin} ${dir}</strong> ${p.leverage}×
+          @ $${_fmtPrice(p.entry_px)}
+          <span class="muted" style="font-size:.63rem">${slStr}${tpStr}</span>
+        </span>
+        <span style="color:${pnlCol};font-weight:700;font-size:.7rem">${pnlSign}$${Math.abs(pnl).toFixed(2)} (${pnlSign}${roe.toFixed(1)}%)</span>
+        <span class="muted" style="font-size:.63rem">${p.wallet_label} · ${walletSh}</span>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="pool-card" style="border-left-color:#a855f7">
+      <div class="pool-card-header">
+        <div class="health-dot" style="background:#a855f7;box-shadow:0 0 6px #a855f7"></div>
+        <span class="pool-pair" style="color:#a855f7">📊 Posiciones HL</span>
+        <span class="pools-count">${positions.length} abiertas</span>
+        <span class="pool-nft" style="color:${totalCol};font-weight:700">P&L ${totalSign}$${Math.abs(totalPnl).toFixed(2)}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        ${rows}
       </div>
     </div>`;
 }
