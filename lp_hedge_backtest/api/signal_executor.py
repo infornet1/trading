@@ -3,6 +3,7 @@ HL order placement helper for signal copy trading.
 Synchronous — wrap with asyncio.to_thread() in async contexts.
 """
 import math
+from typing import Optional
 
 # Testing phase: fixed USDC notional per trade (overrides signal size_pct).
 # Set to None to go live with normal size_pct-based sizing.
@@ -14,6 +15,17 @@ from hyperliquid.info import Info
 from hyperliquid.utils import constants
 
 from api.crypto import decrypt
+
+
+def _extract_oid(resp) -> Optional[str]:
+    """Extract order ID from a trigger (resting) HL order response."""
+    try:
+        statuses = resp.get("response", {}).get("data", {}).get("statuses", [{}])
+        resting  = statuses[0].get("resting", {}) if statuses else {}
+        oid      = resting.get("oid") if resting else None
+        return str(oid) if oid else None
+    except Exception:
+        return None
 
 
 def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
@@ -150,34 +162,39 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         fill_price  = float(filled.get("avgPx", entry) or entry)
 
         # ── Native SL — full size, reduce_only (covers runner after TP1 partial fill)
-        exchange.order(
+        sl_resp = exchange.order(
             symbol, close_is_buy, size, sl_price,
             {"trigger": {"triggerPx": sl_price, "isMarket": True, "tpsl": "sl"}},
             reduce_only=True,
         )
+        sl_oid  = _extract_oid(sl_resp)
+        tp1_oid = None
+        tp2_oid = None
 
         # ── Native TP orders ─────────────────────────────────────────────────
         if split_tps:
             # TP1: 50% at first target
-            exchange.order(
+            tp1_resp = exchange.order(
                 symbol, close_is_buy, tp1_size, tp1_price,
                 {"trigger": {"triggerPx": tp1_price, "isMarket": True, "tpsl": "tp"}},
                 reduce_only=True,
             )
+            tp1_oid = _extract_oid(tp1_resp)
             # TP2: remaining 50% at second target
-            # After TP1 fires, SL (reduce_only) auto-scales to cover the runner
-            exchange.order(
+            tp2_resp = exchange.order(
                 symbol, close_is_buy, tp2_size, tp2_price,
                 {"trigger": {"triggerPx": tp2_price, "isMarket": True, "tpsl": "tp"}},
                 reduce_only=True,
             )
+            tp2_oid = _extract_oid(tp2_resp)
         elif tp1_price:
             # Single target — close full size at TP
-            exchange.order(
+            tp1_resp = exchange.order(
                 symbol, close_is_buy, size, tp1_price,
                 {"trigger": {"triggerPx": tp1_price, "isMarket": True, "tpsl": "tp"}},
                 reduce_only=True,
             )
+            tp1_oid = _extract_oid(tp1_resp)
 
         return {
             "success":            True,
@@ -198,6 +215,9 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
             "split_tps":          split_tps,
             "tp1_size":           round(tp1_size, 6),
             "tp2_size":           round(tp2_size, 6) if tp2_size else None,
+            "sl_order_id":        sl_oid,
+            "tp1_order_id":       tp1_oid,
+            "tp2_order_id":       tp2_oid,
         }
 
     except Exception as exc:

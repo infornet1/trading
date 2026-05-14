@@ -240,6 +240,9 @@ async def execute_signal(
         hl_order_id    = hl_order_id,
         fill_price     = fill_price,
         outcome        = outcome,
+        sl_order_id    = order_result.get("sl_order_id")  if order_result else None,
+        tp1_order_id   = order_result.get("tp1_order_id") if order_result else None,
+        tp2_order_id   = order_result.get("tp2_order_id") if order_result else None,
     )
     db.add(execution)
     await db.commit()
