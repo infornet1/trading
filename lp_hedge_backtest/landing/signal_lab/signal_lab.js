@@ -343,8 +343,17 @@ function _renderSignalCard(sig) {
   let btnHtml;
   if (isClosed) {
     btnHtml = `<span style="font-size:0.65rem;color:var(--color-text-muted)">${statusLabel}</span>`;
+  } else if (sig.is_running) {
+    // Already live on HL for this wallet — show status, no execute button
+    const autoTag = _autoStatus.armed ? `<span class="sl-auto-armed-tag">🤖</span>` : "";
+    btnHtml = `
+      <div class="sl-btn-group">
+        ${autoTag}
+        <span class="sl-running-badge">🟢 En curso</span>
+      </div>
+    `;
   } else {
-    // Always show Execute button — auto fires automatically, this is the manual fallback
+    // Not running yet — show Execute button (auto fires automatically, this is the fallback)
     const autoTag = _autoStatus.armed
       ? `<span class="sl-auto-armed-tag" title="Auto-execute armado — se ejecutará automáticamente">🤖</span>`
       : "";

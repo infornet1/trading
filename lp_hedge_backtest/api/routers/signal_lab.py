@@ -146,7 +146,24 @@ async def list_signals(
     if status:
         q = q.where(SignalEvent.status == status)
     result = await db.execute(q)
-    return {"signals": [_signal_to_dict(e) for e in result.scalars().all()]}
+    signals = result.scalars().all()
+
+    # Which signals are currently running on any of the connected user's wallets?
+    running_res = await db.execute(
+        select(SignalExecution.signal_id)
+        .join(SignalWallet, SignalExecution.hl_wallet_addr == SignalWallet.hl_wallet_addr)
+        .where(
+            SignalWallet.user_address   == address.lower(),
+            SignalExecution.outcome     == "filled",
+            SignalExecution.close_price.is_(None),
+        )
+    )
+    running_ids = {row[0] for row in running_res.fetchall()}
+
+    return {"signals": [
+        {**_signal_to_dict(e), "is_running": e.id in running_ids}
+        for e in signals
+    ]}
 
 
 @router.get("/lp-range")
