@@ -284,8 +284,9 @@ async function fetchSignals() {
 
     loading.classList.add("hidden");
 
-    const active  = _signals.filter(s => s.status === "pending");
-    const closed  = _signals.filter(s => s.status !== "pending");
+    const CLOSED_STATUSES = ["stopped", "tp_hit", "cancelled"];
+    const active  = _signals.filter(s => !CLOSED_STATUSES.includes(s.status));
+    const closed  = _signals.filter(s =>  CLOSED_STATUSES.includes(s.status));
 
     if (active.length === 0 && closed.length === 0) {
       empty.classList.remove("hidden");
