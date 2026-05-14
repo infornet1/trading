@@ -228,6 +228,10 @@ async def _auto_execute_signal(signal_id: int, sig):
         await db.commit()
 
 
+# Parser returns "target_hit"/"partial"; DB ENUM uses "tp_hit"
+_STATUS_MAP = {"target_hit": "tp_hit", "partial": "tp_hit"}
+
+
 async def apply_update_to_db(msg, update_status: str, source_id: int) -> dict | None:
     """
     Find the most recent open signal before this msg and update its status.
@@ -277,7 +281,7 @@ async def apply_update_to_db(msg, update_status: str, source_id: int) -> dict | 
             "pair":        target.pair,
             "direction":   target.direction,
         }
-        target.status = update_status
+        target.status = _STATUS_MAP.get(update_status, update_status)
         await db.commit()
         return info
 
@@ -755,7 +759,7 @@ async def main():
                     flush=True,
                 )
                 # Auto-close HL position if channel signals exit on an executed trade
-                if info and info["prev_status"] == "executed" and update in ("target_hit", "stopped"):
+                if info and info["prev_status"] == "executed" and update in ("target_hit", "stopped", "tp_hit"):
                     asyncio.create_task(_auto_close_signal(info, update))
 
         asyncio.create_task(_breakeven_monitor())
