@@ -242,11 +242,15 @@ async def lifespan(app: FastAPI):
     # Start signal expiry sweeper — marks pending signals >4h as expired every 15 min
     from api.signal_expiry import run_signal_expiry
     expiry_task = asyncio.create_task(run_signal_expiry())
+    # Start signal reconciler — polls HL fills for orphaned open executions every 5 min
+    from api.signal_reconciler import run_signal_reconciler
+    rec_task = asyncio.create_task(run_signal_reconciler())
     yield
     # Graceful shutdown
     tg_task.cancel()
     lp_task.cancel()
     expiry_task.cancel()
+    rec_task.cancel()
     try:
         await tg_task
     except asyncio.CancelledError:
@@ -257,6 +261,10 @@ async def lifespan(app: FastAPI):
         pass
     try:
         await expiry_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await rec_task
     except asyncio.CancelledError:
         pass
     from api.bot_manager import manager
