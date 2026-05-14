@@ -164,8 +164,23 @@ async def _reconcile_once() -> None:
             )
             continue
 
-        new_status = "stopped" if reason == "sl" else "tp_hit"
-        icon       = "🛑" if reason == "sl" else "🎯"
+        if reason == "sl":
+            new_status = "stopped"
+            icon = "🛑"
+        elif reason in ("tp1", "tp2"):
+            new_status = "tp_hit"
+            icon = "🎯"
+        else:
+            # OID unknown (pre-migration exec or data gap) — infer from price direction
+            fp_val = float(execution.fill_price) if execution.fill_price else None
+            if fp_val:
+                is_loss = (close_price > fp_val) if is_short else (close_price < fp_val)
+                new_status = "stopped" if is_loss else "tp_hit"
+                icon = "🛑" if is_loss else "🎯"
+            else:
+                # No fill price either — can't infer, default to tp_hit (original behaviour)
+                new_status = "tp_hit"
+                icon = "🎯"
 
         async with AsyncSessionLocal() as db:
             await db.execute(
