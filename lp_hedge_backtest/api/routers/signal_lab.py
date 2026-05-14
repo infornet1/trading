@@ -697,6 +697,104 @@ async def patch_signal_wallet(
     return {"id": wallet.id, "auto_execute": wallet.auto_execute, "active": wallet.active, "label": wallet.label}
 
 
+@router.get("/hl-positions")
+async def get_hl_positions(
+    db:      AsyncSession = Depends(get_db),
+    address: str          = Depends(get_current_address),
+):
+    """Return live Hyperliquid positions + SL/TP orders for all active wallets of the user."""
+    res = await db.execute(
+        select(SignalWallet).where(
+            SignalWallet.user_address == address.lower(),
+            SignalWallet.active       == True,
+        )
+    )
+    wallets = res.scalars().all()
+    if not wallets:
+        return {"positions": [], "total_pnl": 0.0}
+
+    def _fetch_one(wallet):
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+            info        = Info(constants.MAINNET_API_URL, skip_ws=True)
+            state       = info.user_state(wallet.hl_wallet_addr)
+            open_orders = info.open_orders(wallet.hl_wallet_addr)
+
+            orders_by_coin: dict = {}
+            for o in open_orders:
+                orders_by_coin.setdefault(o["coin"], []).append(o)
+
+            result = []
+            for ap in state.get("assetPositions", []):
+                pos     = ap["position"]
+                coin    = pos["coin"]
+                szi     = float(pos.get("szi", 0))
+                if szi == 0:
+                    continue
+                side     = "short" if szi < 0 else "long"
+                size     = abs(szi)
+                entry_px = float(pos.get("entryPx", 0))
+                upnl     = float(pos.get("unrealizedPnl", 0))
+                roe      = float(pos.get("returnOnEquity", 0))
+                pos_val  = float(pos.get("positionValue", 0))
+                margin   = float(pos.get("marginUsed", 0))
+                liq_raw  = pos.get("liquidationPx")
+                liq_px   = float(liq_raw) if liq_raw else None
+                lev      = pos.get("leverage", {})
+                lev_val  = int(lev.get("value", 1)) if isinstance(lev, dict) else 1
+                lev_type = lev.get("type", "cross") if isinstance(lev, dict) else "cross"
+
+                reduce_orders = [o for o in orders_by_coin.get(coin, []) if o.get("reduceOnly")]
+                sl_price: Optional[float] = None
+                tp_prices: list           = []
+
+                if side == "short":
+                    sl_cands = [o for o in reduce_orders if float(o["limitPx"]) > entry_px]
+                    tp_cands = sorted(
+                        [o for o in reduce_orders if float(o["limitPx"]) < entry_px],
+                        key=lambda o: float(o["limitPx"]), reverse=True,
+                    )
+                    if sl_cands:
+                        sl_price = float(max(sl_cands, key=lambda o: float(o["limitPx"]))["limitPx"])
+                else:
+                    sl_cands = [o for o in reduce_orders if float(o["limitPx"]) < entry_px]
+                    tp_cands = sorted(
+                        [o for o in reduce_orders if float(o["limitPx"]) > entry_px],
+                        key=lambda o: float(o["limitPx"]),
+                    )
+                    if sl_cands:
+                        sl_price = float(min(sl_cands, key=lambda o: float(o["limitPx"]))["limitPx"])
+
+                tp_prices = [float(o["limitPx"]) for o in tp_cands]
+
+                result.append({
+                    "wallet_addr":    wallet.hl_wallet_addr,
+                    "wallet_label":   wallet.label,
+                    "coin":           coin,
+                    "side":           side,
+                    "size":           size,
+                    "entry_px":       entry_px,
+                    "pos_value":      round(pos_val, 4),
+                    "unrealized_pnl": round(upnl, 4),
+                    "roe_pct":        round(roe * 100, 2),
+                    "leverage":       lev_val,
+                    "leverage_type":  lev_type,
+                    "margin_used":    round(margin, 4),
+                    "liq_px":         round(liq_px, 4) if liq_px else None,
+                    "sl_price":       sl_price,
+                    "tp_prices":      tp_prices,
+                })
+            return result
+        except Exception:
+            return []
+
+    results      = await asyncio.gather(*[asyncio.to_thread(_fetch_one, w) for w in wallets])
+    all_positions = [p for wallet_pos in results for p in wallet_pos]
+    total_pnl     = round(sum(p["unrealized_pnl"] for p in all_positions), 4)
+    return {"positions": all_positions, "total_pnl": total_pnl}
+
+
 @router.delete("/wallets/{wallet_id}", status_code=204)
 async def delete_signal_wallet(
     wallet_id: int,

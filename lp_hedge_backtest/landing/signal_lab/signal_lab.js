@@ -71,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function refreshAll() {
   _setTimestamp("Actualizando...");
-  await Promise.all([fetchLpRange(), fetchAutoStatus(), fetchSignals()]);
+  await Promise.all([fetchLpRange(), fetchAutoStatus(), fetchSignals(), fetchHlPositions()]);
   _setTimestamp("Actualizado " + new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" }));
 }
 
@@ -481,6 +481,99 @@ function _renderHistoryRow(sig) {
       ${priceBlock}
       ${pnlBadge}
       <span class="sl-history-date">${age}</span>
+    </div>
+  `;
+}
+
+// ── HL Open Positions ──────────────────────────────────────
+
+async function fetchHlPositions() {
+  const loading    = document.getElementById("hl-positions-loading");
+  const content    = document.getElementById("hl-positions-content");
+  const empty      = document.getElementById("hl-positions-empty");
+  const countBadge = document.getElementById("hl-positions-count");
+
+  loading.classList.remove("hidden");
+  content.classList.add("hidden");
+  empty.classList.add("hidden");
+  countBadge.classList.add("hidden");
+
+  if (!_token) {
+    loading.classList.add("hidden");
+    empty.textContent = "Conecta tu wallet para ver posiciones abiertas en Hyperliquid.";
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/signal-lab/hl-positions`, {
+      headers: { ..._authHeader() },
+    });
+    if (!res.ok) throw new Error(res.status);
+    const data      = await res.json();
+    const positions = data.positions || [];
+
+    loading.classList.add("hidden");
+
+    if (positions.length === 0) {
+      empty.textContent = "No hay posiciones abiertas en Hyperliquid.";
+      empty.classList.remove("hidden");
+      return;
+    }
+
+    countBadge.textContent = positions.length;
+    countBadge.classList.remove("hidden");
+
+    const totalPnl  = data.total_pnl || 0;
+    const totalSign = totalPnl >= 0 ? "+" : "";
+    const totalCls  = totalPnl >= 0 ? "sl-pnl-pos" : "sl-pnl-neg";
+
+    content.innerHTML = `
+      <div class="sl-pos-total">
+        P&L no realizado: <span class="sl-pnl-badge ${totalCls}">${totalSign}$${Math.abs(totalPnl).toFixed(2)}</span>
+      </div>
+      <div class="sl-pos-list">${positions.map(_renderPositionCard).join("")}</div>
+    `;
+    content.classList.remove("hidden");
+  } catch {
+    loading.classList.add("hidden");
+    empty.textContent = "Error al cargar posiciones.";
+    empty.classList.remove("hidden");
+  }
+}
+
+function _renderPositionCard(p) {
+  const dir      = (p.side || "short").toLowerCase();
+  const levType  = p.leverage_type === "isolated" ? "iso" : "cross";
+  const entry    = `$${_fmt(p.entry_px)}`;
+  const val      = `$${_fmt(p.pos_value)}`;
+  const margin   = `$${_fmt(p.margin_used)}`;
+  const walletShort = p.wallet_addr
+    ? p.wallet_addr.slice(0, 6) + "…" + p.wallet_addr.slice(-4)
+    : "";
+
+  const slStr = p.sl_price  ? `SL $${_fmt(p.sl_price)}`                                : "";
+  const tpStr = (p.tp_prices || []).length > 0
+    ? `TP ${p.tp_prices.map(t => `$${_fmt(t)}`).join(" / ")}`
+    : "";
+  const levelsStr = [slStr, tpStr].filter(Boolean).join(" · ");
+
+  const pnl     = p.unrealized_pnl || 0;
+  const roe     = p.roe_pct || 0;
+  const pnlPos  = pnl >= 0;
+  const pnlSign = pnlPos ? "+" : "";
+  const pnlCls  = pnlPos ? "sl-pnl-pos" : "sl-pnl-neg";
+
+  return `
+    <div class="sl-pos-card">
+      <span class="sl-dir-pill ${dir}">${dir.toUpperCase()}</span>
+      <div class="sl-pos-info">
+        <div class="sl-pos-pair">${p.coin}/USDT <span class="sl-pos-lev">${p.leverage}× ${levType}</span></div>
+        <div class="sl-pos-meta">E ${entry} · ${p.size} ${p.coin} (${val}) · Margin ${margin}</div>
+        ${levelsStr ? `<div class="sl-pos-levels">${levelsStr}</div>` : ""}
+        <div class="sl-pos-wallet">${p.wallet_label} · <code>${walletShort}</code></div>
+      </div>
+      <span class="sl-pnl-badge sl-pos-pnl ${pnlCls}">${pnlSign}$${Math.abs(pnl).toFixed(2)} · ${pnlSign}${roe.toFixed(1)}%</span>
     </div>
   `;
 }
