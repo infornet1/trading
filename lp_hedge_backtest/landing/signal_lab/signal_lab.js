@@ -106,7 +106,9 @@ function _renderAutoStatusBanner() {
 
   el.innerHTML = `
     <span class="sl-auto-dot"></span>
-    <span class="sl-auto-label">Auto-execute armado</span>
+    <span class="sl-auto-label">🤖 Auto-execute activo</span>
+    <span style="font-size:0.68rem;color:var(--color-text-muted);margin:0 6px">·</span>
+    <span style="font-size:0.68rem;color:var(--color-text-muted)">señales se ejecutan automáticamente · Ejecutar → como respaldo</span>
     ${walletTags}
   `;
   el.classList.remove("hidden");
@@ -334,22 +336,23 @@ function _renderSignalCard(sig) {
     ? `<span class="sl-source-badge">📊 BTC Daily</span>`
     : "";
 
-  // Signals that are closed/invalid — no point re-entering
+  // Signals that are closed/invalid — trade is over, no re-entry
   const isClosed = ["stopped", "tp_hit", "cancelled"].includes(sig.status);
 
   let btnHtml;
   if (isClosed) {
     btnHtml = `<span style="font-size:0.65rem;color:var(--color-text-muted)">${statusLabel}</span>`;
-  } else if (_autoStatus.armed) {
-    // Auto is armed — show armed indicator + manual override button
+  } else {
+    // Always show Execute button — auto fires automatically, this is the manual fallback
+    const autoTag = _autoStatus.armed
+      ? `<span class="sl-auto-armed-tag" title="Auto-execute armado — se ejecutará automáticamente">🤖</span>`
+      : "";
     btnHtml = `
       <div class="sl-btn-group">
-        <span class="sl-auto-armed-tag">🤖 Auto</span>
-        <button class="btn btn-outline btn-sm" onclick="openExecuteModal(${sig.id})" title="Ejecutar manualmente con otra wallet">Manual →</button>
+        ${autoTag}
+        <button class="btn btn-primary btn-sm" onclick="openExecuteModal(${sig.id})">Ejecutar →</button>
       </div>
     `;
-  } else {
-    btnHtml = `<button class="btn btn-primary btn-sm" onclick="openExecuteModal(${sig.id})">Ejecutar →</button>`;
   }
 
   return `
