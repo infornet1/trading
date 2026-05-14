@@ -330,6 +330,9 @@ function _renderSignalCard(sig, forceExpired = false) {
   const statusLabel = _statusLabel(sig.status);
 
   const dirHtml = `<span class="sl-dir-pill ${dir}">${dir.toUpperCase()}</span>`;
+  const srcBadge = sig.source_id === 2
+    ? `<span class="sl-source-badge">📊 BTC Daily</span>`
+    : "";
 
   let btnHtml;
   if (expired) {
@@ -355,7 +358,7 @@ function _renderSignalCard(sig, forceExpired = false) {
     <div class="sl-signal-card${expired ? " sl-signal-card--expired" : ""}">
       ${dirHtml}
       <div class="sl-signal-info">
-        <div class="sl-signal-pair">${sig.pair || "—"} ${lev}</div>
+        <div class="sl-signal-pair">${srcBadge}${sig.pair || "—"} ${lev}</div>
         <div class="sl-signal-prices">E ${entry} · SL ${sl}${tps ? " · TP " + tps : ""}</div>
       </div>
       <div class="sl-signal-age">${age}</div>

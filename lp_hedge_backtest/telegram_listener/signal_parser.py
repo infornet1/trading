@@ -78,9 +78,9 @@ def parse_format_a(text: str) -> Optional[Signal]:
         return None
     entry = _clean_price(entry_m.group(1))
 
-    sl_m = re.search(r"Stoploss\s+is\s+at\s+\$?([\d,]+\.?\d*)", text, re.IGNORECASE)
+    sl_m = re.search(r"Stop-?loss\s+is\s+at\s+\$?([\d,]+\.?\d*)", text, re.IGNORECASE)
     if not sl_m:
-        sl_m = re.search(r"Stoploss[:\s]+\$?([\d,]+\.?\d*)", text, re.IGNORECASE)
+        sl_m = re.search(r"Stop-?loss[:\s]+\$?([\d,]+\.?\d*)", text, re.IGNORECASE)
     if not sl_m:
         return None
     stoploss = _clean_price(sl_m.group(1))

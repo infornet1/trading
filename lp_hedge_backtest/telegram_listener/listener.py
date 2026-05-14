@@ -46,12 +46,14 @@ SESSION  = os.getenv("TG_SESSION", "viznago_listener")
 DB_URL   = os.getenv("DB_URL", "mysql+aiomysql://viznago:90GSxYu0GdSe6fzGowBA4hNOlsBK@localhost/viznago_dev")
 
 CHANNEL_ID        = 1951769926
-SHORT_TERM_THREAD = 7    # signals thread
+SHORT_TERM_THREAD = 7    # Short-Term signals (thread 7)
+BTC_DAILY_THREAD  = 22   # Bitcoin Daily signals (thread 22)
+
+# thread_id → signal_sources.id (matches signal_sources table)
+SOURCE_ID_MAP = {SHORT_TERM_THREAD: 1, BTC_DAILY_THREAD: 2}
 
 engine       = create_async_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600, echo=False)
 AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-SOURCE_ID = 1   # signal_sources.id for Short-Term thread
 
 
 def _thread_id(msg) -> int | None:
@@ -62,16 +64,19 @@ def _thread_id(msg) -> int | None:
     return getattr(rt, "reply_to_top_id", None) or getattr(rt, "reply_to_msg_id", None)
 
 
-def _is_short_term(msg) -> bool:
+def _signal_source(msg) -> int | None:
+    """Return the source_id for the thread this message belongs to, or None."""
     tid = _thread_id(msg)
-    # Topic creation message has id == thread_id; subsequent replies have top_id == thread_id
-    return tid == SHORT_TERM_THREAD or msg.id == SHORT_TERM_THREAD
+    for thread_id, source_id in SOURCE_ID_MAP.items():
+        if tid == thread_id or msg.id == thread_id:
+            return source_id
+    return None
 
 
-async def save_signal(msg, sig) -> int | None:
+async def save_signal(msg, sig, source_id: int) -> int | None:
     async with AsyncSession_() as db:
         ev = SignalEvent(
-            source_id   = SOURCE_ID,
+            source_id   = source_id,
             pair        = sig.pair,
             direction   = sig.direction,
             leverage    = sig.leverage,
@@ -220,7 +225,7 @@ async def _auto_execute_signal(signal_id: int, sig):
         await db.commit()
 
 
-async def apply_update_to_db(msg, update_status: str) -> dict | None:
+async def apply_update_to_db(msg, update_status: str, source_id: int) -> dict | None:
     """
     Find the most recent open signal before this msg and update its status.
     Returns {"id": signal_id, "prev_status": str, "pair": str, "direction": str}
@@ -239,7 +244,7 @@ async def apply_update_to_db(msg, update_status: str) -> dict | None:
         if parent_id:
             res = await db.execute(
                 select(SignalEvent).where(
-                    SignalEvent.source_id == SOURCE_ID,
+                    SignalEvent.source_id == source_id,
                     SignalEvent.msg_id    == parent_id,
                     SignalEvent.status.in_(OPEN_STATUSES),
                 )
@@ -247,11 +252,11 @@ async def apply_update_to_db(msg, update_status: str) -> dict | None:
             target = res.scalar_one_or_none()
 
         if not target:
-            # Standalone update — apply to most recent open signal before this msg timestamp
+            # Standalone update — apply to most recent open signal in same thread before this msg
             res = await db.execute(
                 select(SignalEvent)
                 .where(
-                    SignalEvent.source_id   == SOURCE_ID,
+                    SignalEvent.source_id   == source_id,
                     SignalEvent.status.in_(OPEN_STATUSES),
                     SignalEvent.received_at <= msg.date,
                 )
@@ -569,14 +574,15 @@ async def main():
     async with TelegramClient(session_path, API_ID, API_HASH) as client:
         me = await client.get_me()
         print(f"[Signal Lab Listener] Logged in as @{me.username}", flush=True)
-        print(f"[Signal Lab Listener] Listening on channel {CHANNEL_ID} thread {SHORT_TERM_THREAD}", flush=True)
+        print(f"[Signal Lab Listener] Listening on channel {CHANNEL_ID} threads {SHORT_TERM_THREAD} + {BTC_DAILY_THREAD}", flush=True)
 
         entity = await client.get_entity(PeerChannel(CHANNEL_ID))
 
         @client.on(events.NewMessage(chats=entity))
         async def on_message(event):
             msg = event.message
-            if not _is_short_term(msg):
+            source_id = _signal_source(msg)
+            if source_id is None:
                 return  # ignore messages from other threads
 
             text = msg.text or ""
@@ -585,9 +591,9 @@ async def main():
 
             sig = parse_signal(text)
             if sig:
-                ev_id = await save_signal(msg, sig)
+                ev_id = await save_signal(msg, sig, source_id)
                 print(
-                    f"[{msg.date:%H:%M:%S}] NEW SIGNAL saved (id={ev_id}): "
+                    f"[{msg.date:%H:%M:%S}] NEW SIGNAL saved (id={ev_id}, src={source_id}): "
                     f"{sig.pair} {sig.direction.upper()} {sig.leverage}x @ ${sig.entry}",
                     flush=True,
                 )
@@ -595,7 +601,7 @@ async def main():
 
             update = parse_update(text)
             if update:
-                info = await apply_update_to_db(msg, update)
+                info = await apply_update_to_db(msg, update, source_id)
                 label = info["id"] if info else "no match"
                 print(
                     f"[{msg.date:%H:%M:%S}] UPDATE ({update}) → signal id={label}",
