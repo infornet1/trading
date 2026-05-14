@@ -4,6 +4,10 @@ Synchronous — wrap with asyncio.to_thread() in async contexts.
 """
 import math
 
+# Testing phase: fixed USDC notional per trade (overrides signal size_pct).
+# Set to None to go live with normal size_pct-based sizing.
+SIGNAL_TEST_NOTIONAL_USDC: float | None = 10.0
+
 from eth_account import Account
 from hyperliquid.exchange import Exchange
 from hyperliquid.info import Info
@@ -62,19 +66,24 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         leverage          = min(leverage_requested, max_leverage)
         leverage_adjusted = leverage < leverage_requested
 
-        margin   = balance * size_pct / 100
-        size     = round((margin * leverage) / entry, sz_decimals)  # must satisfy szDecimals
-
         size_scaled = False
-        if size * entry < 10:
-            # ceil to nearest valid lot to guarantee notional >= $10 (round() can round down)
-            factor   = 10 ** sz_decimals
-            min_size = math.ceil((10.0 / entry) * factor) / factor
-            if min_size * entry / leverage > balance:
-                return {"success": False, "dry_run": dry_run,
-                        "error": f"Notional too small and insufficient margin: ${balance:.2f} balance (need ${10/leverage:.2f} margin for $10 notional)"}
-            size = min_size
-            size_scaled = True
+        factor      = 10 ** sz_decimals
+        if SIGNAL_TEST_NOTIONAL_USDC:
+            # Testing phase: ignore size_pct, use fixed notional
+            notional = SIGNAL_TEST_NOTIONAL_USDC
+            size     = math.ceil((notional / entry) * factor) / factor
+            margin   = size * entry / leverage
+        else:
+            margin   = balance * size_pct / 100
+            size     = round((margin * leverage) / entry, sz_decimals)
+            if size * entry < 10:
+                # ceil to nearest valid lot to guarantee notional >= $10 (round() can round down)
+                min_size = math.ceil((10.0 / entry) * factor) / factor
+                if min_size * entry / leverage > balance:
+                    return {"success": False, "dry_run": dry_run,
+                            "error": f"Notional too small and insufficient margin: ${balance:.2f} balance (need ${10/leverage:.2f} margin for $10 notional)"}
+                size = min_size
+                size_scaled = True
 
         is_buy       = (signal.direction == "long")
         sl_price     = float(signal.stoploss)
