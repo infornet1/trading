@@ -175,13 +175,22 @@ async def execute_signal(
     """
     wallet_addr = body.hl_wallet_addr.lower().strip()
 
-    # 1. Signal must exist and be pending
+    # 1. Signal must exist
     ev_res = await db.execute(select(SignalEvent).where(SignalEvent.id == body.signal_id))
     signal = ev_res.scalar_one_or_none()
     if not signal:
         raise HTTPException(status_code=404, detail="Signal not found")
-    if signal.status != "pending":
-        raise HTTPException(status_code=409, detail=f"Signal is already {signal.status}")
+
+    # Block only if THIS wallet already filled this signal (not global status)
+    dup_res = await db.execute(
+        select(SignalExecution).where(
+            SignalExecution.signal_id      == body.signal_id,
+            SignalExecution.hl_wallet_addr == wallet_addr,
+            SignalExecution.outcome        == "filled",
+        )
+    )
+    if dup_res.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="This wallet already executed this signal")
 
     # 2. LP bot conflict guard — hard block
     conflict_res = await db.execute(

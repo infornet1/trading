@@ -299,7 +299,7 @@ async function fetchSignals() {
 
     content.innerHTML = `<div class="sl-signal-list">${active.map(_renderSignalCard).join("")}</div>`;
     if (closed.length > 0) {
-      content.innerHTML += `<div class="sl-signal-list" style="margin-top:8px">${closed.slice(0,3).map(s => _renderSignalCard(s, true)).join("")}</div>`;
+      content.innerHTML += `<div class="sl-signal-list" style="margin-top:8px">${closed.slice(0,3).map(_renderSignalCard).join("")}</div>`;
     }
     content.classList.remove("hidden");
 
@@ -319,8 +319,7 @@ async function fetchSignals() {
   }
 }
 
-function _renderSignalCard(sig, forceExpired = false) {
-  const expired  = forceExpired || sig.status !== "pending";
+function _renderSignalCard(sig) {
   const dir      = (sig.direction || "short").toLowerCase();
   const lev      = sig.leverage ? `${sig.leverage}x` : "";
   const entry    = sig.entry    ? `$${_fmt(sig.entry)}`    : "—";
@@ -334,14 +333,12 @@ function _renderSignalCard(sig, forceExpired = false) {
     ? `<span class="sl-source-badge">📊 BTC Daily</span>`
     : "";
 
+  // Signals that are closed/invalid — no point re-entering
+  const isClosed = ["stopped", "tp_hit", "cancelled"].includes(sig.status);
+
   let btnHtml;
-  if (expired) {
-    // "executed" status means auto or manual trade was placed
-    if (sig.status === "executed") {
-      btnHtml = `<span class="sl-auto-exec-badge">🤖 Auto</span>`;
-    } else {
-      btnHtml = `<span style="font-size:0.65rem;color:var(--color-text-muted)">${statusLabel}</span>`;
-    }
+  if (isClosed) {
+    btnHtml = `<span style="font-size:0.65rem;color:var(--color-text-muted)">${statusLabel}</span>`;
   } else if (_autoStatus.armed) {
     // Auto is armed — show armed indicator + manual override button
     btnHtml = `
@@ -355,7 +352,7 @@ function _renderSignalCard(sig, forceExpired = false) {
   }
 
   return `
-    <div class="sl-signal-card${expired ? " sl-signal-card--expired" : ""}">
+    <div class="sl-signal-card${isClosed ? " sl-signal-card--expired" : ""}">
       ${dirHtml}
       <div class="sl-signal-info">
         <div class="sl-signal-pair">${srcBadge}${sig.pair || "—"} ${lev}</div>
