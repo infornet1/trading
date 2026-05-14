@@ -165,7 +165,22 @@ async def _auto_execute_signal(signal_id: int, sig):
             db.add(execution)
 
             if result["success"]:
-                signal.status = "executed"
+                # Re-read status: channel may have posted a stop while the order was placing
+                await db.refresh(signal)
+                if signal.status in ("stopped", "cancelled"):
+                    # Order landed on HL but channel already stopped — close immediately
+                    print(
+                        f"[Auto-Execute] ⚠️ {sig.pair} filled but channel stopped during execution "
+                        f"— closing position now",
+                        flush=True,
+                    )
+                    asyncio.create_task(_auto_close_signal(
+                        {"id": signal_id, "prev_status": "executed",
+                         "pair": sig.pair, "direction": sig.direction},
+                        "stopped",
+                    ))
+                else:
+                    signal.status = "executed"
                 print(
                     f"[Auto-Execute] ✅ {sig.pair} filled @ ${result['fill_price']} "
                     f"| order {result['hl_order_id']}",
