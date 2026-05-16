@@ -5,8 +5,8 @@ Synchronous — wrap with asyncio.to_thread() in async contexts.
 import math
 from typing import Optional
 
-# Live sizing: notional = size_pct % of wallet balance. $10 floor still applies.
-SIGNAL_TEST_NOTIONAL_USDC: float | None = None
+# Fixed $10 notional per trade (controlled live mode). Set to None for full size_pct sizing.
+SIGNAL_TEST_NOTIONAL_USDC: float | None = 10.0
 
 from eth_account import Account
 from hyperliquid.exchange import Exchange
