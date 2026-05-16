@@ -47,10 +47,13 @@ DB_URL   = os.getenv("DB_URL", "mysql+aiomysql://viznago:90GSxYu0GdSe6fzGowBA4hN
 
 CHANNEL_ID        = 1951769926
 SHORT_TERM_THREAD = 7    # Short-Term signals (thread 7)
-BTC_DAILY_THREAD  = 22   # Bitcoin Daily signals (thread 22)
+BTC_DAILY_THREAD  = 22   # Bitcoin Daily (thread 22)
+MID_TERM_THREAD   = 29   # Mid Term Signals (thread 29)
 
 # thread_id → signal_sources.id (matches signal_sources table)
-SOURCE_ID_MAP = {SHORT_TERM_THREAD: 1, BTC_DAILY_THREAD: 2}
+SOURCE_ID_MAP = {SHORT_TERM_THREAD: 1, BTC_DAILY_THREAD: 2, MID_TERM_THREAD: 3}
+
+SOURCE_NAMES = {1: "Short-Term", 2: "Bitcoin Daily", 3: "Mid Term"}
 
 engine       = create_async_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600, echo=False)
 AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -98,10 +101,11 @@ async def save_signal(msg, sig, source_id: int) -> int | None:
     entry_str = f"${sig.entry:,.4f}" if sig.entry else "market"
     sl_str    = f"${sig.stoploss:,.4f}" if sig.stoploss else "—"
     tps_str   = " / ".join(f"${t:,.4f}" for t in (sig.targets or [])) or "—"
+    source_name = SOURCE_NAMES.get(source_id, f"Source {source_id}")
     await asyncio.to_thread(
         send_signal_email,
-        f"📡 Nueva señal: {sig.pair} {sig.direction.upper()} {sig.leverage}x",
-        f"Señal recibida de Swallow Trade\n\n"
+        f"📡 Nueva señal: {sig.pair} {sig.direction.upper()} {sig.leverage}x [{source_name}]",
+        f"Señal recibida de Swallow Trade · {source_name}\n\n"
         f"Par:       {sig.pair}\n"
         f"Dirección: {sig.direction.upper()}\n"
         f"Leverage:  {sig.leverage}x\n"
@@ -748,7 +752,7 @@ async def main():
     async with TelegramClient(session_path, API_ID, API_HASH) as client:
         me = await client.get_me()
         print(f"[Signal Lab Listener] Logged in as @{me.username}", flush=True)
-        print(f"[Signal Lab Listener] Listening on channel {CHANNEL_ID} threads {SHORT_TERM_THREAD} + {BTC_DAILY_THREAD}", flush=True)
+        print(f"[Signal Lab Listener] Listening on channel {CHANNEL_ID} threads {SHORT_TERM_THREAD} + {BTC_DAILY_THREAD} + {MID_TERM_THREAD}", flush=True)
 
         entity = await client.get_entity(PeerChannel(CHANNEL_ID))
 

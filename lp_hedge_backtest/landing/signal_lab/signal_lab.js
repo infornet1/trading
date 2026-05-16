@@ -17,6 +17,18 @@ let _activeSignalId = null;   // signal being executed
 let _overrideSig    = null;   // signal data saved for modal reset
 let _autoStatus     = { armed: false, wallets: [] }; // auto-execute armed state
 
+// Source filter (persisted across page loads)
+let _sourceFilter = (() => {
+  const v = localStorage.getItem("sl_source_filter");
+  return v ? (parseInt(v) || null) : null;
+})();
+
+const SOURCE_META = {
+  1: { label: "📡 Short-Term", color: "#00d4ff" },
+  2: { label: "📊 BTC Daily",  color: "#fbbf24" },
+  3: { label: "📈 Mid Term",   color: "#2dd4bf" },
+};
+
 // Per-pair defaults (loaded once, updated on save/delete)
 let _userDefaults     = null;   // {COIN: {leverage, size_usdt}} — null until loaded
 let _hlAssets         = null;   // [{coin, max_leverage, sz_decimals}] — null until loaded
@@ -308,42 +320,75 @@ async function fetchSignals() {
     _signals = data.signals || [];
 
     loading.classList.add("hidden");
-
-    const CLOSED_STATUSES = ["stopped", "tp_hit", "cancelled"];
-    const ACTIVE_MAX_AGE  = 7 * 3600;
-    const active  = _signals.filter(s => !CLOSED_STATUSES.includes(s.status) && s.age_seconds < ACTIVE_MAX_AGE);
-    const closed  = _signals.filter(s =>  CLOSED_STATUSES.includes(s.status) || s.age_seconds >= ACTIVE_MAX_AGE);
-
-    if (active.length === 0 && closed.length === 0) {
-      empty.classList.remove("hidden");
-      return;
-    }
-
-    if (active.length > 0) {
-      badge.textContent = active.length;
-      badge.classList.remove("hidden");
-    }
-
-    content.innerHTML = `<div class="sl-signal-list">${active.map(_renderSignalCard).join("")}</div>`;
-    if (closed.length > 0) {
-      content.innerHTML += `<div class="sl-signal-list" style="margin-top:8px">${closed.slice(0,3).map(_renderSignalCard).join("")}</div>`;
-    }
-    content.classList.remove("hidden");
-
-    // Build a basic summary from what's visible; will be replaced with accurate stats on history open
-    _buildHistorySummary({
-      tp:       closed.filter(s => s.status === "tp_hit").length,
-      sl:       closed.filter(s => s.status === "stopped").length,
-      expired:  closed.filter(s => s.status === "expired" || s.status === "cancelled").length,
-      win_rate: null,
-      decided:  0,
-    });
-    histTgl.classList.remove("hidden");
+    _renderFilterPills();
+    _renderFeed();
 
   } catch {
     loading.classList.add("hidden");
     empty.classList.remove("hidden");
   }
+}
+
+function _renderFilterPills() {
+  const el = document.getElementById("signal-source-filter");
+  if (!el) return;
+  const sources = [...new Set(_signals.map(s => s.source_id))].sort();
+  if (sources.length <= 1) { el.classList.add("hidden"); return; }
+
+  const pills = [[0, "Todas"], ...sources.map(s => [s, SOURCE_META[s]?.label || `Canal ${s}`])];
+  el.innerHTML = pills.map(([src, label]) => {
+    const active = (src === 0 && _sourceFilter === null) || _sourceFilter === src ? " active" : "";
+    return `<button class="sl-filter-pill${active}" onclick="_setSourceFilter(${src})">${label}</button>`;
+  }).join("");
+  el.classList.remove("hidden");
+}
+
+function _setSourceFilter(src) {
+  _sourceFilter = src === 0 ? null : src;
+  localStorage.setItem("sl_source_filter", _sourceFilter ?? "");
+  _renderFilterPills();
+  _renderFeed();
+}
+
+function _renderFeed() {
+  const content = document.getElementById("signal-feed-content");
+  const empty   = document.getElementById("signals-empty");
+  const badge   = document.getElementById("signal-count-badge");
+  const histTgl = document.getElementById("signal-history-toggle");
+
+  const filtered = _sourceFilter ? _signals.filter(s => s.source_id === _sourceFilter) : _signals;
+
+  const CLOSED_STATUSES = ["stopped", "tp_hit", "cancelled"];
+  const ACTIVE_MAX_AGE  = 7 * 3600;
+  const active  = filtered.filter(s => !CLOSED_STATUSES.includes(s.status) && s.age_seconds < ACTIVE_MAX_AGE);
+  const closed  = filtered.filter(s =>  CLOSED_STATUSES.includes(s.status) || s.age_seconds >= ACTIVE_MAX_AGE);
+
+  if (active.length === 0 && closed.length === 0) {
+    content.classList.add("hidden");
+    empty.classList.remove("hidden");
+    badge.classList.add("hidden");
+    histTgl.classList.add("hidden");
+    return;
+  }
+
+  empty.classList.add("hidden");
+  badge.textContent = active.length;
+  active.length > 0 ? badge.classList.remove("hidden") : badge.classList.add("hidden");
+
+  content.innerHTML = `<div class="sl-signal-list">${active.map(_renderSignalCard).join("")}</div>`;
+  if (closed.length > 0) {
+    content.innerHTML += `<div class="sl-signal-list" style="margin-top:8px">${closed.slice(0,3).map(_renderSignalCard).join("")}</div>`;
+  }
+  content.classList.remove("hidden");
+
+  _buildHistorySummary({
+    tp:       closed.filter(s => s.status === "tp_hit").length,
+    sl:       closed.filter(s => s.status === "stopped").length,
+    expired:  closed.filter(s => s.status === "expired" || s.status === "cancelled").length,
+    win_rate: null,
+    decided:  0,
+  });
+  histTgl.classList.remove("hidden");
 }
 
 function _renderSignalCard(sig) {
@@ -358,7 +403,9 @@ function _renderSignalCard(sig) {
   const dirHtml = `<span class="sl-dir-pill ${dir}">${dir.toUpperCase()}</span>`;
   const srcBadge = sig.source_id === 2
     ? `<span class="sl-source-badge">📊 BTC Daily</span>`
-    : "";
+    : sig.source_id === 3
+      ? `<span class="sl-source-badge sl-source-badge--mid">📈 Mid Term</span>`
+      : "";
 
   // Signals that are closed/invalid — trade is over, no re-entry
   const isClosed = ["stopped", "tp_hit", "cancelled"].includes(sig.status);

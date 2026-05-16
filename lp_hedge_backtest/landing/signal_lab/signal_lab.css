@@ -322,6 +322,38 @@
   margin-right: 5px;
   vertical-align: middle;
 }
+.sl-source-badge--mid {
+  background: rgba(45,212,191,0.12);
+  color: #2dd4bf;
+}
+
+/* ── Source filter pills ──────────────────────────────────── */
+
+.sl-filter-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.sl-filter-pill {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.sl-filter-pill:hover,
+.sl-filter-pill.active {
+  border-color: var(--color-neon-cyan);
+  color: var(--color-neon-cyan);
+  background: rgba(0,212,255,0.08);
+}
 
 .sl-signal-age {
   font-size: 0.65rem;
