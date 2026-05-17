@@ -24,9 +24,9 @@ let _sourceFilter = (() => {
 })();
 
 const SOURCE_META = {
-  1: { label: "📡 Short-Term", color: "#00d4ff" },
-  2: { label: "📊 BTC Daily",  color: "#fbbf24" },
-  3: { label: "📈 Mid Term",   color: "#2dd4bf" },
+  1: { label: "📡 Short-Term",    color: "#00d4ff" },
+  2: { label: "📊 BTC Signals",   color: "#fbbf24" },
+  3: { label: "📈 Mid Term",      color: "#2dd4bf" },
 };
 
 // Per-pair defaults (loaded once, updated on save/delete)
@@ -209,8 +209,8 @@ function _renderLpRange(data) {
   }
 
   const dateLabel = msgDate
-    ? `gráfico del ${msgDate.toLocaleDateString("es-VE", {day:"numeric", month:"short"})} · Bitcoin Daily`
-    : "Bitcoin Daily";
+    ? `gráfico del ${msgDate.toLocaleDateString("es-VE", {day:"numeric", month:"short"})} · Bitcoin Daily Signals`
+    : "Bitcoin Daily Signals";
 
   return `
     <div class="sl-range-meta">
@@ -402,7 +402,7 @@ function _renderSignalCard(sig) {
 
   const dirHtml = `<span class="sl-dir-pill ${dir}">${dir.toUpperCase()}</span>`;
   const srcBadge = sig.source_id === 2
-    ? `<span class="sl-source-badge">📊 BTC Daily</span>`
+    ? `<span class="sl-source-badge">📊 BTC Signals</span>`
     : sig.source_id === 3
       ? `<span class="sl-source-badge sl-source-badge--mid">📈 Mid Term</span>`
       : "";

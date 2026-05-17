@@ -147,9 +147,9 @@ class SignalSource(Base):
     __tablename__ = "signal_sources"
 
     id         = Column(Integer,    primary_key=True, autoincrement=True)
-    name       = Column(String(100), nullable=False)          # "Short-Term", "Bitcoin Daily"
+    name       = Column(String(100), nullable=False)          # "Short-Term", "Bitcoin Daily Signals"
     channel_id = Column(BigInteger,  nullable=False)          # 1951769926
-    thread_id  = Column(Integer,     nullable=True)           # 7 or 22
+    thread_id  = Column(Integer,     nullable=True)           # 7, 22, or 29
     purpose    = Column(Enum("signals", "lp_range"), nullable=False)
     active     = Column(Boolean, default=True)
     added_at   = Column(DateTime, default=datetime.utcnow)

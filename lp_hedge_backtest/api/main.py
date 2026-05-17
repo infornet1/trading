@@ -120,8 +120,15 @@ async def _run_column_migrations():
         ),
         (
             "INSERT IGNORE INTO signal_sources (id, name, channel_id, thread_id, purpose, active) "
-            "VALUES (2, 'Bitcoin Daily', 1951769926, 22, 'lp_range', 1)"
+            "VALUES (2, 'Bitcoin Daily Signals', 1951769926, 22, 'signals', 1)"
         ),
+        # Source 3 (Mid Term) added in phase 7z — seed idempotently
+        (
+            "INSERT IGNORE INTO signal_sources (id, name, channel_id, thread_id, purpose, active) "
+            "VALUES (3, 'Mid Term Signals', 1951769926, 29, 'signals', 1)"
+        ),
+        # Rename source 2 and fix its purpose (was lp_range — it is also a copy-trade signal source)
+        "UPDATE signal_sources SET name='Bitcoin Daily Signals', purpose='signals' WHERE id=2",
         # Signal wallets: registered wallets for copy trading
         (
             "CREATE TABLE IF NOT EXISTS signal_wallets ("

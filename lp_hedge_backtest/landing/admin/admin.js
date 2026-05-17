@@ -1653,7 +1653,7 @@ function _slFeedCard(activity) {
       const entry   = a.entry ? ` @ $${_fmtPrice(a.entry)}` : '';
       const dir     = (a.direction || '').toUpperCase();
       const srcBadge = a.source_id === 2
-        ? `<span class="badge" style="font-size:.56rem;background:rgba(251,191,36,.15);color:#fbbf24;margin-left:3px">📊 BTC</span>`
+        ? `<span class="badge" style="font-size:.56rem;background:rgba(251,191,36,.15);color:#fbbf24;margin-left:3px">📊 BTC Sig</span>`
         : a.source_id === 3
           ? `<span class="badge" style="font-size:.56rem;background:rgba(45,212,191,.15);color:#2dd4bf;margin-left:3px">📈 Mid</span>`
           : '';
@@ -1686,7 +1686,7 @@ function _slFeedCard(activity) {
   }).join('');
 
   const empty = !activity.length
-    ? `<div class="mini-evt mini-evt--muted"><span class="muted">Sin actividad — esperando señales (Short-Term · Mid Term · BTC Daily)</span></div>`
+    ? `<div class="mini-evt mini-evt--muted"><span class="muted">Sin actividad — esperando señales (Short-Term · Mid Term · BTC Signals)</span></div>`
     : '';
 
   return `
