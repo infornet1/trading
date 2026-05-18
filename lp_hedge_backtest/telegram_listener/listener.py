@@ -13,6 +13,7 @@ Run:
 import asyncio
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 # Allow importing api.* from project root and signal_parser from telegram_listener/
@@ -57,6 +58,26 @@ SOURCE_NAMES = {1: "Short-Term", 2: "Bitcoin Daily Signals", 3: "Mid Term"}
 
 engine       = create_async_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600, echo=False)
 AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+# HL perpetual asset whitelist — refreshed every hour
+_HL_ASSETS: set[str] = set()
+_HL_ASSETS_TS: float = 0.0
+_HL_ASSETS_TTL: float = 3600.0
+
+
+def _fetch_hl_assets_sync() -> set[str]:
+    meta = Info(hlc.MAINNET_API_URL, skip_ws=True).meta()
+    return {a["name"].upper() for a in meta.get("universe", [])}
+
+
+async def _get_hl_assets() -> set[str]:
+    global _HL_ASSETS, _HL_ASSETS_TS
+    if _HL_ASSETS and (time.monotonic() - _HL_ASSETS_TS) < _HL_ASSETS_TTL:
+        return _HL_ASSETS
+    assets = await asyncio.to_thread(_fetch_hl_assets_sync)
+    _HL_ASSETS = assets
+    _HL_ASSETS_TS = time.monotonic()
+    return assets
 
 
 def _thread_id(msg) -> int | None:
@@ -749,6 +770,9 @@ async def main():
 
     await _reconcile_orphans()
 
+    hl_assets = await _get_hl_assets()
+    print(f"[Signal Lab Listener] HL assets loaded: {len(hl_assets)} perpetuals", flush=True)
+
     async with TelegramClient(session_path, API_ID, API_HASH) as client:
         me = await client.get_me()
         print(f"[Signal Lab Listener] Logged in as @{me.username}", flush=True)
@@ -769,6 +793,14 @@ async def main():
 
             sig = parse_signal(text)
             if sig:
+                base      = sig.pair.split("/")[0].upper()
+                hl_assets = await _get_hl_assets()
+                if base not in hl_assets:
+                    print(
+                        f"[{msg.date:%H:%M:%S}] SKIP {sig.pair} — not listed on HL ({len(hl_assets)} assets loaded)",
+                        flush=True,
+                    )
+                    return
                 ev_id = await save_signal(msg, sig, source_id)
                 print(
                     f"[{msg.date:%H:%M:%S}] NEW SIGNAL saved (id={ev_id}, src={source_id}): "
