@@ -27,6 +27,7 @@ const SOURCE_META = {
   1: { label: "📡 Short-Term",    color: "#00d4ff" },
   2: { label: "📊 BTC Signals",   color: "#fbbf24" },
   3: { label: "📈 Mid Term",      color: "#2dd4bf" },
+  4: { label: "🥇 Gold Signals",  color: "#d4af37" },
 };
 
 // Per-pair defaults (loaded once, updated on save/delete)
@@ -405,7 +406,9 @@ function _renderSignalCard(sig) {
     ? `<span class="sl-source-badge">📊 BTC Signals</span>`
     : sig.source_id === 3
       ? `<span class="sl-source-badge sl-source-badge--mid">📈 Mid Term</span>`
-      : "";
+      : sig.source_id === 4
+        ? `<span class="sl-source-badge sl-source-badge--gold">🥇 Gold Signals</span>`
+        : "";
 
   // Signals that are closed/invalid — trade is over, no re-entry
   const isClosed = ["stopped", "tp_hit", "cancelled"].includes(sig.status);

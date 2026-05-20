@@ -326,6 +326,10 @@
   background: rgba(45,212,191,0.12);
   color: #2dd4bf;
 }
+.sl-source-badge--gold {
+  background: rgba(212,175,55,0.12);
+  color: #d4af37;
+}
 
 /* ── Source filter pills ──────────────────────────────────── */
 

@@ -1,7 +1,7 @@
 """
 LP Signal Lab — Telegram listener daemon.
 
-Listens to thread 7 (Short-Term signals) of channel 1951769926.
+Listens to threads 7, 22, 29, 7901 of channel 1951769926.
 Parses signals + standalone update messages, persists to signal_events DB table.
 
 Run:
@@ -46,15 +46,21 @@ API_HASH = os.getenv("TG_API_HASH")
 SESSION  = os.getenv("TG_SESSION", "viznago_listener")
 DB_URL   = os.getenv("DB_URL", "mysql+aiomysql://viznago:90GSxYu0GdSe6fzGowBA4hNOlsBK@localhost/viznago_dev")
 
-CHANNEL_ID        = 1951769926
-SHORT_TERM_THREAD = 7    # Short-Term signals (thread 7)
-BTC_DAILY_THREAD  = 22   # Bitcoin Daily Signals (thread 22)
-MID_TERM_THREAD   = 29   # Mid Term Signals (thread 29)
+CHANNEL_ID          = 1951769926
+SHORT_TERM_THREAD   = 7     # Short-Term signals (thread 7)
+BTC_DAILY_THREAD    = 22    # Bitcoin Daily Signals (thread 22)
+MID_TERM_THREAD     = 29    # Mid Term Signals (thread 29)
+GOLD_SIGNALS_THREAD = 7901  # Gold Signals (thread 7901)
 
 # thread_id → signal_sources.id (matches signal_sources table)
-SOURCE_ID_MAP = {SHORT_TERM_THREAD: 1, BTC_DAILY_THREAD: 2, MID_TERM_THREAD: 3}
+SOURCE_ID_MAP = {
+    SHORT_TERM_THREAD:   1,
+    BTC_DAILY_THREAD:    2,
+    MID_TERM_THREAD:     3,
+    GOLD_SIGNALS_THREAD: 4,
+}
 
-SOURCE_NAMES = {1: "Short-Term", 2: "Bitcoin Daily Signals", 3: "Mid Term"}
+SOURCE_NAMES = {1: "Short-Term", 2: "Bitcoin Daily Signals", 3: "Mid Term", 4: "Gold Signals"}
 
 engine       = create_async_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600, echo=False)
 AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -776,7 +782,7 @@ async def main():
     async with TelegramClient(session_path, API_ID, API_HASH) as client:
         me = await client.get_me()
         print(f"[Signal Lab Listener] Logged in as @{me.username}", flush=True)
-        print(f"[Signal Lab Listener] Listening on channel {CHANNEL_ID} threads {SHORT_TERM_THREAD} + {BTC_DAILY_THREAD} + {MID_TERM_THREAD}", flush=True)
+        print(f"[Signal Lab Listener] Listening on channel {CHANNEL_ID} threads {SHORT_TERM_THREAD} + {BTC_DAILY_THREAD} + {MID_TERM_THREAD} + {GOLD_SIGNALS_THREAD}", flush=True)
 
         entity = await client.get_entity(PeerChannel(CHANNEL_ID))
 

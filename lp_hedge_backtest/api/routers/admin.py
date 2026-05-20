@@ -352,6 +352,11 @@ async def signal_lab_status(admin: str = Depends(get_current_admin)):
             .where(SignalEvent.status == "pending", SignalEvent.source_id == 3)
         )).scalar_one()
 
+        pending_s4 = (await db.execute(
+            select(func.count()).select_from(SignalEvent)
+            .where(SignalEvent.status == "pending", SignalEvent.source_id == 4)
+        )).scalar_one()
+
         cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
         expired_24h = (await db.execute(
             select(func.count()).select_from(SignalEvent)
@@ -415,6 +420,7 @@ async def signal_lab_status(admin: str = Depends(get_current_admin)):
             "pending_s1":    pending_s1,
             "pending_s2":    pending_s2,
             "pending_s3":    pending_s3,
+            "pending_s4":    pending_s4,
             "expired_24h":   expired_24h,
             "total":         total_signals,
             "live_execs":    live_exec_count,

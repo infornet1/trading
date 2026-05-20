@@ -1459,7 +1459,7 @@ function renderSignalLab(d) {
           <div class="sl-admin-label">Pendientes</div>
           <div class="sl-admin-val">
             ${signals.pending ?? '—'}
-            ${(signals.pending_s1 != null) ? `<span style="font-size:.64rem;color:var(--muted);margin-left:5px">📡 ${signals.pending_s1} · 📈 ${signals.pending_s3 ?? 0} · 📊 ${signals.pending_s2 ?? 0}</span>` : ''}
+            ${(signals.pending_s1 != null) ? `<span style="font-size:.64rem;color:var(--muted);margin-left:5px">📡 ${signals.pending_s1} · 📊 ${signals.pending_s2 ?? 0} · 📈 ${signals.pending_s3 ?? 0} · 🥇 ${signals.pending_s4 ?? 0}</span>` : ''}
           </div>
         </div>
         <div class="sl-admin-group">
@@ -1656,7 +1656,9 @@ function _slFeedCard(activity) {
         ? `<span class="badge" style="font-size:.56rem;background:rgba(251,191,36,.15);color:#fbbf24;margin-left:3px">📊 BTC Sig</span>`
         : a.source_id === 3
           ? `<span class="badge" style="font-size:.56rem;background:rgba(45,212,191,.15);color:#2dd4bf;margin-left:3px">📈 Mid</span>`
-          : '';
+          : a.source_id === 4
+            ? `<span class="badge" style="font-size:.56rem;background:rgba(212,175,55,.15);color:#d4af37;margin-left:3px">🥇 Gold</span>`
+            : '';
       return `
         <div class="mini-evt mini-evt--${color}">
           <span>${icon} ${a.pair || '—'} <strong>${dir}</strong>${lev}${entry}${srcBadge}</span>
@@ -1686,7 +1688,7 @@ function _slFeedCard(activity) {
   }).join('');
 
   const empty = !activity.length
-    ? `<div class="mini-evt mini-evt--muted"><span class="muted">Sin actividad — esperando señales (Short-Term · Mid Term · BTC Signals)</span></div>`
+    ? `<div class="mini-evt mini-evt--muted"><span class="muted">Sin actividad — esperando señales (Short-Term · Mid Term · BTC Signals · Gold Signals)</span></div>`
     : '';
 
   return `
