@@ -760,6 +760,7 @@ function poolCard(p, ethPrice, isHistorical = false) {
       <span title="Trailing Stop" style="color:${p.trailing_stop ? 'var(--green)' : 'var(--muted)'}">Trail ${p.trailing_stop ? '✓' : '✗'}</span>
       <span title="Auto-rearm" style="color:${p.auto_rearm ? 'var(--green)' : 'var(--muted)'}">Rearm ${p.auto_rearm ? '✓' : '✗'}</span>
       ${p.mode === 'avaro' ? `<span title="From-above distance gate (M2-47)" style="color:var(--color-neon-cyan,#00d4ff)">FA≤${p.from_above_dist_pct ?? 5}%</span>` : ''}
+      ${p.mode === 'avaro' && p.use_funding_gate ? `<span title="Funding gate active (M2-44)" style="color:#a78bfa">Fund≤-${p.funding_gate_pct ?? 0.05}%</span>` : ''}
     </span>
   </div>
 
@@ -994,6 +995,8 @@ function renderHlDetail(d, ethPrice = null) {
         det.leverage       ? `lev: ${det.leverage}x` : '',
         det.sl_price       ? `SL: $${fmtNum(det.sl_price)}` : '',
         det.breakeven_pct  ? `BE: ${det.breakeven_pct}%` : '',
+        det.funding_rate_1h != null ? `fund: ${Number(det.funding_rate_1h) >= 0 ? '+' : ''}${det.funding_rate_1h}%/1h` : '',
+        det.funding_usdc_net != null ? `fund PnL: ${Number(det.funding_usdc_net) >= 0 ? '+' : ''}$${det.funding_usdc_net}` : '',
         det.reason         ? `${det.reason}` : '',
         det.error          ? `err: ${det.error}` : '',
       ].filter(Boolean).join(' · ');

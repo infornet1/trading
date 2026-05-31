@@ -68,6 +68,9 @@ ATR_PERIOD   = int(os.getenv("ATR_PERIOD",   "14"))
 ATR_MULT_BE  = float(os.getenv("ATR_MULT_BE", "1.5"))
 # M2-47: from_above distance gate — skip entry if price is more than X% below upper_bound
 MAX_FROM_ABOVE_DIST_PCT = float(os.getenv("MAX_FROM_ABOVE_DIST_PCT", "5.0"))
+# M2-44: funding rate awareness — Phase 1 (log) + Phase 2 (optional gate)
+USE_FUNDING_GATE = os.getenv("USE_FUNDING_GATE", "0").strip() not in ("0", "false", "False")
+FUNDING_GATE_PCT = float(os.getenv("FUNDING_GATE_PCT", "0.05"))  # block entry when rate < -X%/1h
 REENTRY_BUFFER = float(os.getenv("REENTRY_BUFFER_PCT", "0.5")) / 100.0
 
 _tp_env  = os.getenv("TP_PCT", "").strip()
@@ -181,6 +184,7 @@ class LiveHedgeBotV2:
         self.entry_price       = None
         self.hedge_size_eth    = None
         self.leverage_used     = None
+        self.open_time         = None   # M2-44: wall-clock timestamp when hedge opened
         self.current_sl_price  = None
         self.breakeven_reached        = False
         self.short_min_price          = None
@@ -591,6 +595,23 @@ class LiveHedgeBotV2:
             print(f"📐 Size: {size:.4f} ETH | Leverage: {leverage}x | "
                   f"Notional: ${notional:.2f} | Margin: ${req_margin:.2f}", flush=True)
 
+            # M2-44: fetch funding rate; Phase 2 gate blocks entry if rate is too negative
+            funding_rate = self._fetch_funding_rate()
+            if funding_rate is not None:
+                fr_pct = funding_rate * 100
+                marker = "✓ favorable" if funding_rate >= 0 else f"⚠ cost ({fr_pct:.4f}%/1h)"
+                print(f"💸 [M2-44] Funding rate: {fr_pct:.4f}%/1h — {marker}", flush=True)
+            if USE_FUNDING_GATE and funding_rate is not None:
+                if funding_rate < -(FUNDING_GATE_PCT / 100):
+                    print(f"⏭️  [M2-44] Funding gate blocked — rate {funding_rate*100:.4f}%/1h "
+                          f"< threshold -{FUNDING_GATE_PCT:.4f}%", flush=True)
+                    log_event("stopped", price=price, details={
+                        "reason":           "funding_gate",
+                        "funding_rate_1h":  round(funding_rate * 100, 5),
+                        "gate_threshold":   FUNDING_GATE_PCT,
+                    })
+                    return
+
             self.exchange.update_leverage(leverage, "ETH")
             order = self.exchange.market_open("ETH", False, size, slippage=0.01)
 
@@ -613,6 +634,7 @@ class LiveHedgeBotV2:
                 self.open_trigger             = trigger
                 self.current_sl_price         = price * (1 + DEFAULT_SL_PCT)
                 self._effective_breakeven_pct = self._compute_atr_breakeven(price)  # M2-49
+                self.open_time                = time.time()                          # M2-44
 
                 print(f"✅ SHORT OPENED | Entry: ${self.entry_price:.2f} | "
                       f"SL: ${self.current_sl_price:.2f} | Trigger: {label}", flush=True)
@@ -659,7 +681,8 @@ class LiveHedgeBotV2:
                     "notional":     round(notional, 2),
                     "margin":       round(req_margin, 2),
                     "engine":       "v2",
-                    "breakeven_pct": round(self._effective_breakeven_pct * 100, 2),  # M2-49
+                    "breakeven_pct":    round(self._effective_breakeven_pct * 100, 2),  # M2-49
+                    "funding_rate_1h":  round(funding_rate * 100, 5) if funding_rate is not None else None,  # M2-44
                 })
                 tp_line = (
                     f"Native TP:    ${self.entry_price * (1 - TP_PCT):.2f} (OID: {self.hl_tp_order_id or 'FAILED'})\n"
@@ -787,6 +810,10 @@ class LiveHedgeBotV2:
                 )
                 # M2-43: capture IL attribution before state reset
                 il_attr = self._calc_il_attribution(self.entry_price, price) if self.entry_price else {}
+                # M2-44: capture actual cumulative funding cost before state reset
+                fund_attr = self._calc_funding_cost(
+                    self.open_time, self.hedge_size_eth or 0, self.entry_price or 0
+                ) if self.open_time else {}
                 close_price = price
                 self._reset_short_state(close_price)
 
@@ -811,6 +838,7 @@ class LiveHedgeBotV2:
                     "reentry_guard":      round(self.reentry_guard_price, 4),
                     "consecutive_stops":  self._consecutive_stops,
                     **il_attr,
+                    **fund_attr,
                 })
                 self.send_email(
                     f"Short CLOSED ✅ ({reason})",
@@ -917,6 +945,7 @@ class LiveHedgeBotV2:
         self.open_trigger        = None
         self.hl_sl_order_id      = None
         self.hl_tp_order_id      = None
+        self.open_time           = None
         self.reentry_guard_price = close_price * (1 + REENTRY_BUFFER)
         self.sl_close_price      = close_price
         self.price_was_above     = False
@@ -983,6 +1012,41 @@ class LiveHedgeBotV2:
             }
         except Exception as exc:
             return {"il_calc_err": str(exc)}
+
+    # ── M2-44: Funding rate awareness ────────────────────────────────────────
+
+    def _fetch_funding_rate(self) -> Optional[float]:
+        """Return latest 1h ETH funding rate on HL, or None on failure.
+        Positive = longs pay shorts (favorable for our SHORT).
+        Negative = shorts pay longs (cost for our SHORT)."""
+        try:
+            now_ms   = int(time.time() * 1000)
+            start_ms = now_ms - 2 * 3_600_000  # last 2 h, enough to get the latest record
+            records  = self.info.funding_history("ETH", start_ms, now_ms)
+            if records:
+                return float(records[-1]["fundingRate"])
+        except Exception as exc:
+            print(f"⚠️  [M2-44] Funding fetch failed: {exc}", flush=True)
+        return None
+
+    def _calc_funding_cost(self, open_time_secs: float, hedge_size_eth: float,
+                           entry_price: float) -> dict:
+        """Query user's actual funding payments since open_time and return summary dict."""
+        try:
+            hours    = (time.time() - open_time_secs) / 3600
+            start_ms = int(open_time_secs * 1000)
+            records  = self.info.user_funding_history(HL_ADDRESS, start_ms) or []
+            eth_recs = [r for r in records if r.get("coin") == "ETH"]
+            total_usdc = sum(float(r.get("usdc", 0)) for r in eth_recs)
+            pos_usdc   = hedge_size_eth * entry_price
+            funding_pct = (total_usdc / pos_usdc * 100) if pos_usdc > 0 else 0.0
+            return {
+                "funding_hours":    round(hours, 1),
+                "funding_usdc_net": round(total_usdc, 4),   # + = received, – = paid
+                "funding_pct_net":  round(funding_pct, 4),  # % of position value
+            }
+        except Exception as exc:
+            return {"funding_calc_err": str(exc)}
 
     # ── HL position sync ──────────────────────────────────────────────────────
 
@@ -1231,6 +1295,9 @@ class LiveHedgeBotV2:
               f"Breakeven: {BREAKEVEN_PCT*100:.1f}% base (ATR-adaptive, {ATR_MULT_BE}×ATR{ATR_PERIOD}) | "
               f"Trail: {TRAIL_PCT*100:.1f}%", flush=True)
         print(f"📐 [V2] Native HL SL: enabled | Cancel+replace on trail: enabled", flush=True)
+        print(f"📐 [M2-44] Funding: logged at open+close | "
+              f"Gate: {'ON (block if rate < -' + str(FUNDING_GATE_PCT) + '%/1h)' if USE_FUNDING_GATE else 'OFF (log-only)'}",
+              flush=True)
 
         # Only emit started event if not recovering an orphan (reconcile already logged)
         if not self.hedge_active:

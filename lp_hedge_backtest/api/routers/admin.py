@@ -834,6 +834,8 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                 "trailing_stop": bool(cfg.trailing_stop) if cfg.trailing_stop is not None else True,
                 "auto_rearm":   bool(cfg.auto_rearm)    if cfg.auto_rearm     is not None else True,
                 "from_above_dist_pct": float(cfg.from_above_dist_pct) if cfg.from_above_dist_pct is not None else 5.0,
+                "use_funding_gate":    bool(cfg.use_funding_gate)  if cfg.use_funding_gate  is not None else False,
+                "funding_gate_pct":    float(cfg.funding_gate_pct) if cfg.funding_gate_pct  is not None else 0.05,
                 "active":       cfg.active,
                 "running":      running,
                 "hl_wallet_addr": cfg.hl_wallet_addr,

@@ -71,6 +71,8 @@ class BotConfig(Base):
     paper_trade     = Column(Boolean, default=False)          # simulate trades, no real orders
     engine_v2       = Column(Boolean, default=False)          # True → launch live_hedge_bot_v2.py
     from_above_dist_pct = Column(Numeric(5, 2), default=5.00) # M2-47: max % below upper_bound for from_above entry
+    use_funding_gate    = Column(Boolean,       default=False) # M2-44: gate entry when funding too adverse
+    funding_gate_pct    = Column(Numeric(5, 3), default=0.050) # M2-44: threshold % per 1h (rate < -X% blocks entry)
     active          = Column(Boolean, default=False)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

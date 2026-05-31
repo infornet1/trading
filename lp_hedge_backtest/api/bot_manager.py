@@ -104,6 +104,9 @@ class BotManager:
             "AUTO_REARM":                  str(config.get("auto_rearm",    "1")),
             # M2-47: from-above distance gate (user-tunable, default 5%)
             "MAX_FROM_ABOVE_DIST_PCT":     str(config.get("from_above_dist_pct", "5.0")),
+            # M2-44: funding rate gate (Phase 2, default off)
+            "USE_FUNDING_GATE":            str(config.get("use_funding_gate", "0")),
+            "FUNDING_GATE_PCT":            str(config.get("funding_gate_pct", "0.05")),
         }
 
         # Select bot script based on mode; inject mode-specific vars if needed

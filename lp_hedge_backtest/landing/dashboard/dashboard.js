@@ -2423,6 +2423,10 @@ function buildProtectionDrawer(pos) {
         <div class="prot-info-item">
           <span class="prot-info-label">Filtro Desde Arriba</span>
           <span class="prot-info-value">${bot.from_above_dist_pct ?? 5.0}% del techo</span>
+        </div>
+        <div class="prot-info-item">
+          <span class="prot-info-label">Funding Gate</span>
+          <span class="prot-info-value">${bot.use_funding_gate ? `ON (-${bot.funding_gate_pct ?? 0.05}%/1h)` : 'OFF (log-only)'}</span>
         </div>` : ''}
       </div>
       <button class="btn btn-outline btn-sm prot-btn-full prot-btn-stop" id="prot-stop-btn-${bot.id}"
@@ -2441,7 +2445,9 @@ function buildProtectionDrawer(pos) {
     const tpVal        = bot?.tp_pct        ?? '';
     const trailVal     = bot?.trailing_stop ?? true;
     const rearmVal     = bot?.auto_rearm    ?? true;
-    const faDistVal    = bot?.from_above_dist_pct ?? 5.0;
+    const faDistVal       = bot?.from_above_dist_pct ?? 5.0;
+    const fundGateVal     = bot?.use_funding_gate   ?? false;
+    const fundGatePctVal  = bot?.funding_gate_pct   ?? 0.05;
     const apiKeyPH     = bot
       ? t('prot.apikey.keepcurrent')
       : t('prot.apikey.placeholder');
@@ -2674,13 +2680,42 @@ function buildProtectionDrawer(pos) {
         </div>
 
         <!-- Auto-rearm checkbox -->
-        <div class="tp-check-row" style="margin-bottom:12px">
+        <div class="tp-check-row">
           <input type="checkbox" id="prot-rearm-${tokenId}" ${rearmVal ? 'checked' : ''} />
           <label class="tp-check-label" for="prot-rearm-${tokenId}">Auto-rearm</label>
           <span class="tp-check-hint">Tras SL, el bot vuelve a buscar breakouts</span>
         </div>
 
-        <button class="btn btn-primary btn-sm prot-btn-full"
+        <!-- M2-44: Funding Gate (avaro mode only) -->
+        <div class="tp-check-row" style="margin-top:8px" id="tp-fundgate-row-${tokenId}" ${modeVal !== 'avaro' ? 'style="display:none"' : ''}>
+          <input type="checkbox" id="prot-fundgate-${tokenId}" ${fundGateVal ? 'checked' : ''}
+                 onchange="onFundGateChange('${tokenId}')" />
+          <label class="tp-check-label" for="prot-fundgate-${tokenId}">Funding Gate
+            <span class="tp-info-anchor" tabindex="0" aria-label="Qué es esto">❓
+              <span class="tp-info-popover">
+                <strong>¿Qué es el Funding Gate?</strong><br><br>
+                En Hyperliquid, cuando hay muchos vendedores en corto, los shorts pagan a los longs una tasa de financiamiento. Esto reduce la ganancia neta de tu cobertura.<br><br>
+                Si activas este gate, el bot <strong>no abrirá nuevos shorts</strong> cuando la tasa de financiamiento sea más negativa que el umbral configurado.<br><br>
+                <span style="color:#00d4ff">Ejemplo con 0.05%: Si la tasa es -0.06%/hora, el bot espera a que se normalice antes de entrar.</span><br><br>
+                ⚠️ Con gate <strong>desactivado</strong> (default), el funding se registra igualmente en cada operación — visible en el historial.
+              </span>
+            </span>
+          </label>
+        </div>
+        <div class="prot-field" id="tp-fundgate-pct-row-${tokenId}" style="${!fundGateVal || modeVal !== 'avaro' ? 'display:none' : ''}">
+          <label class="prot-label" style="font-size:0.6rem;color:var(--color-text-muted)">Umbral mínimo de financiamiento (%/hora)</label>
+          <div class="prot-input-group">
+            <input type="number" class="prot-input" id="prot-fundgate-pct-${tokenId}"
+                   value="${fundGatePctVal}" step="0.001" min="0.001" max="1.0"
+                   style="width:80px" />
+            <span class="prot-input-suffix">%/1h</span>
+          </div>
+          <span style="font-size:0.58rem;color:var(--color-text-muted);margin-top:2px">
+            VIZNAGO sugiere: 0.05%/1h (bloquea si shorts pagan más de 0.05% por hora)
+          </span>
+        </div>
+
+        <button class="btn btn-primary btn-sm prot-btn-full" style="margin-top:12px"
                 id="prot-activate-btn-${tokenId}"
                 onclick="activateProtection('${tokenId}')">
           🛡&nbsp; ${t('prot.btn.activate')}
@@ -2790,6 +2825,19 @@ window.onModeChange = function (tokenId, radio) {
   // M2-47: show from-above distance gate only in avaro mode
   const faRow = document.getElementById(`tp-fadist-row-${tokenId}`);
   if (faRow) faRow.style.display = radio?.value === 'avaro' ? '' : 'none';
+  // M2-44: show funding gate row only in avaro mode
+  const fgRow = document.getElementById(`tp-fundgate-row-${tokenId}`);
+  if (fgRow) fgRow.style.display = radio?.value === 'avaro' ? '' : 'none';
+  if (radio?.value !== 'avaro') {
+    const fgPctRow = document.getElementById(`tp-fundgate-pct-row-${tokenId}`);
+    if (fgPctRow) fgPctRow.style.display = 'none';
+  }
+};
+
+window.onFundGateChange = function (tokenId) {
+  const cb     = document.getElementById(`prot-fundgate-${tokenId}`);
+  const pctRow = document.getElementById(`tp-fundgate-pct-row-${tokenId}`);
+  if (pctRow) pctRow.style.display = cb?.checked ? '' : 'none';
 };
 
 window.onFaDistChange = function (tokenId, pos) {
@@ -2947,12 +2995,18 @@ window.activateProtection = async function (tokenId) {
 
     if (existingBot) {
       // Update existing config
-      const faDistEl = document.getElementById(`prot-fadist-${tokenId}`);
-      const faDistPct = faDistEl ? parseFloat(faDistEl.value) : 5.0;
+      const faDistEl    = document.getElementById(`prot-fadist-${tokenId}`);
+      const faDistPct   = faDistEl ? parseFloat(faDistEl.value) : 5.0;
+      const fundGateEl  = document.getElementById(`prot-fundgate-${tokenId}`);
+      const fundGatePctEl = document.getElementById(`prot-fundgate-pct-${tokenId}`);
+      const useFundGate = fundGateEl ? fundGateEl.checked : false;
+      const fundGatePct = fundGatePctEl ? parseFloat(fundGatePctEl.value) : 0.05;
       const payload = {
         trigger_pct: trigger, hedge_ratio: hedge, hl_wallet_addr: hlWallet, mode,
         leverage, sl_pct: slPct, tp_pct: tpPct, trailing_stop: trailingStop, auto_rearm: autoRearm,
         from_above_dist_pct: faDistPct,
+        use_funding_gate: useFundGate,
+        funding_gate_pct: fundGatePct,
       };
       if (apiKey) payload.hl_api_key = apiKey;
       await apiCall('PUT', `/bots/${existingBot.id}`, payload);
@@ -2974,9 +3028,11 @@ window.activateProtection = async function (tokenId) {
         leverage,
         sl_pct:         slPct,
         tp_pct:         tpPct,
-        trailing_stop:  trailingStop,
-        auto_rearm:     autoRearm,
+        trailing_stop:      trailingStop,
+        auto_rearm:         autoRearm,
         from_above_dist_pct: faDistPct,
+        use_funding_gate:   useFundGate,
+        funding_gate_pct:   fundGatePct,
       });
       configId = res.id;
     }

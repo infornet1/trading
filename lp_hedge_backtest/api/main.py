@@ -46,6 +46,9 @@ async def _run_column_migrations():
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS engine_v2 TINYINT(1) NOT NULL DEFAULT 0",
         # M2-47: from-above distance gate — user-tunable, default 5.0%
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS from_above_dist_pct DECIMAL(5,2) NOT NULL DEFAULT 5.00",
+        # M2-44: funding rate gate — Phase 2 (gate off by default)
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS use_funding_gate TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS funding_gate_pct DECIMAL(5,3) NOT NULL DEFAULT 0.050",
         # Extend bot_events enum with LP safety + V2 recovery event types
         (
             "ALTER TABLE bot_events MODIFY COLUMN event_type ENUM("
