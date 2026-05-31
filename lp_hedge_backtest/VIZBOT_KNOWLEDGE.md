@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-05-02 (M2-39 DB enum permanent fix — circuit_breaker added to startup migration in main.py; manual ALTER TABLE was being overwritten on every API restart)
+# Last updated: 2026-05-31 (M2-49 ✅ ATR-adaptive breakeven live; M2-47/48 planned; M2-41–M2-46 gap analysis)
 
 ---
 
@@ -192,3 +192,29 @@ Runs every hour as an asyncio background task inside the API process.
 - **No silent overrides**: VIZNIAGO never adjusts user config parameters in the background. If a value is out of recommended range, the UI shows a warning — the user decides. (e.g. SL < 0.5% shows a warning but is allowed.)
 - **Alpha status**: platform is in active development. Some features are marked "Próximamente" (coming soon).
 - **Admin-only endpoints**: `/admin/*` routes require wallet-based auth with an admin wallet address.
+
+---
+
+## Open Enhancement Backlog (May 2026)
+
+Tracked in `MEETING2_PREP.md`. Summary for assistant context:
+
+| ID | Item | Status |
+|----|------|--------|
+| M2-47 | From-above distance gate — skip entry if ETH >5% below upper_bound | 🔲 Planned |
+| M2-48 | Dynamic delta sizing — resize short continuously as ETH moves through range | 🔲 Planned |
+| M2-49 | ATR-adaptive breakeven — `max(BREAKEVEN_PCT, 1.5×ATR14)` per trade at `open_hedge()` | ✅ Done 2026-05-31 |
+| M2-41 | Candle-body + consecutive-poll confirmation for `below_range` trigger (Layer 1+2) | 🔲 Low priority |
+| M2-42 | ATR-adaptive SL floor at trigger time — batch with M2-41 | 🔲 Low priority |
+| M2-43 | IL attribution per trade — log `il_offset_pct` + `fees_earned_est` on every hedge close | 🔲 Planned |
+| M2-44 | Funding rate awareness — log funding cost on open/close; optional entry gate | 🔲 Planned |
+| M2-45 | Out-of-range duration advisory — extend LP reconciler to alert after 24h OOR | 🔲 Planned |
+| M2-46 | Cross-pool hedge overlap warning — log when two bots share the same HL wallet | 🔲 Planned |
+
+Also still open from earlier tracking:
+- **M2-5**: IL vs Fees P&L split on position card (frontend)
+- **M2-10**: Auto-reactivation when balance is replenished
+- **M2-11**: Pre-trigger parameter UX (replace TRIGGER_OFFSET_PCT)
+- **M2-16**: LONG on upside breakout for Defensor Alcista (bot logic deferred)
+- **M2-35**: Platform-wide cumulative P&L stat (admin)
+- **SL-P6**: "Usar este rango →" wires LP Range Advisor output to bot config form (dashboard receiving side not built)

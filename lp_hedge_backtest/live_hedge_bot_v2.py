@@ -62,6 +62,10 @@ MARGIN_BUFFER  = float(os.getenv("MARGIN_BUFFER",   "1.5"))
 DEFAULT_SL_PCT = float(os.getenv("SL_PCT",         "0.5")) / 100.0
 BREAKEVEN_PCT  = float(os.getenv("BREAKEVEN_PCT",   "1.0")) / 100.0
 TRAIL_PCT      = float(os.getenv("TRAIL_PCT",       "1.5")) / 100.0
+
+# M2-49: ATR-adaptive breakeven — effective BE = max(BREAKEVEN_PCT, ATR_MULT_BE × ATR(ATR_PERIOD))
+ATR_PERIOD   = int(os.getenv("ATR_PERIOD",   "14"))
+ATR_MULT_BE  = float(os.getenv("ATR_MULT_BE", "1.5"))
 REENTRY_BUFFER = float(os.getenv("REENTRY_BUFFER_PCT", "0.5")) / 100.0
 
 _tp_env  = os.getenv("TP_PCT", "").strip()
@@ -155,9 +159,10 @@ class LiveHedgeBotV2:
         self.hedge_size_eth    = None
         self.leverage_used     = None
         self.current_sl_price  = None
-        self.breakeven_reached = False
-        self.short_min_price   = None
-        self.open_trigger      = None
+        self.breakeven_reached        = False
+        self.short_min_price          = None
+        self.open_trigger             = None
+        self._effective_breakeven_pct = BREAKEVEN_PCT  # M2-49: set per-trade at open_hedge()
 
         # V2: native HL order tracking
         self.hl_sl_order_id: Optional[int] = None
@@ -576,14 +581,15 @@ class LiveHedgeBotV2:
             if order["status"] == "ok":
                 self._margin_fail_count    = 0
                 self._margin_backoff_until = 0.0
-                self.entry_price       = price
-                self.hedge_size_eth    = size
-                self.leverage_used     = leverage
-                self.hedge_active      = True
-                self.breakeven_reached = False
-                self.short_min_price   = price
-                self.open_trigger      = trigger
-                self.current_sl_price  = price * (1 + DEFAULT_SL_PCT)
+                self.entry_price              = price
+                self.hedge_size_eth           = size
+                self.leverage_used            = leverage
+                self.hedge_active             = True
+                self.breakeven_reached        = False
+                self.short_min_price          = price
+                self.open_trigger             = trigger
+                self.current_sl_price         = price * (1 + DEFAULT_SL_PCT)
+                self._effective_breakeven_pct = self._compute_atr_breakeven(price)  # M2-49
 
                 print(f"✅ SHORT OPENED | Entry: ${self.entry_price:.2f} | "
                       f"SL: ${self.current_sl_price:.2f} | Trigger: {label}", flush=True)
@@ -618,18 +624,19 @@ class LiveHedgeBotV2:
                         })
 
                 log_event("hedge_opened", price=price, details={
-                    "trigger":    trigger,
-                    "entry":      self.entry_price,
-                    "sl":         round(self.current_sl_price, 4),
-                    "sl_oid":     self.hl_sl_order_id,
-                    "tp_oid":     self.hl_tp_order_id,
-                    "size_eth":   size,
-                    "x_max":      round(x_max, 4),
-                    "ratio_pct":  HEDGE_RATIO,
-                    "leverage":   leverage,
-                    "notional":   round(notional, 2),
-                    "margin":     round(req_margin, 2),
-                    "engine":     "v2",
+                    "trigger":      trigger,
+                    "entry":        self.entry_price,
+                    "sl":           round(self.current_sl_price, 4),
+                    "sl_oid":       self.hl_sl_order_id,
+                    "tp_oid":       self.hl_tp_order_id,
+                    "size_eth":     size,
+                    "x_max":        round(x_max, 4),
+                    "ratio_pct":    HEDGE_RATIO,
+                    "leverage":     leverage,
+                    "notional":     round(notional, 2),
+                    "margin":       round(req_margin, 2),
+                    "engine":       "v2",
+                    "breakeven_pct": round(self._effective_breakeven_pct * 100, 2),  # M2-49
                 })
                 tp_line = (
                     f"Native TP:    ${self.entry_price * (1 - TP_PCT):.2f} (OID: {self.hl_tp_order_id or 'FAILED'})\n"
@@ -646,7 +653,9 @@ class LiveHedgeBotV2:
                     f"Notional:     ${notional:.2f}\n"
                     f"Native SL:    ${self.current_sl_price:.2f} (OID: {self.hl_sl_order_id or 'FAILED'})\n"
                     f"{tp_line}"
-                    f"Breakeven at: -{BREAKEVEN_PCT*100:.1f}% → trail {TRAIL_PCT*100:.1f}% from min",
+                    f"Breakeven at: -{self._effective_breakeven_pct*100:.2f}% → trail {TRAIL_PCT*100:.1f}% from min"
+                    + (f" [ATR-adaptive, base {BREAKEVEN_PCT*100:.1f}%]"
+                       if self._effective_breakeven_pct > BREAKEVEN_PCT else ""),
                 )
             else:
                 print(f"❌ Order failed: {order}", flush=True)
@@ -692,12 +701,13 @@ class LiveHedgeBotV2:
         if not TRAILING_STOP:
             return
 
-        if not self.breakeven_reached and price <= self.entry_price * (1 - BREAKEVEN_PCT):
+        if not self.breakeven_reached and price <= self.entry_price * (1 - self._effective_breakeven_pct):
             self.breakeven_reached = True
             trail_sl              = self.short_min_price * (1 + TRAIL_PCT)
             self.current_sl_price = min(self.entry_price, trail_sl)
             pnl_est = (self.entry_price - price) / self.entry_price * 100
-            print(f"🛡️  BREAKEVEN | Trail SL: ${self.current_sl_price:.2f}", flush=True)
+            print(f"🛡️  BREAKEVEN | BE={self._effective_breakeven_pct*100:.2f}% | "
+                  f"Trail SL: ${self.current_sl_price:.2f}", flush=True)
 
             # V2: replace native SL at the new trail level
             self._replace_native_sl(self.current_sl_price)
@@ -710,7 +720,7 @@ class LiveHedgeBotV2:
             })
             self.send_email(
                 "Short Protected 🛡️ (Breakeven)",
-                f"Short profit ≥ {BREAKEVEN_PCT*100:.0f}% — trailing SL activated.\n"
+                f"Short profit ≥ {self._effective_breakeven_pct*100:.2f}% — trailing SL activated.\n"
                 f"NFT #{NFT_ID}\n"
                 f"Entry:     ${self.entry_price:.2f}\n"
                 f"Min price: ${self.short_min_price:.2f}\n"
@@ -879,6 +889,39 @@ class LiveHedgeBotV2:
         self.sl_close_price      = close_price
         self.price_was_above     = False
 
+    # ── M2-49: ATR-adaptive breakeven ────────────────────────────────────────
+
+    def _compute_atr_breakeven(self, entry_price: float) -> float:
+        """Return max(BREAKEVEN_PCT, ATR_MULT_BE × ATR(ATR_PERIOD)) as a fraction.
+        Fetches the last ATR_PERIOD+2 hourly candles from HL.
+        Falls back to the static BREAKEVEN_PCT on any failure."""
+        try:
+            now_ms   = int(time.time() * 1000)
+            start_ms = now_ms - (ATR_PERIOD + 2) * 3_600_000
+            candles  = self.info.candles_snapshot("ETH", "1h", start_ms, now_ms)
+            if not candles or len(candles) < ATR_PERIOD + 1:
+                print(f"⚠️  [M2-49] ATR: only {len(candles) if candles else 0} candles — "
+                      f"using static BE {BREAKEVEN_PCT*100:.1f}%", flush=True)
+                return BREAKEVEN_PCT
+            candles = sorted(candles, key=lambda c: c["t"])[-ATR_PERIOD - 1:]
+            true_ranges = []
+            for i in range(1, len(candles)):
+                h      = float(candles[i]["h"])
+                lo     = float(candles[i]["l"])
+                prev_c = float(candles[i - 1]["c"])
+                true_ranges.append(max(h - lo, abs(h - prev_c), abs(lo - prev_c)))
+            atr     = sum(true_ranges[-ATR_PERIOD:]) / ATR_PERIOD
+            atr_pct = atr / entry_price
+            effective = max(BREAKEVEN_PCT, ATR_MULT_BE * atr_pct)
+            marker = "↑ ATR adaptive" if effective > BREAKEVEN_PCT else "= static floor"
+            print(f"📊 [M2-49] ATR({ATR_PERIOD})=${atr:.2f} ({atr_pct*100:.2f}%) → "
+                  f"BE={effective*100:.2f}% {marker}", flush=True)
+            return effective
+        except Exception as exc:
+            print(f"⚠️  [M2-49] ATR fetch failed ({exc}) — using static BE {BREAKEVEN_PCT*100:.1f}%",
+                  flush=True)
+            return BREAKEVEN_PCT
+
     # ── HL position sync ──────────────────────────────────────────────────────
 
     def _sync_hl_position(self, price):
@@ -999,14 +1042,15 @@ class LiveHedgeBotV2:
             )
 
             # Recover bot state — start SL trail conservatively from entry
-            self.hedge_active      = True
-            self.entry_price       = entry_px
-            self.hedge_size_eth    = size
-            self.leverage_used     = lev_val
-            self.current_sl_price  = entry_px * (1 + DEFAULT_SL_PCT)
-            self.breakeven_reached = False
-            self.short_min_price   = entry_px
-            self.open_trigger      = "recovered"
+            self.hedge_active             = True
+            self.entry_price              = entry_px
+            self.hedge_size_eth           = size
+            self.leverage_used            = lev_val
+            self.current_sl_price         = entry_px * (1 + DEFAULT_SL_PCT)
+            self.breakeven_reached        = False
+            self.short_min_price          = entry_px
+            self.open_trigger             = "recovered"
+            self._effective_breakeven_pct = BREAKEVEN_PCT  # M2-49: static on recovery (no ATR context)
 
             # Check for existing SL and TP orders on HL
             try:
@@ -1120,7 +1164,8 @@ class LiveHedgeBotV2:
               f"TP: {TP_PCT*100:.2f}% (fixed)" if TP_PCT else f"📐 SL: {DEFAULT_SL_PCT*100:.2f}% | TP: off",
               flush=True)
         print(f"📐 Trailing: {'on' if TRAILING_STOP else 'OFF'} | "
-              f"Breakeven: {BREAKEVEN_PCT*100:.1f}% | Trail: {TRAIL_PCT*100:.1f}%", flush=True)
+              f"Breakeven: {BREAKEVEN_PCT*100:.1f}% base (ATR-adaptive, {ATR_MULT_BE}×ATR{ATR_PERIOD}) | "
+              f"Trail: {TRAIL_PCT*100:.1f}%", flush=True)
         print(f"📐 [V2] Native HL SL: enabled | Cancel+replace on trail: enabled", flush=True)
 
         # Only emit started event if not recovering an orphan (reconcile already logged)
