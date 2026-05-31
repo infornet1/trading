@@ -759,6 +759,7 @@ function poolCard(p, ethPrice, isHistorical = false) {
       ${p.tp_pct ? `<span title="Take Profit">TP ${p.tp_pct}%</span>` : ''}
       <span title="Trailing Stop" style="color:${p.trailing_stop ? 'var(--green)' : 'var(--muted)'}">Trail ${p.trailing_stop ? '✓' : '✗'}</span>
       <span title="Auto-rearm" style="color:${p.auto_rearm ? 'var(--green)' : 'var(--muted)'}">Rearm ${p.auto_rearm ? '✓' : '✗'}</span>
+      ${p.mode === 'avaro' ? `<span title="From-above distance gate (M2-47)" style="color:var(--color-neon-cyan,#00d4ff)">FA≤${p.from_above_dist_pct ?? 5}%</span>` : ''}
     </span>
   </div>
 
