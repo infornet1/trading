@@ -862,7 +862,10 @@ function renderHlDetail(d, ethPrice = null) {
     const events      = d.events || [];
     const openIdx     = events.findIndex(e => e.type === 'hedge_opened');
     const trailActive = openIdx > 0 && events.slice(0, openIdx).some(e => e.type === 'breakeven');
-    const trailBadge  = `<span class="badge badge--${trailActive ? 'green' : 'muted'}">${trailActive ? '🛡️ Trail ACTIVO' : 'Trail inactivo'}</span>`;
+    const openEvtDet  = openIdx >= 0 ? (events[openIdx].details || {}) : {};
+    const bePct       = openEvtDet.breakeven_pct;
+    const beLabel     = bePct != null ? ` (BE @ ${bePct}%)` : '';
+    const trailBadge  = `<span class="badge badge--${trailActive ? 'green' : 'muted'}">${trailActive ? '🛡️ Trail ACTIVO' + beLabel : 'Trail inactivo' + beLabel}</span>`;
 
     // SL distance from native order trigger price
     const slPx = d.hl_sl_order?.trigger_px || null;
@@ -973,13 +976,14 @@ function renderHlDetail(d, ethPrice = null) {
     const rows = d.events.map(e => {
       const det = e.details || {};
       const detStr = [
-        det.trigger   ? `trigger: ${det.trigger}` : '',
-        det.size      ? `size: ${det.size} ETH` : '',
-        det.notional  ? `notional: $${fmtNum(det.notional)}` : '',
-        det.leverage  ? `lev: ${det.leverage}x` : '',
-        det.sl_price  ? `SL: $${fmtNum(det.sl_price)}` : '',
-        det.reason    ? `${det.reason}` : '',
-        det.error     ? `err: ${det.error}` : '',
+        det.trigger        ? `trigger: ${det.trigger}` : '',
+        det.size           ? `size: ${det.size} ETH` : '',
+        det.notional       ? `notional: $${fmtNum(det.notional)}` : '',
+        det.leverage       ? `lev: ${det.leverage}x` : '',
+        det.sl_price       ? `SL: $${fmtNum(det.sl_price)}` : '',
+        det.breakeven_pct  ? `BE: ${det.breakeven_pct}%` : '',
+        det.reason         ? `${det.reason}` : '',
+        det.error          ? `err: ${det.error}` : '',
       ].filter(Boolean).join(' · ');
 
       return `<tr>
@@ -1150,6 +1154,10 @@ function renderRiskStrip(pools) {
       const cls     = Math.abs(nearest) < 2 ? 'risk-pnl-neg' : Math.abs(nearest) < 5 ? '' : '';
       distHtml = `<span class="risk-sep">·</span><span class="${cls}" title="Distancia al trigger">${dir}${Math.abs(nearest).toFixed(1)}%</span>`;
     }
+    const triggerType = p.last_event?.details?.trigger || null;
+    const trigHtml    = triggerType
+      ? `<span class="risk-sep">·</span><span class="muted" title="Tipo de entrada">${triggerType === 'from_above' ? '↓above' : '↓below'}</span>`
+      : '';
     return `
       <div class="risk-item" onclick="searchWalletDirect('${p.user_address}')" title="Click para ver detalle">
         <span class="risk-dot ${dotCls}"></span>
@@ -1158,6 +1166,7 @@ function renderRiskStrip(pools) {
         <span class="risk-pair">${p.pair} NFT #${p.nft_token_id}</span>
         <span class="risk-sep">·</span>
         <span class="risk-entry">Entry ${price}</span>
+        ${trigHtml}
         ${pnlHtml ? `<span class="risk-sep">·</span>${pnlHtml}` : ''}
         ${distHtml}
         ${hbHtml}
