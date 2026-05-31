@@ -66,6 +66,8 @@ TRAIL_PCT      = float(os.getenv("TRAIL_PCT",       "1.5")) / 100.0
 # M2-49: ATR-adaptive breakeven — effective BE = max(BREAKEVEN_PCT, ATR_MULT_BE × ATR(ATR_PERIOD))
 ATR_PERIOD   = int(os.getenv("ATR_PERIOD",   "14"))
 ATR_MULT_BE  = float(os.getenv("ATR_MULT_BE", "1.5"))
+# M2-47: from_above distance gate — skip entry if price is more than X% below upper_bound
+MAX_FROM_ABOVE_DIST_PCT = float(os.getenv("MAX_FROM_ABOVE_DIST_PCT", "5.0"))
 REENTRY_BUFFER = float(os.getenv("REENTRY_BUFFER_PCT", "0.5")) / 100.0
 
 _tp_env  = os.getenv("TP_PCT", "").strip()
@@ -1159,7 +1161,9 @@ class LiveHedgeBotV2:
         )
         print(f"📐 Range:         ${self.lower_bound:.2f} — ${self.upper_bound:.2f}", flush=True)
         print(f"📐 Short triggers: {trigger_desc}", flush=True)
-        print(f"📐 Mode:          {BOT_MODE} | from_above={'ON' if FROM_ABOVE_ENABLED else 'OFF'}", flush=True)
+        print(f"📐 Mode:          {BOT_MODE} | from_above={'ON' if FROM_ABOVE_ENABLED else 'OFF'}"
+              f"{f' | M2-47 gate: ≤{MAX_FROM_ABOVE_DIST_PCT:.1f}% below upper' if FROM_ABOVE_ENABLED else ''}",
+              flush=True)
         print(f"📐 SL: {DEFAULT_SL_PCT*100:.2f}% | "
               f"TP: {TP_PCT*100:.2f}% (fixed)" if TP_PCT else f"📐 SL: {DEFAULT_SL_PCT*100:.2f}% | TP: off",
               flush=True)
@@ -1273,9 +1277,20 @@ class LiveHedgeBotV2:
                         opened = False
 
                         if FROM_ABOVE_ENABLED and self.price_was_above and price <= upper_trigger:
-                            self.open_hedge(price, trigger="from_above")
-                            self.price_was_above = False
-                            opened = True
+                            # M2-47: skip if price is too far below upper_bound (stale arm)
+                            fa_min_px = self.upper_bound * (1 - MAX_FROM_ABOVE_DIST_PCT / 100)
+                            if price >= fa_min_px:
+                                self.open_hedge(price, trigger="from_above")
+                                self.price_was_above = False
+                                opened = True
+                            else:
+                                dist_pct = (self.upper_bound - price) / self.upper_bound * 100
+                                print(
+                                    f"⏭️  [M2-47] from_above skipped — price ${price:.2f} is "
+                                    f"{dist_pct:.1f}% below upper_bound "
+                                    f"(gate: {MAX_FROM_ABOVE_DIST_PCT:.1f}%)",
+                                    flush=True,
+                                )
 
                         if not opened and price <= lower_trigger:
                             if self.reentry_guard_price is None:

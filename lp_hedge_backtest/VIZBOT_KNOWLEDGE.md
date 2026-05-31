@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-05-31 (M2-49 ✅ ATR-adaptive breakeven live; M2-47/48 planned; M2-41–M2-46 gap analysis)
+# Last updated: 2026-05-31 (M2-47 ✅ from-above distance gate live; M2-49 ✅ ATR-adaptive breakeven live; M2-48 planned)
 
 ---
 
@@ -201,7 +201,7 @@ Tracked in `MEETING2_PREP.md`. Summary for assistant context:
 
 | ID | Item | Status |
 |----|------|--------|
-| M2-47 | From-above distance gate — skip entry if ETH >5% below upper_bound | 🔲 Planned |
+| M2-47 | From-above distance gate — skip entry if ETH >5% below upper_bound | ✅ Done 2026-05-31 |
 | M2-48 | Dynamic delta sizing — resize short continuously as ETH moves through range | 🔲 Planned |
 | M2-49 | ATR-adaptive breakeven — `max(BREAKEVEN_PCT, 1.5×ATR14)` per trade at `open_hedge()` | ✅ Done 2026-05-31 |
 | M2-41 | Candle-body + consecutive-poll confirmation for `below_range` trigger (Layer 1+2) | 🔲 Low priority |
