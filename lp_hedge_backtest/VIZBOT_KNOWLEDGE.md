@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-05-31 (M2-47 ✅ from-above distance gate live; M2-49 ✅ ATR-adaptive breakeven live; M2-48 planned)
+# Last updated: 2026-05-31 (M2-44 ✅ funding rate awareness live; M2-43 ✅ IL attribution live; M2-47 ✅ from-above gate live; M2-49 ✅ ATR-adaptive breakeven live; M2-48 planned)
 
 ---
 
@@ -195,6 +195,17 @@ Runs every hour as an asyncio background task inside the API process.
 
 ---
 
+## Shipped Enhancements — LP Defensor V2 (May 2026)
+
+Key improvements deployed to `live_hedge_bot_v2.py`. All user-tunable via DB column + dashboard form:
+
+| Enhancement | What it does | User param | Default |
+|---|---|---|---|
+| **M2-47** From-above gate | Skips stale "from_above" entries when ETH is >X% below range ceiling. Blocks entries after `price_was_above` persists for weeks. | `from_above_dist_pct` slider 1–20% | 5% |
+| **M2-49** ATR breakeven | Breakeven trigger adapts to volatility: `max(1%, 1.5×ATR14)`. Prevents trailing stop activating too early in high-vol sessions. | `ATR_MULT_BE` env | 1.5× |
+| **M2-43** IL attribution | On every hedge close, logs: LP value at entry vs close (`lp_chg_pct`), hedge P&L as % of LP value (`hedge_offset_pct`), net result (`net_pct`). Visible in forensic event history. | — | Always on |
+| **M2-44** Funding rate | Logs current 1h ETH funding rate at hedge open. Logs cumulative funding paid/received at close. Optional `USE_FUNDING_GATE` blocks entry when rate < -threshold. | `use_funding_gate` toggle + `funding_gate_pct` | OFF / 0.05% |
+
 ## Open Enhancement Backlog (May 2026)
 
 Tracked in `MEETING2_PREP.md`. Summary for assistant context:
@@ -206,8 +217,8 @@ Tracked in `MEETING2_PREP.md`. Summary for assistant context:
 | M2-49 | ATR-adaptive breakeven — `max(BREAKEVEN_PCT, 1.5×ATR14)` per trade at `open_hedge()` | ✅ Done 2026-05-31 |
 | M2-41 | Candle-body + consecutive-poll confirmation for `below_range` trigger (Layer 1+2) | 🔲 Low priority |
 | M2-42 | ATR-adaptive SL floor at trigger time — batch with M2-41 | 🔲 Low priority |
-| M2-43 | IL attribution per trade — log `il_offset_pct` + `fees_earned_est` on every hedge close | 🔲 Planned |
-| M2-44 | Funding rate awareness — log funding cost on open/close; optional entry gate | 🔲 Planned |
+| M2-43 | IL attribution per trade — `lp_chg_pct`, `hedge_offset_pct`, `net_pct` logged on every close | ✅ Done 2026-05-31 |
+| M2-44 | Funding rate awareness — `funding_rate_1h` at open; `funding_usdc_net`/`pct_net`/`hours` at close; optional `USE_FUNDING_GATE` | ✅ Done 2026-05-31 |
 | M2-45 | Out-of-range duration advisory — extend LP reconciler to alert after 24h OOR | 🔲 Planned |
 | M2-46 | Cross-pool hedge overlap warning — log when two bots share the same HL wallet | 🔲 Planned |
 
