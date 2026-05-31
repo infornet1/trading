@@ -1851,6 +1851,41 @@
   color: var(--color-text-muted);
 }
 
+/* M2-47: from-above distance gate UI */
+.tp-fadist-sublabel {
+  font-size: 0.65rem;
+  color: var(--color-neon-cyan);
+  margin-top: 5px;
+  letter-spacing: 0.02em;
+}
+.tp-fadist-suggest {
+  margin-top: 5px;
+}
+.tp-fadist-chip {
+  display: inline-block;
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+.tp-fadist-chip--active {
+  color: #34d399;
+  border-color: rgba(52,211,153,0.35);
+  background: rgba(52,211,153,0.08);
+}
+.tp-fadist-reset {
+  background: none;
+  border: none;
+  color: var(--color-neon-cyan);
+  font-size: 0.6rem;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+  text-decoration: underline;
+}
+
 /* Slider rows */
 .tp-slider-row {
   margin-bottom: 14px;

@@ -102,6 +102,8 @@ class BotManager:
             "TP_PCT":                      str(config.get("tp_pct",  "")),
             "TRAILING_STOP":               str(config.get("trailing_stop", "1")),
             "AUTO_REARM":                  str(config.get("auto_rearm",    "1")),
+            # M2-47: from-above distance gate (user-tunable, default 5%)
+            "MAX_FROM_ABOVE_DIST_PCT":     str(config.get("from_above_dist_pct", "5.0")),
         }
 
         # Select bot script based on mode; inject mode-specific vars if needed
@@ -234,6 +236,7 @@ class BotManager:
             if config_id in self._procs:
                 self._procs.pop(config_id, None)
                 self._tasks.pop(config_id, None)
+                self._last_seen.pop(config_id, None)
                 # Poll to get actual returncode (-15=SIGTERM, -9=SIGKILL, None=undetermined)
                 proc.poll()
                 killed_by_signal = proc.returncode is None or proc.returncode < 0

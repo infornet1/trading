@@ -2402,6 +2402,11 @@ function buildProtectionDrawer(pos) {
           <span class="prot-info-label">Trailing / Rearm</span>
           <span class="prot-info-value">${bot.trailing_stop ? '✓' : '✗'} / ${bot.auto_rearm ? '✓' : '✗'}</span>
         </div>
+        ${bot.mode === 'avaro' ? `
+        <div class="prot-info-item">
+          <span class="prot-info-label">Filtro Desde Arriba</span>
+          <span class="prot-info-value">${bot.from_above_dist_pct ?? 5.0}% del techo</span>
+        </div>` : ''}
       </div>
       <button class="btn btn-outline btn-sm prot-btn-full prot-btn-stop" id="prot-stop-btn-${bot.id}"
               onclick="stopProtection(${bot.id}, '${tokenId}')">
@@ -2419,6 +2424,7 @@ function buildProtectionDrawer(pos) {
     const tpVal        = bot?.tp_pct        ?? '';
     const trailVal     = bot?.trailing_stop ?? true;
     const rearmVal     = bot?.auto_rearm    ?? true;
+    const faDistVal    = bot?.from_above_dist_pct ?? 5.0;
     const apiKeyPH     = bot
       ? t('prot.apikey.keepcurrent')
       : t('prot.apikey.placeholder');
@@ -2515,6 +2521,30 @@ function buildProtectionDrawer(pos) {
                  min="0" max="5" step="0.1" value="${trigVal}"
                  oninput="onTradingPanelChange('${tokenId}')" />
           <div class="tp-slider-range-labels"><span>0%</span><span>5% max</span></div>
+        </div>
+
+        <!-- M2-47: From-Above Distance Gate (avaro mode only) -->
+        <div class="tp-slider-row" id="tp-fadist-row-${tokenId}" ${modeVal !== 'avaro' ? 'style="display:none"' : ''}>
+          <div class="tp-slider-header">
+            <span class="tp-slider-label">Filtro Entrada Desde Arriba
+              <span class="tp-info-anchor" tabindex="0" aria-label="Qué es esto">❓
+                <span class="tp-info-popover">
+                  <strong>¿Cuándo se ignora la entrada "desde arriba"?</strong><br><br>
+                  Cuando el precio lleva tiempo dentro del rango, la señal de "entrada desde arriba" puede estar desactualizada — el bot se armó cuando el precio estaba por encima del techo, pero eso fue hace semanas.<br><br>
+                  Este filtro cancela esa entrada si el precio ya está demasiado lejos del techo del rango.<br><br>
+                  <span style="color:#00d4ff">Ej con 5% (sugerido): Techo $2,347 → entrada desde arriba solo si precio ≥ $2,230. Por debajo de $2,230, el bot ignora esa señal y espera ruptura inferior.</span><br><br>
+                  ⚠️ El disparador por <strong>ruptura inferior</strong> sigue activo siempre — este filtro solo afecta la entrada desde arriba.
+                </span>
+              </span>
+            </span>
+            <span class="tp-slider-value" id="tp-fadist-val-${tokenId}">${faDistVal.toFixed(1)}%</span>
+          </div>
+          <input type="range" class="tp-slider" id="prot-fadist-${tokenId}"
+                 min="1" max="20" step="0.5" value="${faDistVal}"
+                 oninput="onFaDistChange('${tokenId}', pos)" />
+          <div class="tp-slider-range-labels"><span>1% estricto</span><span>20% permisivo</span></div>
+          <div class="tp-fadist-sublabel" id="tp-fadist-sub-${tokenId}">calculando…</div>
+          <div class="tp-fadist-suggest" id="tp-fadist-suggest-${tokenId}"></div>
         </div>
 
         <!-- Buffer de Capital pills (quick presets for hedge_ratio) -->
@@ -2740,7 +2770,46 @@ window.onModeChange = function (tokenId, radio) {
     const input = label.querySelector('input[type="radio"]');
     label.classList.toggle('prot-mode-opt--active', !!input?.checked);
   });
+  // M2-47: show from-above distance gate only in avaro mode
+  const faRow = document.getElementById(`tp-fadist-row-${tokenId}`);
+  if (faRow) faRow.style.display = radio?.value === 'avaro' ? '' : 'none';
 };
+
+window.onFaDistChange = function (tokenId, pos) {
+  const slider  = document.getElementById(`prot-fadist-${tokenId}`);
+  const valEl   = document.getElementById(`tp-fadist-val-${tokenId}`);
+  const subEl   = document.getElementById(`tp-fadist-sub-${tokenId}`);
+  const sugEl   = document.getElementById(`tp-fadist-suggest-${tokenId}`);
+  if (!slider) return;
+  const pct     = parseFloat(slider.value);
+  if (valEl) valEl.textContent = pct.toFixed(1) + '%';
+
+  // Compute gate price in dollars when upper_bound is available
+  const upper   = pos?.priceUpper ?? null;
+  if (upper && subEl) {
+    const gatePx = upper * (1 - pct / 100);
+    subEl.textContent = `Entrada desde arriba solo si precio ≥ $${gatePx.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+    subEl.style.display = '';
+  }
+
+  // VIZNAGO suggestion chip
+  if (sugEl) {
+    const suggested = _faDistSuggestion(pos);
+    const isSuggested = Math.abs(pct - suggested) < 0.01;
+    if (isSuggested) {
+      sugEl.innerHTML = `<span class="tp-fadist-chip tp-fadist-chip--active">✓ VIZNAGO sugiere ${suggested}%</span>`;
+    } else {
+      sugEl.innerHTML = `<span class="tp-fadist-chip">VIZNAGO sugiere ${suggested}% <button class="tp-fadist-reset" onclick="(function(){var s=document.getElementById('prot-fadist-${tokenId}');if(s){s.value=${suggested};window.onFaDistChange('${tokenId}',null)}})()">← aplicar</button></span>`;
+    }
+  }
+};
+
+function _faDistSuggestion(pos) {
+  if (!pos?.priceUpper || !pos?.priceLower) return 5.0;
+  const rangeWidthPct = (pos.priceUpper - pos.priceLower) / pos.priceUpper * 100;
+  // Suggestion: ~40% of range width, clamped 3–10%
+  return Math.round(Math.min(10, Math.max(3, rangeWidthPct * 0.4)) * 2) / 2;
+}
 
 // ── Wallet dropdown handler ───────────────────────────────────────────────
 window.onWalletSelectChange = function (tokenId) {
@@ -2861,9 +2930,12 @@ window.activateProtection = async function (tokenId) {
 
     if (existingBot) {
       // Update existing config
+      const faDistEl = document.getElementById(`prot-fadist-${tokenId}`);
+      const faDistPct = faDistEl ? parseFloat(faDistEl.value) : 5.0;
       const payload = {
         trigger_pct: trigger, hedge_ratio: hedge, hl_wallet_addr: hlWallet, mode,
         leverage, sl_pct: slPct, tp_pct: tpPct, trailing_stop: trailingStop, auto_rearm: autoRearm,
+        from_above_dist_pct: faDistPct,
       };
       if (apiKey) payload.hl_api_key = apiKey;
       await apiCall('PUT', `/bots/${existingBot.id}`, payload);
@@ -2887,6 +2959,7 @@ window.activateProtection = async function (tokenId) {
         tp_pct:         tpPct,
         trailing_stop:  trailingStop,
         auto_rearm:     autoRearm,
+        from_above_dist_pct: faDistPct,
       });
       configId = res.id;
     }
@@ -3082,6 +3155,9 @@ async function initTradingPanel(tokenId, pos) {
 
   // Show SL warning immediately if saved value is already < 0.5%
   window.onSLChange(tokenId);
+
+  // M2-47: initialize from-above distance gate sub-label + suggestion chip
+  window.onFaDistChange(tokenId, pos);
 }
 
 function _updateMarginBox(tokenId, pos) {

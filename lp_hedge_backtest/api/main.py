@@ -44,6 +44,8 @@ async def _run_column_migrations():
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS whale_oi_spike_threshold DECIMAL(5,3) NULL DEFAULT 0.030",
         # V2 engine flag — routes config to live_hedge_bot_v2.py when TRUE
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS engine_v2 TINYINT(1) NOT NULL DEFAULT 0",
+        # M2-47: from-above distance gate — user-tunable, default 5.0%
+        "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS from_above_dist_pct DECIMAL(5,2) NOT NULL DEFAULT 5.00",
         # Extend bot_events enum with LP safety + V2 recovery event types
         (
             "ALTER TABLE bot_events MODIFY COLUMN event_type ENUM("

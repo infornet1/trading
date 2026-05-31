@@ -56,6 +56,7 @@ class BotConfigCreate(BaseModel):
     whale_use_websocket:     Optional[bool]  = False
     whale_oi_spike_threshold: Optional[float] = 0.03
     paper_trade:       bool            = False
+    from_above_dist_pct: float         = 5.0   # M2-47: max % below upper_bound allowed for from_above entry
 
     @field_validator("mode")
     @classmethod
@@ -100,6 +101,7 @@ class BotConfigUpdate(BaseModel):
     whale_use_websocket:     Optional[bool]  = None
     whale_oi_spike_threshold: Optional[float] = None
     paper_trade:       Optional[bool]  = None
+    from_above_dist_pct: Optional[float] = None  # M2-47
 
     @field_validator("mode")
     @classmethod
@@ -140,6 +142,7 @@ class BotConfigOut(BaseModel):
     whale_use_websocket:     Optional[bool]
     whale_oi_spike_threshold: Optional[float]
     paper_trade:    bool
+    from_above_dist_pct: float
     active:         bool
     created_at:     datetime
     updated_at:     datetime
@@ -266,6 +269,7 @@ async def create_bot(
         whale_use_websocket      = body.whale_use_websocket,
         whale_oi_spike_threshold = body.whale_oi_spike_threshold,
         paper_trade       = body.paper_trade,
+        from_above_dist_pct = max(0.0, min(body.from_above_dist_pct, 50.0)),
     )
     db.add(cfg)
     await db.commit()
@@ -313,6 +317,7 @@ async def update_bot(
     if body.whale_use_websocket      is not None: cfg.whale_use_websocket      = body.whale_use_websocket
     if body.whale_oi_spike_threshold is not None: cfg.whale_oi_spike_threshold = body.whale_oi_spike_threshold
     if body.paper_trade       is not None: cfg.paper_trade       = body.paper_trade
+    if body.from_above_dist_pct is not None: cfg.from_above_dist_pct = max(0.0, min(body.from_above_dist_pct, 50.0))
 
     await db.commit()
     await db.refresh(cfg)
@@ -666,6 +671,7 @@ async def start_bot(
         "whale_watch_assets":     cfg.whale_watch_assets         or "",
         "paper_trade":       is_paper,
         "engine_v2":         bool(cfg.engine_v2),
+        "from_above_dist_pct": str(cfg.from_above_dist_pct or 5.0),
     }
     await manager.start(config_id, config_dict)
     cfg.active = True

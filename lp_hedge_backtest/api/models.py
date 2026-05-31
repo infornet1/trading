@@ -70,6 +70,7 @@ class BotConfig(Base):
     whale_oi_spike_threshold = Column(Numeric(5, 3), nullable=True, default=0.030)
     paper_trade     = Column(Boolean, default=False)          # simulate trades, no real orders
     engine_v2       = Column(Boolean, default=False)          # True → launch live_hedge_bot_v2.py
+    from_above_dist_pct = Column(Numeric(5, 2), default=5.00) # M2-47: max % below upper_bound for from_above entry
     active          = Column(Boolean, default=False)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
