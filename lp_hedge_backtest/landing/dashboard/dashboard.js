@@ -1448,11 +1448,28 @@ async function loadPositionEvents(tokenId) {
       const pnl   = ev.pnl != null
         ? `<span class="evt-pnl ${ev.pnl >= 0 ? 'evt-pnl-pos' : 'evt-pnl-neg'}">${ev.pnl >= 0 ? '+' : ''}${Number(ev.pnl).toFixed(2)}%</span>`
         : '';
+      // M2-43: IL attribution line for close events
+      const CLOSE_TYPES = new Set(['sl_hit', 'trailing_stop', 'tp_hit']);
+      const det = ev.details || {};
+      const ilRow = CLOSE_TYPES.has(ev.event_type) && det.lp_chg_pct != null ? (() => {
+        const lp  = Number(det.lp_chg_pct);
+        const hdg = Number(det.hedge_offset_pct);
+        const net = Number(det.net_pct);
+        const c   = v => v >= 0 ? 'evt-il-pos' : 'evt-il-neg';
+        return `<div class="evt-il-row">` +
+          `<span class="${c(lp)}">LP ${lp >= 0 ? '+' : ''}${lp.toFixed(2)}%</span>` +
+          `<span class="evt-il-sep">·</span>` +
+          `<span class="${c(hdg)}">Hedge ${hdg >= 0 ? '+' : ''}${hdg.toFixed(2)}%</span>` +
+          `<span class="evt-il-sep">·</span>` +
+          `<span class="${c(net)} evt-il-net">Net ${net >= 0 ? '+' : ''}${net.toFixed(2)}%</span>` +
+          `</div>`;
+      })() : '';
       return `<div class="pos-event-row${dimmed ? ' evt-dimmed' : ''}">
         <span class="evt-icon">${m.icon}</span>
         <span class="evt-label ${m.cls}">${m.label}</span>
         ${price}${pnl}
         <span class="evt-time">${time}</span>
+        ${ilRow}
       </div>`;
     };
 

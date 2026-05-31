@@ -126,6 +126,27 @@ def calc_x_max_eth(liquidity, tick_lower, tick_upper):
     return liquidity * (1.0 / sqrt_pa - 1.0 / sqrt_pb) / 1e18
 
 
+def calc_lp_value_usdc(liquidity, tick_lower, tick_upper, price_usdc):
+    """M2-43: LP position value in USDC at given ETH price.
+    ETH=token0 (1e18 decimals), USDC=token1 (1e6 decimals).
+    P_raw = price_usdc / 1e12 adjusts for the decimal difference.
+    """
+    if liquidity == 0 or price_usdc <= 0:
+        return 0.0
+    sqrt_pa = math.sqrt(1.0001 ** tick_lower)
+    sqrt_pb = math.sqrt(1.0001 ** tick_upper)
+    sqrt_p  = math.sqrt(price_usdc / 1e12)
+    if sqrt_p <= sqrt_pa:
+        x_eth  = liquidity * (1 / sqrt_pa - 1 / sqrt_pb) / 1e18
+        return x_eth * price_usdc
+    elif sqrt_p >= sqrt_pb:
+        return liquidity * (sqrt_pb - sqrt_pa) / 1e6
+    else:
+        x_eth  = liquidity * (1 / sqrt_p  - 1 / sqrt_pb) / 1e18
+        y_usdc = liquidity * (sqrt_p - sqrt_pa) / 1e6
+        return x_eth * price_usdc + y_usdc
+
+
 def log_event(event_type: str, price: float = None, pnl: float = None, details: dict = None):
     record = {"event": event_type}
     if price   is not None: record["price"]   = round(price, 4)
@@ -764,6 +785,8 @@ class LiveHedgeBotV2:
                     (self.entry_price - price) / self.entry_price * 100
                     if self.entry_price else None
                 )
+                # M2-43: capture IL attribution before state reset
+                il_attr = self._calc_il_attribution(self.entry_price, price) if self.entry_price else {}
                 close_price = price
                 self._reset_short_state(close_price)
 
@@ -777,10 +800,17 @@ class LiveHedgeBotV2:
 
                 pnl_str = f"{pnl_est:.2f}%" if pnl_est is not None else "n/a"
                 cb_str  = f" | streak {self._consecutive_stops}/{self._CB_STOP_THRESHOLD}" if reason in ("sl_hit", "trailing_stop") else ""
-                print(f"✅ SHORT CLOSED | Reason: {reason} | Exit: ${close_price:.2f} | PnL: {pnl_str}{cb_str}", flush=True)
+                # M2-43: build IL attribution log line
+                il_str = ""
+                if il_attr and "lp_chg_pct" in il_attr:
+                    il_str = (f" | LP {il_attr['lp_chg_pct']:+.2f}% "
+                              f"Hedge {il_attr['hedge_offset_pct']:+.2f}% "
+                              f"Net {il_attr['net_pct']:+.2f}%")
+                print(f"✅ SHORT CLOSED | Reason: {reason} | Exit: ${close_price:.2f} | PnL: {pnl_str}{cb_str}{il_str}", flush=True)
                 log_event(reason, price=price, pnl=pnl_est, details={
                     "reentry_guard":      round(self.reentry_guard_price, 4),
                     "consecutive_stops":  self._consecutive_stops,
+                    **il_attr,
                 })
                 self.send_email(
                     f"Short CLOSED ✅ ({reason})",
@@ -923,6 +953,36 @@ class LiveHedgeBotV2:
             print(f"⚠️  [M2-49] ATR fetch failed ({exc}) — using static BE {BREAKEVEN_PCT*100:.1f}%",
                   flush=True)
             return BREAKEVEN_PCT
+
+    # ── M2-43: IL attribution ─────────────────────────────────────────────────
+
+    def _calc_il_attribution(self, entry_price: float, close_price: float) -> dict:
+        """Compute LP value change and hedge offset at trade close.
+        Returns dict with lp_chg_pct, hedge_offset_pct, net_pct, lp_value_entry,
+        lp_value_close — all rounded. Empty dict on missing data or error."""
+        try:
+            if not self.liquidity or not self.tick_lower or not self.tick_upper:
+                return {}
+            v_entry = calc_lp_value_usdc(
+                self.liquidity, self.tick_lower, self.tick_upper, entry_price
+            )
+            v_close = calc_lp_value_usdc(
+                self.liquidity, self.tick_lower, self.tick_upper, close_price
+            )
+            if v_entry <= 0:
+                return {}
+            lp_chg_pct      = (v_close - v_entry) / v_entry * 100
+            hedge_pnl_usdc  = (entry_price - close_price) * (self.hedge_size_eth or 0)
+            hedge_offset_pct = hedge_pnl_usdc / v_entry * 100
+            return {
+                "lp_value_entry":    round(v_entry, 2),
+                "lp_value_close":    round(v_close, 2),
+                "lp_chg_pct":        round(lp_chg_pct, 3),
+                "hedge_offset_pct":  round(hedge_offset_pct, 3),
+                "net_pct":           round(lp_chg_pct + hedge_offset_pct, 3),
+            }
+        except Exception as exc:
+            return {"il_calc_err": str(exc)}
 
     # ── HL position sync ──────────────────────────────────────────────────────
 

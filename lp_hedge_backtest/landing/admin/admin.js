@@ -976,6 +976,17 @@ function renderHlDetail(d, ethPrice = null) {
   if (d.events?.length) {
     const rows = d.events.map(e => {
       const det = e.details || {};
+      const ilHtml = det.lp_chg_pct != null ? (() => {
+        const lp  = Number(det.lp_chg_pct);
+        const hdg = Number(det.hedge_offset_pct);
+        const net = Number(det.net_pct);
+        const c   = v => v >= 0 ? 'green' : 'red';
+        return `<span class="il-attr" title="LP value change · hedge offset · net">` +
+          `<span class="${c(lp)}">LP ${lp >= 0 ? '+' : ''}${lp.toFixed(2)}%</span> ` +
+          `<span class="${c(hdg)}">Hedge ${hdg >= 0 ? '+' : ''}${hdg.toFixed(2)}%</span> ` +
+          `<span class="${c(net)}">Net ${net >= 0 ? '+' : ''}${net.toFixed(2)}%</span>` +
+          `</span>`;
+      })() : '';
       const detStr = [
         det.trigger        ? `trigger: ${det.trigger}` : '',
         det.size           ? `size: ${det.size} ETH` : '',
@@ -992,7 +1003,7 @@ function renderHlDetail(d, ethPrice = null) {
         <td><span class="badge badge--${evtColor(e.type)}">${evtLabel(e.type)}</span></td>
         <td class="mono">${e.price ? '$'+fmtNum(e.price) : '—'}</td>
         <td class="mono ${e.pnl != null ? (e.pnl >= 0 ? 'pnl-pos' : 'pnl-neg') : ''}">${e.pnl != null ? (e.pnl >= 0 ? '+' : '')+e.pnl.toFixed(2)+'%' : '—'}</td>
-        <td class="muted detail-notes">${detStr}</td>
+        <td class="muted detail-notes">${detStr}${ilHtml ? '<br>' + ilHtml : ''}</td>
       </tr>`;
     }).join('');
 

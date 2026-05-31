@@ -2322,6 +2322,23 @@
   font-family: monospace;
 }
 .evt-dimmed { opacity: 0.55; }
+
+/* M2-43: IL attribution sub-row */
+.evt-il-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6rem;
+  font-family: monospace;
+  margin-top: 2px;
+  padding-left: 20px;
+  opacity: 0.85;
+}
+.evt-il-sep  { color: var(--color-text-muted); }
+.evt-il-pos  { color: var(--color-neon-green); }
+.evt-il-neg  { color: #f87171; }
+.evt-il-net  { font-weight: 600; }
 .evt-session-header {
   display: flex;
   align-items: center;
