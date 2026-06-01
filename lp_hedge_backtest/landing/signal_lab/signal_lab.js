@@ -352,29 +352,46 @@ function _setSourceFilter(src) {
 }
 
 function _renderFeed() {
-  const content = document.getElementById("signal-feed-content");
-  const empty   = document.getElementById("signals-empty");
-  const badge   = document.getElementById("signal-count-badge");
-  const histTgl = document.getElementById("signal-history-toggle");
-
-  const filtered = _sourceFilter ? _signals.filter(s => s.source_id === _sourceFilter) : _signals;
+  const content  = document.getElementById("signal-feed-content");
+  const empty    = document.getElementById("signals-empty");
+  const badge    = document.getElementById("signal-count-badge");
+  const histTgl  = document.getElementById("signal-history-toggle");
+  const filterChip = document.getElementById("signal-filter-chip");
 
   const CLOSED_STATUSES = ["stopped", "tp_hit", "cancelled"];
   const ACTIVE_MAX_AGE  = 7 * 3600;
-  const active  = filtered.filter(s => !CLOSED_STATUSES.includes(s.status) && s.age_seconds < ACTIVE_MAX_AGE);
-  const closed  = filtered.filter(s =>  CLOSED_STATUSES.includes(s.status) || s.age_seconds >= ACTIVE_MAX_AGE);
+
+  const filtered    = _sourceFilter ? _signals.filter(s => s.source_id === _sourceFilter) : _signals;
+  const allActive   = _signals.filter(s => !CLOSED_STATUSES.includes(s.status) && s.age_seconds < ACTIVE_MAX_AGE);
+  const active      = filtered.filter(s => !CLOSED_STATUSES.includes(s.status) && s.age_seconds < ACTIVE_MAX_AGE);
+  const closed      = filtered.filter(s =>  CLOSED_STATUSES.includes(s.status) || s.age_seconds >= ACTIVE_MAX_AGE);
 
   if (active.length === 0 && closed.length === 0) {
     content.classList.add("hidden");
     empty.classList.remove("hidden");
     badge.classList.add("hidden");
     histTgl.classList.add("hidden");
+    if (filterChip) filterChip.classList.add("hidden");
     return;
   }
 
   empty.classList.add("hidden");
   badge.textContent = active.length;
   active.length > 0 ? badge.classList.remove("hidden") : badge.classList.add("hidden");
+
+  // Show filter chip when source filter is hiding signals
+  if (filterChip) {
+    const hiddenCount = allActive.length - active.length;
+    if (_sourceFilter && hiddenCount > 0) {
+      const srcLabel = SOURCE_META[_sourceFilter]?.label || `Canal ${_sourceFilter}`;
+      filterChip.innerHTML = `${srcLabel} · <strong>${hiddenCount}</strong> oculta${hiddenCount !== 1 ? 's' : ''} <button onclick="_setSourceFilter(0)">× ver todas</button>`;
+      filterChip.classList.remove("hidden");
+      badge.classList.add("sl-count-badge--filtered");
+    } else {
+      filterChip.classList.add("hidden");
+      badge.classList.remove("sl-count-badge--filtered");
+    }
+  }
 
   content.innerHTML = `<div class="sl-signal-list">${active.map(_renderSignalCard).join("")}</div>`;
   if (closed.length > 0) {
