@@ -303,6 +303,30 @@ const TRANSLATIONS = {
     'prot.session.expired.msg':   'Tu sesión expiró pero el bot sigue corriendo en el servidor. Vuelve a conectarte para ver el estado en vivo y gestionar la protección.',
     'prot.btn.reauth':            'Reconectar Sesión',
     'dash.session.expired.banner':'Tu sesión expiró — tus bots siguen corriendo. Re-conéctate en cualquier pool para continuar.',
+    // M2-47: From-Above Distance Gate
+    'prot.fadist.label':          'Filtro Entrada Desde Arriba',
+    'prot.fadist.popover.title':  '¿Cuándo se ignora la entrada "desde arriba"?',
+    'prot.fadist.popover.body':   'Cuando el precio lleva tiempo dentro del rango, la señal de "entrada desde arriba" puede estar desactualizada — el bot se armó cuando el precio estaba por encima del techo, pero eso fue hace semanas.<br><br>Este filtro cancela esa entrada si el precio ya está demasiado lejos del techo del rango.<br><br><span style="color:#00d4ff">Ej con 5% (sugerido): Techo $2,347 → entrada desde arriba solo si precio ≥ $2,230. Por debajo de $2,230, el bot ignora esa señal y espera ruptura inferior.</span><br><br>⚠️ El disparador por <strong>ruptura inferior</strong> sigue activo siempre — este filtro solo afecta la entrada desde arriba.',
+    'prot.fadist.range.strict':   '1% estricto',
+    'prot.fadist.range.permissive':'20% permisivo',
+    'prot.fadist.sublabel':       'Entrada desde arriba solo si precio ≥ $',
+    'prot.fadist.calculating':    'calculando…',
+    'prot.fadist.suggest':        'VIZNAGO sugiere',
+    'prot.fadist.apply':          '← aplicar',
+    'prot.fadist.active.label':   'Filtro Desde Arriba',
+    'prot.fadist.active.suffix':  '% del techo',
+    // M2-44: Funding Gate
+    'prot.fundgate.label':        'Funding Gate',
+    'prot.fundgate.popover.title':'¿Qué es el Funding Gate?',
+    'prot.fundgate.popover.body': 'En Hyperliquid, cuando hay muchos vendedores en corto, los shorts pagan a los longs una tasa de financiamiento. Esto reduce la ganancia neta de tu cobertura.<br><br>Si activas este gate, el bot <strong>no abrirá nuevos shorts</strong> cuando la tasa de financiamiento sea más negativa que el umbral configurado.<br><br><span style="color:#00d4ff">Ejemplo con 0.05%: Si la tasa es -0.06%/hora, el bot espera a que se normalice antes de entrar.</span><br><br>⚠️ Con gate <strong>desactivado</strong> (default), el funding se registra igualmente en cada operación — visible en el historial.',
+    'prot.fundgate.threshold.label':'Umbral mínimo de financiamiento (%/hora)',
+    'prot.fundgate.suggest':      'VIZNAGO sugiere: 0.05%/1h (bloquea si shorts pagan más de 0.05% por hora)',
+    'prot.fundgate.active.on':    'ON',
+    'prot.fundgate.active.off':   'OFF (log-only)',
+    // M2-43: IL Attribution row
+    'evt.il.lp':                  'LP',
+    'evt.il.hedge':               'Hedge',
+    'evt.il.net':                 'Net',
   },
 
   /* ══════════════════════════════════════════════════════════════
@@ -595,6 +619,30 @@ const TRANSLATIONS = {
     'prot.session.expired.msg':   'Your session expired but the bot is still running on the server. Re-sign to view live status and manage your protection.',
     'prot.btn.reauth':            'Reconnect Session',
     'dash.session.expired.banner':'Your session expired — your bots are still running. Re-connect on any pool to continue.',
+    // M2-47: From-Above Distance Gate
+    'prot.fadist.label':          'From-Above Entry Filter',
+    'prot.fadist.popover.title':  'When is the "from above" entry ignored?',
+    'prot.fadist.popover.body':   'When price has been inside the range for a while, the "entry from above" signal may be stale — the bot armed when price was above the ceiling, but that was weeks ago.<br><br>This filter cancels that entry if price has drifted too far below the ceiling.<br><br><span style="color:#00d4ff">Example with 5% (suggested): Ceiling $2,347 → from-above entry only if price ≥ $2,230. Below $2,230, the bot ignores that signal and waits for a lower-boundary break.</span><br><br>⚠️ The <strong>lower-boundary break</strong> trigger remains active at all times — this filter only affects from-above entries.',
+    'prot.fadist.range.strict':   '1% strict',
+    'prot.fadist.range.permissive':'20% permissive',
+    'prot.fadist.sublabel':       'From-above entry only if price ≥ $',
+    'prot.fadist.calculating':    'calculating…',
+    'prot.fadist.suggest':        'VIZNAGO suggests',
+    'prot.fadist.apply':          '← apply',
+    'prot.fadist.active.label':   'From-Above Filter',
+    'prot.fadist.active.suffix':  '% of ceiling',
+    // M2-44: Funding Gate
+    'prot.fundgate.label':        'Funding Gate',
+    'prot.fundgate.popover.title':'What is the Funding Gate?',
+    'prot.fundgate.popover.body': 'On Hyperliquid, when there are many short sellers, shorts pay longs a funding rate. This reduces the net profit of your hedge.<br><br>When this gate is enabled, the bot will <strong>not open new shorts</strong> when the funding rate is more negative than the configured threshold.<br><br><span style="color:#00d4ff">Example with 0.05%: If the rate is -0.06%/hour, the bot waits for it to normalize before entering.</span><br><br>⚠️ With the gate <strong>disabled</strong> (default), funding is still logged on every trade — visible in the event history.',
+    'prot.fundgate.threshold.label':'Minimum funding threshold (%/hour)',
+    'prot.fundgate.suggest':      'VIZNAGO suggests: 0.05%/1h (blocks if shorts pay more than 0.05% per hour)',
+    'prot.fundgate.active.on':    'ON',
+    'prot.fundgate.active.off':   'OFF (log-only)',
+    // M2-43: IL Attribution row
+    'evt.il.lp':                  'LP',
+    'evt.il.hedge':               'Hedge',
+    'evt.il.net':                 'Net',
   },
 };
 

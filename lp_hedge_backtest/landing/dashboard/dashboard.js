@@ -1457,11 +1457,11 @@ async function loadPositionEvents(tokenId) {
         const net = Number(det.net_pct);
         const c   = v => v >= 0 ? 'evt-il-pos' : 'evt-il-neg';
         return `<div class="evt-il-row">` +
-          `<span class="${c(lp)}">LP ${lp >= 0 ? '+' : ''}${lp.toFixed(2)}%</span>` +
+          `<span class="${c(lp)}">${t('evt.il.lp')} ${lp >= 0 ? '+' : ''}${lp.toFixed(2)}%</span>` +
           `<span class="evt-il-sep">·</span>` +
-          `<span class="${c(hdg)}">Hedge ${hdg >= 0 ? '+' : ''}${hdg.toFixed(2)}%</span>` +
+          `<span class="${c(hdg)}">${t('evt.il.hedge')} ${hdg >= 0 ? '+' : ''}${hdg.toFixed(2)}%</span>` +
           `<span class="evt-il-sep">·</span>` +
-          `<span class="${c(net)} evt-il-net">Net ${net >= 0 ? '+' : ''}${net.toFixed(2)}%</span>` +
+          `<span class="${c(net)} evt-il-net">${t('evt.il.net')} ${net >= 0 ? '+' : ''}${net.toFixed(2)}%</span>` +
           `</div>`;
       })() : '';
       return `<div class="pos-event-row${dimmed ? ' evt-dimmed' : ''}">
@@ -2421,12 +2421,12 @@ function buildProtectionDrawer(pos) {
         </div>
         ${bot.mode === 'avaro' ? `
         <div class="prot-info-item">
-          <span class="prot-info-label">Filtro Desde Arriba</span>
-          <span class="prot-info-value">${bot.from_above_dist_pct ?? 5.0}% del techo</span>
+          <span class="prot-info-label">${t('prot.fadist.active.label')}</span>
+          <span class="prot-info-value">${bot.from_above_dist_pct ?? 5.0}${t('prot.fadist.active.suffix')}</span>
         </div>
         <div class="prot-info-item">
-          <span class="prot-info-label">Funding Gate</span>
-          <span class="prot-info-value">${bot.use_funding_gate ? `ON (-${bot.funding_gate_pct ?? 0.05}%/1h)` : 'OFF (log-only)'}</span>
+          <span class="prot-info-label">${t('prot.fundgate.label')}</span>
+          <span class="prot-info-value">${bot.use_funding_gate ? `${t('prot.fundgate.active.on')} (-${bot.funding_gate_pct ?? 0.05}%/1h)` : t('prot.fundgate.active.off')}</span>
         </div>` : ''}
       </div>
       <button class="btn btn-outline btn-sm prot-btn-full prot-btn-stop" id="prot-stop-btn-${bot.id}"
@@ -2549,14 +2549,11 @@ function buildProtectionDrawer(pos) {
         <!-- M2-47: From-Above Distance Gate (avaro mode only) -->
         <div class="tp-slider-row" id="tp-fadist-row-${tokenId}" ${modeVal !== 'avaro' ? 'style="display:none"' : ''}>
           <div class="tp-slider-header">
-            <span class="tp-slider-label">Filtro Entrada Desde Arriba
+            <span class="tp-slider-label">${t('prot.fadist.label')}
               <span class="tp-info-anchor" tabindex="0" aria-label="Qué es esto">❓
                 <span class="tp-info-popover">
-                  <strong>¿Cuándo se ignora la entrada "desde arriba"?</strong><br><br>
-                  Cuando el precio lleva tiempo dentro del rango, la señal de "entrada desde arriba" puede estar desactualizada — el bot se armó cuando el precio estaba por encima del techo, pero eso fue hace semanas.<br><br>
-                  Este filtro cancela esa entrada si el precio ya está demasiado lejos del techo del rango.<br><br>
-                  <span style="color:#00d4ff">Ej con 5% (sugerido): Techo $2,347 → entrada desde arriba solo si precio ≥ $2,230. Por debajo de $2,230, el bot ignora esa señal y espera ruptura inferior.</span><br><br>
-                  ⚠️ El disparador por <strong>ruptura inferior</strong> sigue activo siempre — este filtro solo afecta la entrada desde arriba.
+                  <strong>${t('prot.fadist.popover.title')}</strong><br><br>
+                  ${t('prot.fadist.popover.body')}
                 </span>
               </span>
             </span>
@@ -2565,8 +2562,8 @@ function buildProtectionDrawer(pos) {
           <input type="range" class="tp-slider" id="prot-fadist-${tokenId}"
                  min="1" max="20" step="0.5" value="${faDistVal}"
                  oninput="onFaDistChange('${tokenId}', pos)" />
-          <div class="tp-slider-range-labels"><span>1% estricto</span><span>20% permisivo</span></div>
-          <div class="tp-fadist-sublabel" id="tp-fadist-sub-${tokenId}">calculando…</div>
+          <div class="tp-slider-range-labels"><span>${t('prot.fadist.range.strict')}</span><span>${t('prot.fadist.range.permissive')}</span></div>
+          <div class="tp-fadist-sublabel" id="tp-fadist-sub-${tokenId}">${t('prot.fadist.calculating')}</div>
           <div class="tp-fadist-suggest" id="tp-fadist-suggest-${tokenId}"></div>
         </div>
 
@@ -2690,20 +2687,17 @@ function buildProtectionDrawer(pos) {
         <div class="tp-check-row" style="margin-top:8px" id="tp-fundgate-row-${tokenId}" ${modeVal !== 'avaro' ? 'style="display:none"' : ''}>
           <input type="checkbox" id="prot-fundgate-${tokenId}" ${fundGateVal ? 'checked' : ''}
                  onchange="onFundGateChange('${tokenId}')" />
-          <label class="tp-check-label" for="prot-fundgate-${tokenId}">Funding Gate
+          <label class="tp-check-label" for="prot-fundgate-${tokenId}">${t('prot.fundgate.label')}
             <span class="tp-info-anchor" tabindex="0" aria-label="Qué es esto">❓
               <span class="tp-info-popover">
-                <strong>¿Qué es el Funding Gate?</strong><br><br>
-                En Hyperliquid, cuando hay muchos vendedores en corto, los shorts pagan a los longs una tasa de financiamiento. Esto reduce la ganancia neta de tu cobertura.<br><br>
-                Si activas este gate, el bot <strong>no abrirá nuevos shorts</strong> cuando la tasa de financiamiento sea más negativa que el umbral configurado.<br><br>
-                <span style="color:#00d4ff">Ejemplo con 0.05%: Si la tasa es -0.06%/hora, el bot espera a que se normalice antes de entrar.</span><br><br>
-                ⚠️ Con gate <strong>desactivado</strong> (default), el funding se registra igualmente en cada operación — visible en el historial.
+                <strong>${t('prot.fundgate.popover.title')}</strong><br><br>
+                ${t('prot.fundgate.popover.body')}
               </span>
             </span>
           </label>
         </div>
         <div class="prot-field" id="tp-fundgate-pct-row-${tokenId}" style="${!fundGateVal || modeVal !== 'avaro' ? 'display:none' : ''}">
-          <label class="prot-label" style="font-size:0.6rem;color:var(--color-text-muted)">Umbral mínimo de financiamiento (%/hora)</label>
+          <label class="prot-label" style="font-size:0.6rem;color:var(--color-text-muted)">${t('prot.fundgate.threshold.label')}</label>
           <div class="prot-input-group">
             <input type="number" class="prot-input" id="prot-fundgate-pct-${tokenId}"
                    value="${fundGatePctVal}" step="0.001" min="0.001" max="1.0"
@@ -2711,7 +2705,7 @@ function buildProtectionDrawer(pos) {
             <span class="prot-input-suffix">%/1h</span>
           </div>
           <span style="font-size:0.58rem;color:var(--color-text-muted);margin-top:2px">
-            VIZNAGO sugiere: 0.05%/1h (bloquea si shorts pagan más de 0.05% por hora)
+            ${t('prot.fundgate.suggest')}
           </span>
         </div>
 
@@ -2853,7 +2847,7 @@ window.onFaDistChange = function (tokenId, pos) {
   const upper   = pos?.priceUpper ?? null;
   if (upper && subEl) {
     const gatePx = upper * (1 - pct / 100);
-    subEl.textContent = `Entrada desde arriba solo si precio ≥ $${gatePx.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+    subEl.textContent = `${t('prot.fadist.sublabel')}${gatePx.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
     subEl.style.display = '';
   }
 
@@ -2862,9 +2856,9 @@ window.onFaDistChange = function (tokenId, pos) {
     const suggested = _faDistSuggestion(pos);
     const isSuggested = Math.abs(pct - suggested) < 0.01;
     if (isSuggested) {
-      sugEl.innerHTML = `<span class="tp-fadist-chip tp-fadist-chip--active">✓ VIZNAGO sugiere ${suggested}%</span>`;
+      sugEl.innerHTML = `<span class="tp-fadist-chip tp-fadist-chip--active">✓ ${t('prot.fadist.suggest')} ${suggested}%</span>`;
     } else {
-      sugEl.innerHTML = `<span class="tp-fadist-chip">VIZNAGO sugiere ${suggested}% <button class="tp-fadist-reset" onclick="(function(){var s=document.getElementById('prot-fadist-${tokenId}');if(s){s.value=${suggested};window.onFaDistChange('${tokenId}',null)}})()">← aplicar</button></span>`;
+      sugEl.innerHTML = `<span class="tp-fadist-chip">${t('prot.fadist.suggest')} ${suggested}% <button class="tp-fadist-reset" onclick="(function(){var s=document.getElementById('prot-fadist-${tokenId}');if(s){s.value=${suggested};window.onFaDistChange('${tokenId}',null)}})()">← ${t('prot.fadist.apply')}</button></span>`;
     }
   }
 };

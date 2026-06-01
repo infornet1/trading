@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-05-31 (M2-44 ✅ funding rate awareness live; M2-43 ✅ IL attribution live; M2-47 ✅ from-above gate live; M2-49 ✅ ATR-adaptive breakeven live; M2-48 planned)
+# Last updated: 2026-06-01 (i18n fix: M2-43/44/47 UI fully bilingual EN+ES; systemd Restart=always fix; M2-44 ✅ M2-43 ✅ M2-47 ✅ M2-49 ✅ live; M2-48 planned)
 
 ---
 
@@ -205,6 +205,8 @@ Key improvements deployed to `live_hedge_bot_v2.py`. All user-tunable via DB col
 | **M2-49** ATR breakeven | Breakeven trigger adapts to volatility: `max(1%, 1.5×ATR14)`. Prevents trailing stop activating too early in high-vol sessions. | `ATR_MULT_BE` env | 1.5× |
 | **M2-43** IL attribution | On every hedge close, logs: LP value at entry vs close (`lp_chg_pct`), hedge P&L as % of LP value (`hedge_offset_pct`), net result (`net_pct`). Visible in forensic event history. | — | Always on |
 | **M2-44** Funding rate | Logs current 1h ETH funding rate at hedge open. Logs cumulative funding paid/received at close. Optional `USE_FUNDING_GATE` blocks entry when rate < -threshold. | `use_funding_gate` toggle + `funding_gate_pct` | OFF / 0.05% |
+
+All M2-43/44/47 dashboard strings are **fully bilingual (EN + ES)** as of 2026-06-01. Uses `t('key')` from `landing/i18n.js` — label, popover, slider ranges, sublabel, suggestion chip, active panel all localized.
 
 ## Open Enhancement Backlog (May 2026)
 
