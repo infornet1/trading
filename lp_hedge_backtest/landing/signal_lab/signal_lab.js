@@ -362,9 +362,10 @@ function _renderFeed() {
   const ACTIVE_MAX_AGE  = 7 * 3600;
 
   const filtered    = _sourceFilter ? _signals.filter(s => s.source_id === _sourceFilter) : _signals;
-  const allActive   = _signals.filter(s => !CLOSED_STATUSES.includes(s.status) && s.age_seconds < ACTIVE_MAX_AGE);
-  const active      = filtered.filter(s => !CLOSED_STATUSES.includes(s.status) && s.age_seconds < ACTIVE_MAX_AGE);
-  const closed      = filtered.filter(s =>  CLOSED_STATUSES.includes(s.status) || s.age_seconds >= ACTIVE_MAX_AGE);
+  const _isActive = s => !CLOSED_STATUSES.includes(s.status) && (s.status === "executed" || s.age_seconds < ACTIVE_MAX_AGE);
+  const allActive   = _signals.filter(_isActive);
+  const active      = filtered.filter(_isActive);
+  const closed      = filtered.filter(s => !_isActive(s));
 
   if (active.length === 0 && closed.length === 0) {
     content.classList.add("hidden");
