@@ -358,7 +358,7 @@ function _renderFeed() {
   const histTgl  = document.getElementById("signal-history-toggle");
   const filterChip = document.getElementById("signal-filter-chip");
 
-  const CLOSED_STATUSES = ["stopped", "tp_hit", "cancelled"];
+  const CLOSED_STATUSES = ["stopped", "tp_hit", "cancelled", "expired"];
   const ACTIVE_MAX_AGE  = 7 * 3600;
 
   const filtered    = _sourceFilter ? _signals.filter(s => s.source_id === _sourceFilter) : _signals;

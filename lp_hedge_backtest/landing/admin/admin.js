@@ -1487,6 +1487,12 @@ function renderSignalLab(d) {
           </div>
         </div>
         <div class="sl-admin-group">
+          <div class="sl-admin-label">Ejecutadas (abiertas)</div>
+          <div class="sl-admin-val" style="${(signals.executed ?? 0) > 0 ? 'color:#4ade80' : ''}">
+            ${signals.executed ?? '—'}
+          </div>
+        </div>
+        <div class="sl-admin-group">
           <div class="sl-admin-label">En vivo (HL)</div>
           <div class="sl-admin-val" style="${(signals.live_execs ?? 0) > 0 ? 'color:#4ade80' : ''}">
             ${signals.live_execs ?? '—'}
@@ -1666,9 +1672,9 @@ function _slWalletCard(w) {
 // ── Signal feed card (unified activity log) ─────────────────────────────────
 
 function _slFeedCard(activity) {
-  const pending = activity.filter(a => a.kind === 'signal' && a.status === 'pending').length;
-  const countBadge = pending > 0
-    ? `<span class="pools-count">${pending} activas</span>` : '';
+  const active = activity.filter(a => a.kind === 'signal' && (a.status === 'pending' || a.status === 'executed')).length;
+  const countBadge = active > 0
+    ? `<span class="pools-count">${active} activas</span>` : '';
 
   const rows = activity.slice(0, 15).map(a => {
     if (a.kind === 'signal') {
