@@ -271,6 +271,15 @@ async def _auto_execute_signal(signal_id: int, sig):
                     f"Acción requerida: revisa el balance y la configuración de la wallet.",
                 )
 
+        # If every wallet failed, the signal never entered "executed" — mark it cancelled
+        # so it doesn't stay orphaned as "pending" indefinitely.
+        if signal.status == "pending":
+            signal.status = "cancelled"
+            print(
+                f"[Auto-Execute] ⚠️ All wallets failed for {sig.pair} — signal marked cancelled",
+                flush=True,
+            )
+
         await db.commit()
 
 
