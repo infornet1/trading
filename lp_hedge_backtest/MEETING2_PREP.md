@@ -237,6 +237,9 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 | SL-P5b | Price drift warning in Execute modal | Low | ✅ Done 2026-04-27 |
 | SL-P5c | SL buffer remaining % in Execute modal | Low | ✅ Done 2026-04-27 |
 | SL-P6 | "Usar este rango →" pre-fills LP Defensor bot config form | Medium | 🔲 Next |
+| SL-P8a | Signal active window — executed signals never age out | Low | ✅ Done 2026-06-09 — `pending` signals still expire after 7h in UI; `executed` signals stay in active bucket until terminal status (stopped/tp_hit/cancelled). Fixes mismatch where 3 open HL positions showed as 1 active signal. |
+| SL-P8b | Auto-execute all-fail → mark signal cancelled | Low | ✅ Done 2026-06-09 — when every wallet's order fails (e.g. limit not filled, price moved), signal is marked `cancelled` instead of staying `pending` indefinitely. Fixed signal #52 (BTC, both wallets failed "order not filled resting"). |
+| SL-P8c | Source filter chip — show hidden active count | Low | ✅ Done 2026-06-09 — amber chip next to badge when source filter hides active signals; shows channel name + hidden count + "× ver todas" reset. |
 | SL-P7 | Auto copy trading: signal_wallets table, real HL execution, agent key model | High | ✅ Done 2026-05-03 |
 | SL-P7b | Copy Trading card in Wallet Manager (card UX, spot_usable detection) | Medium | ✅ Done 2026-05-03 |
 | SL-P7c | Email notifications: new signal, fill, failure, listener crash | Low | ✅ Done 2026-05-03 |
@@ -319,4 +322,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-06-01 — i18n fix: all M2-43/44/47 UI strings now bilingual (EN+ES) in `landing/i18n.js` + `dashboard.js`. systemd `Restart=always` fix for viznago_api.service (was dying silently after 1000 requests). M2-43 ✅ M2-44 ✅ M2-47 ✅ (all marked done). M2-47 ✅ live (from-above distance gate, `MAX_FROM_ABOVE_DIST_PCT=5.0`). M2-49 ✅ live (ATR-adaptive breakeven). M2-48 added (dynamic delta sizing, highest theoretical impact). M2-47 added (from-above distance gate, highest-impact per live data) and deployed same session. M2-41/42 downgraded to Low after live data analysis (Config 17, 54 trades). M2-41–M2-46 added (strategic depth gap analysis). SL-P7/7b/7c ✅ copy trading auto-execute live. M2-39 permanent DB enum fix `4cdf0d3`. M2-34 ✅ M2-28 ✅ M2-30 ✅ M2-6 ✅ M2-7 ✅ M2-16 (UI) ✅ T1-3 ✅ T2-6 ✅ M2-9 ✅ M2-13 ✅ M2-21 ✅ M2-39 ✅ M2-40 ✅ all live-validated. M2-29 deferred.*
+*Last updated: 2026-06-09 — Signal Lab fixes: SL-P8a executed signals never age out of active bucket ✅; SL-P8b auto-execute all-fail → signal cancelled ✅; SL-P8c source filter chip ✅. Signal Lab win rates observed: src=3 (Mid Term) 77.8%, src=1 42.9%, src=2 37.5%. Previously (2026-06-01): i18n fix M2-43/44/47 ✅ bilingual; systemd Restart=always fix; M2-48 added (dynamic delta sizing); M2-41/42 downgraded to Low.*

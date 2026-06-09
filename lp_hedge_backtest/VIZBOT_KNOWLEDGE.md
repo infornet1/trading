@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-06-01 (i18n fix: M2-43/44/47 UI fully bilingual EN+ES; systemd Restart=always fix; M2-44 ✅ M2-43 ✅ M2-47 ✅ M2-49 ✅ live; M2-48 planned)
+# Last updated: 2026-06-09 (Signal Lab fixes: executed signals never age out of active bucket; auto-execute all-fail → signal marked cancelled; source filter chip UI)
 
 ---
 
@@ -59,7 +59,9 @@
 - **Wallet Manager**: users register copy-trading wallets via a card (🟢 ARMADO / 🟡 EN PAUSA) on the Wallet Manager page (`/wallet/`).
 - **Signal Lab page** (`/signal_lab/`): shows armed banner, signal cards with 🤖 Auto state, manual override button, history.
 - **Email alerts**: new signal received, order filled (fill price + size + margin), order failed (error reason), listener crash (watchdog restart).
-- **Signal expiry**: signals older than 4h auto-marked `expired`, not executable.
+- **Signal expiry**: `pending` signals older than 4h auto-marked `expired` (backend sweep). Frontend active window: `pending` signals shown as active for up to 7h; `executed` signals shown as active indefinitely until they receive a terminal status (`stopped`/`tp_hit`/`cancelled`) — no age cutoff once a trade is open.
+- **Auto-execute failure handling**: if every wallet attempt fails (e.g. limit order not filled, price moved), the signal is automatically marked `cancelled` — it does not stay orphaned as `pending`. A failure email is sent per wallet regardless.
+- **Source filter chip**: when a source-channel filter is active and it hides active signals, an amber chip appears inline with the badge showing how many signals are hidden and a "× ver todas" one-click reset.
 - **Safety**: wallets with active LP bots are hard-blocked from signal execution (UI + API).
 - **Admin monitor**: Signal Lab section in admin dashboard shows pool-card style wallet cards (armed/paused/inactive status, balance, last 3 executions as mini-evt rows, toggle/deactivate) + a signal feed card (last 15 signals + executions, cyan border). Registration form removed from admin — registration belongs in Wallet Manager.
 - **Dry run test**: `python -m telegram_listener.test_signal_lab` — 6-step pipeline test without real orders.
