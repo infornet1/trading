@@ -88,6 +88,6 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 | H4, H5, M3, M4, M6, L5 | listener restart only — LP untouched |
 | M5 | API reload (bots respawn; check manual trade on Config 17 wallet first) |
 
-- **M8** — HL position panels show SL/TP *limit* px instead of trigger px (`admin.py`/`signal_lab.py` `_fetch_one`); switch to `frontend_open_orders` and read `triggerPx`. Display-only.
+- **M8 — HL position panels showed SL/TP *limit* px instead of trigger px. ✅ FIXED 2026-06-10.** Both `_fetch_one` blocks (admin + user Signal Lab) switched to `frontend_open_orders` and classify/display by `triggerPx` (fallback `limitPx` for plain limit orders). E.g. Config 17 SL displayed $1720 while the real trigger was $1645.
 
-**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 ✅ + H4 ✅ (listener restarted 2026-06-09) → M1 ✅ + M2 ✅ + L1 ✅ (API + listener restarted 2026-06-10) → M5 ✅ + M7 ✅ (API + listener restarted 2026-06-10). Remaining: M3, M4, M6, M8, L2–L5.
+**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 ✅ + H4 ✅ (listener restarted 2026-06-09) → M1 ✅ + M2 ✅ + L1 ✅ (API + listener restarted 2026-06-10) → M5 ✅ + M7 ✅ (API + listener restarted 2026-06-10) → M8 ✅ (API restarted 2026-06-10). Remaining: M3, M4, M6, L2–L5.

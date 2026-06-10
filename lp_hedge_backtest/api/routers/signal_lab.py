@@ -858,7 +858,12 @@ async def get_hl_positions(
             from hyperliquid.utils import constants
             info        = Info(constants.MAINNET_API_URL, skip_ws=True)
             state       = info.user_state(wallet.hl_wallet_addr)
-            open_orders = info.open_orders(wallet.hl_wallet_addr)
+            # M8: frontend_open_orders — basic endpoint omits triggerPx, so the
+            # panel showed the SL *limit* px (trigger ×1.03) instead of the trigger
+            open_orders = info.frontend_open_orders(wallet.hl_wallet_addr)
+
+            def _order_px(o):
+                return float(o.get("triggerPx") or o["limitPx"])
 
             orders_by_coin: dict = {}
             for o in open_orders:
@@ -889,23 +894,23 @@ async def get_hl_positions(
                 tp_prices: list           = []
 
                 if side == "short":
-                    sl_cands = [o for o in reduce_orders if float(o["limitPx"]) > entry_px]
+                    sl_cands = [o for o in reduce_orders if _order_px(o) > entry_px]
                     tp_cands = sorted(
-                        [o for o in reduce_orders if float(o["limitPx"]) < entry_px],
-                        key=lambda o: float(o["limitPx"]), reverse=True,
+                        [o for o in reduce_orders if _order_px(o) < entry_px],
+                        key=_order_px, reverse=True,
                     )
                     if sl_cands:
-                        sl_price = float(max(sl_cands, key=lambda o: float(o["limitPx"]))["limitPx"])
+                        sl_price = _order_px(max(sl_cands, key=_order_px))
                 else:
-                    sl_cands = [o for o in reduce_orders if float(o["limitPx"]) < entry_px]
+                    sl_cands = [o for o in reduce_orders if _order_px(o) < entry_px]
                     tp_cands = sorted(
-                        [o for o in reduce_orders if float(o["limitPx"]) > entry_px],
-                        key=lambda o: float(o["limitPx"]),
+                        [o for o in reduce_orders if _order_px(o) > entry_px],
+                        key=_order_px,
                     )
                     if sl_cands:
-                        sl_price = float(min(sl_cands, key=lambda o: float(o["limitPx"]))["limitPx"])
+                        sl_price = _order_px(min(sl_cands, key=_order_px))
 
-                tp_prices = [float(o["limitPx"]) for o in tp_cands]
+                tp_prices = [_order_px(o) for o in tp_cands]
 
                 result.append({
                     "wallet_addr":    wallet.hl_wallet_addr,
