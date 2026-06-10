@@ -22,6 +22,19 @@ from api.models import SignalEvent, SignalExecution, SignalWallet
 SCAN_INTERVAL = 300   # every 5 minutes
 STARTUP_DELAY =  90   # stagger from other background tasks
 
+# L5: Info() construction costs ~2 REST calls (fetches meta) — one shared
+# client instead of one per execution row per scan pass.
+_INFO_CLIENT = None
+
+
+def _get_info():
+    global _INFO_CLIENT
+    if _INFO_CLIENT is None:
+        from hyperliquid.info import Info
+        from hyperliquid.utils import constants
+        _INFO_CLIENT = Info(constants.MAINNET_API_URL, skip_ws=True)
+    return _INFO_CLIENT
+
 
 def _hl_check_closed(
     wallet_addr:  str,
@@ -43,9 +56,7 @@ def _hl_check_closed(
       error       str | None
     """
     try:
-        from hyperliquid.info import Info
-        from hyperliquid.utils import constants
-        info = Info(constants.MAINNET_API_URL, skip_ws=True)
+        info = _get_info()  # L5: shared client
 
         # ── 1. Is position still open? ────────────────────────────────────────
         state = info.user_state(wallet_addr)

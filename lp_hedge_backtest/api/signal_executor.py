@@ -4,6 +4,7 @@ Synchronous — wrap with asyncio.to_thread() in async contexts.
 """
 import math
 import os
+import time
 from typing import Optional
 
 # Fixed $10 notional per trade (controlled live mode). Set to None for full size_pct sizing.
@@ -21,6 +22,29 @@ from hyperliquid.info import Info
 from hyperliquid.utils import constants
 
 from api.crypto import decrypt
+
+# L5/M4: Info() construction itself costs ~2 REST calls (fetches meta+spot_meta)
+# and meta() was re-fetched per order — share one client and cache meta 1h.
+_INFO_CLIENT: Optional[Info] = None
+_META_CACHE:  Optional[dict] = None
+_META_TS:     float = 0.0
+_META_TTL:    float = 3600.0
+
+
+def _get_info() -> Info:
+    global _INFO_CLIENT
+    if _INFO_CLIENT is None:
+        _INFO_CLIENT = Info(constants.MAINNET_API_URL, skip_ws=True)
+    return _INFO_CLIENT
+
+
+def _get_meta(info: Info) -> dict:
+    global _META_CACHE, _META_TS
+    if _META_CACHE is not None and (time.monotonic() - _META_TS) < _META_TTL:
+        return _META_CACHE
+    _META_CACHE = info.meta()
+    _META_TS    = time.monotonic()
+    return _META_CACHE
 
 
 def _extract_oid(resp) -> Optional[str]:
@@ -45,7 +69,7 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
     try:
         secret_key = decrypt(hl_secret_key_encrypted)
         account    = Account.from_key(secret_key)
-        info       = Info(constants.MAINNET_API_URL, skip_ws=True)
+        info       = _get_info()  # L5: shared client
 
         # ── Balance check (unified account: perp + spot USDC both usable as margin)
         state   = info.user_state(hl_wallet_addr)
@@ -75,7 +99,7 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         max_leverage = leverage_requested
         sz_decimals  = 4  # safe default; HL rejects sizes with too many decimal places
         try:
-            meta = info.meta()
+            meta = _get_meta(info)  # M4: cached 1h — was a fresh fetch per order
             for asset in meta.get("universe", []):
                 if asset.get("name", "").upper() == symbol:
                     max_leverage = int(asset.get("maxLeverage", leverage_requested))

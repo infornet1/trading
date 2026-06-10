@@ -12,6 +12,7 @@ Run:
 
 import asyncio
 import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -65,6 +66,18 @@ SOURCE_NAMES = {1: "Short-Term", 2: "Bitcoin Daily Signals", 3: "Mid Term", 4: "
 engine       = create_async_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600, echo=False)
 AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+# L5: Info() construction costs ~2 REST calls (fetches meta+spot_meta) — one
+# shared read-only client for all sync helpers instead of one per call.
+_INFO_CLIENT: Info | None = None
+
+
+def _hl_info() -> Info:
+    global _INFO_CLIENT
+    if _INFO_CLIENT is None:
+        _INFO_CLIENT = Info(hlc.MAINNET_API_URL, skip_ws=True)
+    return _INFO_CLIENT
+
+
 # HL perpetual asset whitelist — refreshed every hour
 _HL_ASSETS: set[str] = set()
 _HL_ASSETS_TS: float = 0.0
@@ -72,7 +85,7 @@ _HL_ASSETS_TTL: float = 3600.0
 
 
 def _fetch_hl_assets_sync() -> set[str]:
-    meta = Info(hlc.MAINNET_API_URL, skip_ws=True).meta()
+    meta = _hl_info().meta()
     return {a["name"].upper() for a in meta.get("universe", [])}
 
 
@@ -149,8 +162,128 @@ async def save_signal(msg, sig, source_id: int) -> int | None:
     return ev_id
 
 
+# M3: transient failures worth retrying — drift/balance rejections are final
+_RETRYABLE_MARKERS = ("not filled", "timeout", "timed out", "connection", "temporarily")
+_EXEC_RETRIES      = 3
+_EXEC_RETRY_DELAY  = 2.0
+
+
+async def _place_with_retry(wallet, signal) -> dict:
+    """M3: place_hl_order with up to 3 attempts on transient errors."""
+    result: dict = {"success": False, "error": "not attempted"}
+    for attempt in range(1, _EXEC_RETRIES + 1):
+        result = await asyncio.to_thread(
+            place_hl_order, wallet.hl_wallet_addr, wallet.hl_secret_key, signal,
+        )
+        if result["success"]:
+            return result
+        err = (result.get("error") or "").lower()
+        if attempt == _EXEC_RETRIES or not any(m in err for m in _RETRYABLE_MARKERS):
+            return result
+        print(
+            f"[Auto-Execute] ↻ retry {attempt + 1}/{_EXEC_RETRIES} for "
+            f"{signal.pair} — {result.get('error')}",
+            flush=True,
+        )
+        await asyncio.sleep(_EXEC_RETRY_DELAY)
+    return result
+
+
+async def _exec_one_wallet(signal_id: int, sig, signal, wallet) -> dict:
+    """M4: execute one wallet with its own DB session — safe to run concurrently."""
+    print(
+        f"[Auto-Execute] Wallet {wallet.hl_wallet_addr[:10]}… → "
+        f"{sig.pair} {sig.direction.upper()} {sig.leverage}x",
+        flush=True,
+    )
+    result = await _place_with_retry(wallet, signal)
+
+    outcome = "filled" if result["success"] else "failed"
+    async with AsyncSession_() as db:
+        db.add(SignalExecution(
+            signal_id      = signal_id,
+            user_address   = wallet.hl_wallet_addr,  # auto-exec: wallet is the "user"
+            hl_wallet_addr = wallet.hl_wallet_addr,
+            hl_order_id    = result.get("hl_order_id"),
+            fill_price     = result.get("fill_price"),
+            outcome        = outcome,
+            sl_order_id    = result.get("sl_order_id"),
+            tp1_order_id   = result.get("tp1_order_id"),
+            tp2_order_id   = result.get("tp2_order_id"),
+            # M5: record ACTUAL leverage + notional — required for real $ P&L
+            exec_leverage  = result.get("leverage"),
+            exec_size_usdt = (
+                round(result["size"] * result["fill_price"], 2)
+                if result.get("success") and result.get("size") and result.get("fill_price")
+                else None
+            ),
+        ))
+        await db.commit()
+
+    if result["success"]:
+        print(
+            f"[Auto-Execute] ✅ {sig.pair} filled @ ${result['fill_price']} "
+            f"| order {result['hl_order_id']}",
+            flush=True,
+        )
+        sym = sig.pair.split('/')[0]
+        lev_line = (
+            f"Leverage:   {result['leverage']}x  "
+            f"⚠️ ajustado desde {result['leverage_requested']}x (máx HL para {sym})\n"
+            if result.get("leverage_adjusted") else
+            f"Leverage:   {result['leverage']}x\n"
+        )
+        if result.get("split_tps"):
+            tp_lines = (
+                f"TP1:        ${result['tp1_price']:,.4f}  ({result['tp1_size']} {sym} — 50%)\n"
+                f"TP2:        ${result['tp2_price']:,.4f}  ({result['tp2_size']} {sym} — 50%)\n"
+                f"SL:         ${result.get('sl_price', float(sig.stoploss)):,.4f}  (full size, reduce_only — cubre runner)\n"
+            )
+        else:
+            tp1 = result.get("tp1_price")
+            tp_lines = (
+                f"TP:         ${tp1:,.4f}  (full size)\n" if tp1 else ""
+                f"SL:         ${float(sig.stoploss):,.4f}\n"
+            )
+        _size_pct_display = float(sig.size_pct or 2.0)
+        scaled_note = (
+            f"⚠️  Nota: tamaño escalado al mínimo de $10 USDC (señal pedía "
+            f"{_size_pct_display:.1f}% = ${_size_pct_display / 100 * result['balance']:.2f})\n\n"
+            if result.get("size_scaled") else ""
+        )
+        await asyncio.to_thread(
+            send_signal_email,
+            f"✅ Orden ejecutada: {sig.pair} {sig.direction.upper()} {sig.leverage}x",
+            f"Copy trade ejecutado automáticamente en Hyperliquid\n\n"
+            f"{scaled_note}"
+            f"Par:        {sig.pair}\n"
+            f"Dirección:  {sig.direction.upper()}\n"
+            f"{lev_line}"
+            f"Fill price: ${result['fill_price']:,.4f}\n"
+            f"Size:       {result['size']} {sym}\n"
+            f"Margen:     ${result['margin_used']:.2f} USDC\n"
+            f"Balance:    ${result['balance']:.2f} USDC\n"
+            f"Order ID:   {result['hl_order_id']}\n\n"
+            f"{tp_lines}",
+        )
+    else:
+        print(
+            f"[Auto-Execute] ❌ {sig.pair} failed: {result['error']}",
+            flush=True,
+        )
+        await asyncio.to_thread(
+            send_signal_email,
+            f"❌ Auto-execute FALLIDO: {sig.pair} {sig.direction.upper()}",
+            f"La orden NO fue ejecutada en Hyperliquid\n\n"
+            f"Par:    {sig.pair}\n"
+            f"Error:  {result['error']}\n\n"
+            f"Acción requerida: revisa el balance y la configuración de la wallet.",
+        )
+    return result
+
+
 async def _auto_execute_signal(signal_id: int, sig):
-    """Fire real HL orders for all active auto-execute wallets."""
+    """Fire real HL orders for all active auto-execute wallets (M4: concurrently)."""
     async with AsyncSession_() as db:
         res = await db.execute(
             select(SignalWallet).where(
@@ -159,135 +292,53 @@ async def _auto_execute_signal(signal_id: int, sig):
             )
         )
         wallets = res.scalars().all()
-
         if not wallets:
             return
 
-        # Re-fetch signal to get SQLAlchemy model (place_hl_order reads .pair etc.)
+        # Re-fetch signal as ORM model (place_hl_order reads .pair etc.)
         sig_res = await db.execute(select(SignalEvent).where(SignalEvent.id == signal_id))
         signal  = sig_res.scalar_one_or_none()
         if not signal:
             return
 
-        for wallet in wallets:
-            print(
-                f"[Auto-Execute] Wallet {wallet.hl_wallet_addr[:10]}… → "
-                f"{sig.pair} {sig.direction.upper()} {sig.leverage}x",
-                flush=True,
-            )
-            result = await asyncio.to_thread(
-                place_hl_order,
-                wallet.hl_wallet_addr,
-                wallet.hl_secret_key,
-                signal,
-            )
+    # M4: wallets run concurrently — wallet #2 no longer waits for #1's order+email
+    results = await asyncio.gather(
+        *[_exec_one_wallet(signal_id, sig, signal, w) for w in wallets],
+        return_exceptions=True,
+    )
+    any_success = any(isinstance(r, dict) and r.get("success") for r in results)
+    for r in results:
+        if isinstance(r, Exception):
+            print(f"[Auto-Execute] ❌ wallet task crashed: {r}", flush=True)
 
-            outcome = "filled" if result["success"] else "failed"
-            execution = SignalExecution(
-                signal_id      = signal_id,
-                user_address   = wallet.hl_wallet_addr,  # auto-exec: wallet is the "user"
-                hl_wallet_addr = wallet.hl_wallet_addr,
-                hl_order_id    = result.get("hl_order_id"),
-                fill_price     = result.get("fill_price"),
-                outcome        = outcome,
-                sl_order_id    = result.get("sl_order_id"),
-                tp1_order_id   = result.get("tp1_order_id"),
-                tp2_order_id   = result.get("tp2_order_id"),
-                # M5: record ACTUAL leverage + notional — required for real $ P&L
-                exec_leverage  = result.get("leverage"),
-                exec_size_usdt = (
-                    round(result["size"] * result["fill_price"], 2)
-                    if result.get("success") and result.get("size") and result.get("fill_price")
-                    else None
-                ),
-            )
-            db.add(execution)
-
-            if result["success"]:
-                # Re-read status: channel may have posted a stop while the order was placing
-                await db.refresh(signal)
-                if signal.status in ("stopped", "cancelled"):
-                    # Order landed on HL but channel already stopped — close immediately
-                    print(
-                        f"[Auto-Execute] ⚠️ {sig.pair} filled but channel stopped during execution "
-                        f"— closing position now",
-                        flush=True,
-                    )
-                    asyncio.create_task(_auto_close_signal(
-                        {"id": signal_id, "prev_status": "executed",
-                         "pair": sig.pair, "direction": sig.direction},
-                        "stopped",
-                    ))
-                else:
-                    signal.status = "executed"
+    # Status transition — single writer, after all wallets settled.
+    # Re-read first: the channel may have posted a stop while orders were placing.
+    async with AsyncSession_() as db:
+        sig_res = await db.execute(select(SignalEvent).where(SignalEvent.id == signal_id))
+        row = sig_res.scalar_one_or_none()
+        if not row:
+            return
+        if any_success:
+            if row.status in ("stopped", "cancelled"):
                 print(
-                    f"[Auto-Execute] ✅ {sig.pair} filled @ ${result['fill_price']} "
-                    f"| order {result['hl_order_id']}",
+                    f"[Auto-Execute] ⚠️ {sig.pair} filled but channel stopped during execution "
+                    f"— closing position now",
                     flush=True,
                 )
-                sym = sig.pair.split('/')[0]
-                lev_line = (
-                    f"Leverage:   {result['leverage']}x  "
-                    f"⚠️ ajustado desde {result['leverage_requested']}x (máx HL para {sym})\n"
-                    if result.get("leverage_adjusted") else
-                    f"Leverage:   {result['leverage']}x\n"
-                )
-                if result.get("split_tps"):
-                    tp_lines = (
-                        f"TP1:        ${result['tp1_price']:,.4f}  ({result['tp1_size']} {sym} — 50%)\n"
-                        f"TP2:        ${result['tp2_price']:,.4f}  ({result['tp2_size']} {sym} — 50%)\n"
-                        f"SL:         ${result.get('sl_price', float(sig.stoploss)):,.4f}  (full size, reduce_only — cubre runner)\n"
-                    )
-                else:
-                    tp1 = result.get("tp1_price")
-                    tp_lines = (
-                        f"TP:         ${tp1:,.4f}  (full size)\n" if tp1 else ""
-                        f"SL:         ${float(sig.stoploss):,.4f}\n"
-                    )
-                _size_pct_display = float(sig.size_pct or 2.0)
-                scaled_note = (
-                    f"⚠️  Nota: tamaño escalado al mínimo de $10 USDC (señal pedía "
-                    f"{_size_pct_display:.1f}% = ${_size_pct_display / 100 * result['balance']:.2f})\n\n"
-                    if result.get("size_scaled") else ""
-                )
-                await asyncio.to_thread(
-                    send_signal_email,
-                    f"✅ Orden ejecutada: {sig.pair} {sig.direction.upper()} {sig.leverage}x",
-                    f"Copy trade ejecutado automáticamente en Hyperliquid\n\n"
-                    f"{scaled_note}"
-                    f"Par:        {sig.pair}\n"
-                    f"Dirección:  {sig.direction.upper()}\n"
-                    f"{lev_line}"
-                    f"Fill price: ${result['fill_price']:,.4f}\n"
-                    f"Size:       {result['size']} {sym}\n"
-                    f"Margen:     ${result['margin_used']:.2f} USDC\n"
-                    f"Balance:    ${result['balance']:.2f} USDC\n"
-                    f"Order ID:   {result['hl_order_id']}\n\n"
-                    f"{tp_lines}",
-                )
-            else:
-                print(
-                    f"[Auto-Execute] ❌ {sig.pair} failed: {result['error']}",
-                    flush=True,
-                )
-                await asyncio.to_thread(
-                    send_signal_email,
-                    f"❌ Auto-execute FALLIDO: {sig.pair} {sig.direction.upper()}",
-                    f"La orden NO fue ejecutada en Hyperliquid\n\n"
-                    f"Par:    {sig.pair}\n"
-                    f"Error:  {result['error']}\n\n"
-                    f"Acción requerida: revisa el balance y la configuración de la wallet.",
-                )
-
-        # If every wallet failed, the signal never entered "executed" — mark it cancelled
-        # so it doesn't stay orphaned as "pending" indefinitely.
-        if signal.status == "pending":
-            signal.status = "cancelled"
+                asyncio.create_task(_auto_close_signal(
+                    {"id": signal_id, "prev_status": "executed",
+                     "pair": sig.pair, "direction": sig.direction},
+                    "stopped",
+                ))
+            elif row.status == "pending":
+                row.status = "executed"
+        elif row.status == "pending":
+            # All wallets failed — don't leave the signal orphaned as pending
+            row.status = "cancelled"
             print(
                 f"[Auto-Execute] ⚠️ All wallets failed for {sig.pair} — signal marked cancelled",
                 flush=True,
             )
-
         await db.commit()
 
 
@@ -322,7 +373,9 @@ async def apply_update_to_db(msg, update_status: str, source_id: int) -> dict | 
             target = res.scalar_one_or_none()
 
         if not target:
-            # Standalone update — apply to most recent open signal in same thread before this msg
+            # Standalone update — candidates are open signals in this thread.
+            # M6: if the update text names a coin, match on it — two overlapping
+            # signals in one thread used to send the update to the wrong trade.
             res = await db.execute(
                 select(SignalEvent)
                 .where(
@@ -331,9 +384,25 @@ async def apply_update_to_db(msg, update_status: str, source_id: int) -> dict | 
                     SignalEvent.received_at <= msg.date,
                 )
                 .order_by(SignalEvent.received_at.desc())
-                .limit(1)
+                .limit(5)
             )
-            target = res.scalar_one_or_none()
+            candidates = res.scalars().all()
+            if candidates:
+                text_up  = (msg.text or "").upper()
+                matching = [
+                    s for s in candidates
+                    if s.pair and re.search(
+                        rf"\b{re.escape(s.pair.split('/')[0].upper())}\b", text_up
+                    )
+                ]
+                # Most recent among coin matches; fall back to most recent open
+                target = matching[0] if matching else candidates[0]
+                if matching and len(candidates) > 1:
+                    print(
+                        f"[M6] Update matched by pair → {target.pair} (id={target.id}) "
+                        f"among {len(candidates)} open signals",
+                        flush=True,
+                    )
 
         if not target:
             return None
@@ -358,7 +427,7 @@ def _close_hl_position(wallet_addr: str, secret_key_encrypted: str,
     try:
         secret_key = decrypt(secret_key_encrypted)
         account    = Account.from_key(secret_key)
-        info       = Info(hlc.MAINNET_API_URL, skip_ws=True)
+        info       = _hl_info()  # L5: shared client
         exchange   = Exchange(account, hlc.MAINNET_API_URL, account_address=wallet_addr)
 
         # Confirm position still open
@@ -481,7 +550,7 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
 def _get_open_order_ids(wallet_addr: str, symbol: str) -> set:
     """Synchronous: return set of open order IDs for a symbol on HL."""
     try:
-        info   = Info(hlc.MAINNET_API_URL, skip_ws=True)
+        info   = _hl_info()  # L5: shared client
         orders = info.open_orders(wallet_addr)
         return {str(o["oid"]) for o in orders if o.get("coin") == symbol}
     except Exception:
@@ -498,7 +567,7 @@ def _move_sl_to_breakeven(wallet_addr: str, secret_key_encrypted: str,
     try:
         secret_key = decrypt(secret_key_encrypted)
         account    = Account.from_key(secret_key)
-        info       = Info(hlc.MAINNET_API_URL, skip_ws=True)
+        info       = _hl_info()  # L5: shared client
         exchange   = Exchange(account, hlc.MAINNET_API_URL, account_address=wallet_addr)
 
         # Cancel original SL (best-effort — may already be gone)
@@ -632,7 +701,7 @@ async def _breakeven_monitor():
 
 def _fetch_orphan_report(hl_wallet_addr: str) -> list[dict]:
     """Synchronous: return open HL positions with their native SL/TP order status."""
-    info   = Info(hlc.MAINNET_API_URL, skip_ws=True)
+    info   = _hl_info()  # L5: shared client
     state  = info.user_state(hl_wallet_addr)
     if not state:
         return []

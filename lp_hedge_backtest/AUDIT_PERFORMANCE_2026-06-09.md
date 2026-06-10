@@ -60,10 +60,10 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 
 - **M1 — 30s REST polling vs WebSocket. ✅ FIXED 2026-06-10.** Bot subscribes to WS `allMids` (sub-second push); main loop ticks every 3s while the feed is fresh, falls back to 30s REST automatically if the WS goes stale (>15s). `USE_WS_PRICE=0` reverts fully; `WS_TICK_SECS` tunes cadence. Status line throttled to 30s and shows the price source (`ws`/`rest`).
 - **M2 — 1% slippage tolerance vs 1.5% stop distance. ✅ FIXED 2026-06-10.** Both modules: slippage cap 0.3% (`MAX_SLIPPAGE_PCT` / `SIGNAL_MAX_SLIPPAGE_PCT`) with one re-quote retry on an IOC miss; fill status now actually verified (top-level "ok" ≠ filled). LP bot anchors entry/SL/breakeven on the **actual fill price** instead of the poll price. Signal executor adds a stale-price guard: entry rejected if the mid is already beyond the signal SL or drifted >1% past the signal entry (`SIGNAL_MAX_ENTRY_DRIFT_PCT`).
-- **M3 — Auto-execute one-shot.** IOC miss → signal permanently `cancelled` (signal #52). Fix: 2–3 retries with fresh price inside tolerance. ⏳
-- **M4 — Redundant REST + serial wallets.** 3 read calls per order (`user_state`, `spot_user_state`, `meta()` — cacheable); wallets execute sequentially. Fix: cache `meta()`, `asyncio.gather` wallets. ⏳
+- **M3 — Auto-execute one-shot. ✅ FIXED 2026-06-10.** `_place_with_retry` in the listener: up to 3 attempts (2s apart) on transient errors (`not filled`/timeout/connection); drift-guard and balance rejections stay final. Combined with M2's in-order re-quote, a momentary IOC miss no longer cancels the signal.
+- **M4 — Redundant REST + serial wallets. ✅ FIXED 2026-06-10.** `meta()` cached 1h in signal_executor; wallets now execute concurrently via `asyncio.gather` (each with its own DB session; signal status transition is a single writer after all wallets settle, preserving the stop-during-execution race fix and all-failed→cancelled).
 - **M5 — Stats ignore fees + exec params never saved. ✅ FIXED 2026-06-10.** All three P&L calcs (`signal_lab.py::_calc_pnl`, admin monitor exec rows, reconciler emails) now net of HL taker fees (0.045% × 2 round trip, × leverage). Auto-executions record `exec_leverage` + `exec_size_usdt` (actual notional = size × fill) — real $ P&L per trade is now computable. Admin `has_overrides` redefined: ✏️ only when exec leverage ≠ signal leverage.
-- **M6 — Standalone update matching.** Non-reply stop/target applies to most recent open signal in thread — can close the wrong trade. Fix: require pair match when present. ⏳
+- **M6 — Standalone update matching. ✅ FIXED 2026-06-10.** Candidates = last 5 open signals in the thread; if the update text names a coin (word-boundary match on the base symbol), the most recent matching signal wins; otherwise falls back to most-recent-open (previous behavior).
 - **M7 — Frequent restarts wipe trail state. ✅ FIXED 2026-06-10.**
   *Persistence:* trail state (`breakeven_reached`, `short_min_price`, `current_sl_price`, `open_time`, BE%) saved atomically to `bot_state/hedge_state_{config}.json` on open/breakeven/trail-move, cleared on close, restored at recovery when entry (±0.1%) and size match the live HL position; `trail_restored` flag added to `orphan_recovered` events.
   *Restart-frequency investigation:* NOT crashes. systemd `NRestarts=0` (zero service crashes); 12 manual deploy restarts + 3 host reboots since Apr 11; per-bot admin restarts (M2-28 endpoint) and dashboard re-arms account for the rest. Recoveries cluster exactly on heavy dev-session days (May 3: 11, May 14: 8, May 31: 6 — all documented work sessions). Conclusion: deploy churn, now harmless with persistence. Recommendation stands: batch deploys, prefer idle windows.
@@ -71,10 +71,10 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 ### LOW
 
 - **L1** — Trail cancel+replace on every tick-min, no min-move threshold (brief no-SL window + API churn). ✅ FIXED 2026-06-10 (bundled with M1): replace only when the SL improves ≥0.1%.
-- **L2** — `market_close("ETH")` closes the entire wallet ETH position, including manual trades sharing the wallet. Close by recorded size, `reduce_only`.
-- **L3** — ATR breakeven includes the in-progress hourly candle (mild repaint). Drop partial candle.
-- **L4** — Failed price fetch → syncs run with `price or 0` → `reentry_guard_price=0` on a real close at that moment.
-- **L5** — Reconciler/breakeven monitor build a new `Info` client per row; no 429 backoff anywhere (current volume far below HL limits — hygiene only).
+- **L2** — `market_close("ETH")` closed the entire wallet ETH position incl. manual trades. ✅ FIXED 2026-06-10: bot closes by recorded size (`sz=hedge_size_eth`).
+- **L3** — ATR breakeven included the in-progress hourly candle (mild repaint). ✅ FIXED 2026-06-10: partial candle dropped (filter on candle end-time).
+- **L4** — Failed price fetch ran syncs with `price or 0`, corrupting reentry-guard/CB state on a concurrent close. ✅ FIXED 2026-06-10: syncs skipped (deferred one tick) when price is unavailable.
+- **L5** — New `Info` client per row/call (each construction = ~2 REST calls for meta). ✅ FIXED 2026-06-10: shared lazy singletons in listener, signal_executor, and reconciler. (No 429 backoff anywhere remains true — volume is far below HL limits.)
 
 ## Fee vs IL assessment
 
@@ -90,4 +90,4 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 
 - **M8 — HL position panels showed SL/TP *limit* px instead of trigger px. ✅ FIXED 2026-06-10.** Both `_fetch_one` blocks (admin + user Signal Lab) switched to `frontend_open_orders` and classify/display by `triggerPx` (fallback `limitPx` for plain limit orders). E.g. Config 17 SL displayed $1720 while the real trigger was $1645.
 
-**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 ✅ + H4 ✅ (listener restarted 2026-06-09) → M1 ✅ + M2 ✅ + L1 ✅ (API + listener restarted 2026-06-10) → M5 ✅ + M7 ✅ (API + listener restarted 2026-06-10) → M8 ✅ (API restarted 2026-06-10). Remaining: M3, M4, M6, L2–L5.
+**ALL 17 FINDINGS CLOSED 2026-06-10** — H1–H6, M1–M8, L1–L5. Final batch (M3+M4+M6+L2–L5) deployed with API + listener restart 2026-06-10.

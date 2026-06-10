@@ -893,7 +893,9 @@ class LiveHedgeBotV2:
             self._cancel_native_sl()
             self._cancel_native_tp()
 
-            result = self.exchange.market_close("ETH")
+            # L2: close only the bot's recorded size — market_close("ETH") with no
+            # sz would also close any manual ETH trade sharing this wallet.
+            result = self.exchange.market_close("ETH", sz=self.hedge_size_eth)
             if result is None:
                 # M2-40: native SL fired between polls — set cooldown
                 self._ext_close_cooldown_until = time.time() + self._EXT_COOLDOWN_SECS
@@ -1233,8 +1235,11 @@ class LiveHedgeBotV2:
         Falls back to the static BREAKEVEN_PCT on any failure."""
         try:
             now_ms   = int(time.time() * 1000)
-            start_ms = now_ms - (ATR_PERIOD + 2) * 3_600_000
+            start_ms = now_ms - (ATR_PERIOD + 3) * 3_600_000
             candles  = self.info.candles_snapshot("ETH", "1h", start_ms, now_ms)
+            # L3: drop the in-progress candle — its partial range understates TR
+            if candles:
+                candles = [c for c in candles if int(c.get("T", 0)) <= now_ms]
             if not candles or len(candles) < ATR_PERIOD + 1:
                 print(f"⚠️  [M2-49] ATR: only {len(candles) if candles else 0} candles — "
                       f"using static BE {BREAKEVEN_PCT*100:.1f}%", flush=True)
@@ -1656,13 +1661,15 @@ class LiveHedgeBotV2:
             price = self.get_eth_price()
 
             # ── Periodic safety syncs ────────────────────────────────────────
-            if self.hedge_active and now - self.last_lp_sync > HL_SYNC_INTERVAL:
+            # L4: skip syncs when the price fetch failed — running them with
+            # price=0 corrupted reentry_guard/CB state if a close was detected
+            if price and self.hedge_active and now - self.last_lp_sync > HL_SYNC_INTERVAL:
                 self.last_lp_sync = now
-                self._sync_lp_position(price or 0)
+                self._sync_lp_position(price)
 
-            if self.hedge_active and now - self.last_hl_sync > HL_SYNC_INTERVAL:
+            if price and self.hedge_active and now - self.last_hl_sync > HL_SYNC_INTERVAL:
                 self.last_hl_sync = now
-                self._sync_hl_position(price or 0)
+                self._sync_hl_position(price)
 
             # ── Periodic bounds refresh (idle only) ──────────────────────────
             if (not self.hedge_active and
