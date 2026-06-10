@@ -777,6 +777,10 @@ class LiveHedgeBotV2:
 
     def close_hedge(self, price, reason):
         try:
+            # H1: capture native order IDs before cancelling — needed to classify
+            # the close from HL fills if the position turns out to be already gone.
+            sl_oid, tp_oid = self.hl_sl_order_id, self.hl_tp_order_id
+
             # V2: cancel native SL + TP before market close to avoid double-fill
             self._cancel_native_sl()
             self._cancel_native_tp()
@@ -785,8 +789,14 @@ class LiveHedgeBotV2:
             if result is None:
                 # M2-40: native SL fired between polls — set cooldown
                 self._ext_close_cooldown_until = time.time() + self._EXT_COOLDOWN_SECS
+                # H1: classify the external close from actual HL fills (win vs loss)
+                outcome = self._classify_external_close(sl_oid, tp_oid)
                 # M2-39: all CB systems updated here (before state reset)
-                self._on_stop_event(price)
+                self._on_stop_event(
+                    price,
+                    is_win=outcome["is_win"] if outcome else False,
+                    pnl_usd=outcome["pnl_usd"] if outcome else None,
+                )
                 print(f"⚠️  market_close returned None — position already gone. Resetting.", flush=True)
                 self._reset_short_state(price)
                 log_event("stopped", price=price, details={
@@ -794,9 +804,18 @@ class LiveHedgeBotV2:
                     "note":              "HL position not found — native SL fired or manual close",
                     "cooldown":          self._EXT_COOLDOWN_SECS,
                     "consecutive_stops": self._consecutive_stops,
+                    **(outcome or {"classified": "unavailable"}),
                 })
+                _oc_line = (
+                    f"Resultado real (fills HL): {outcome['reason']} | "
+                    f"cierre ${outcome['close_px']:.2f} | "
+                    f"PnL neto ${outcome['pnl_usd']:+.2f} ({'WIN' if outcome['is_win'] else 'LOSS'})\n"
+                    if outcome else
+                    "Resultado real: no se pudieron leer los fills de HL — contado como pérdida estimada.\n"
+                )
                 self.send_email("⚠️ Hedge Externally Closed",
                     f"NFT #{NFT_ID}: HL SHORT not found during close attempt.\n"
+                    f"{_oc_line}"
                     f"Bot reset to IDLE — {self._EXT_COOLDOWN_SECS // 60} min cooldown before re-arm (M2-40).\n"
                     f"Consecutive stops: {self._consecutive_stops}/{self._CB_STOP_THRESHOLD}")
                 if not AUTO_REARM:
@@ -856,7 +875,8 @@ class LiveHedgeBotV2:
             print(f"❌ close_hedge error: {e}", flush=True)
             log_event("error", price=price, details={"msg": str(e)})
 
-    def _on_stop_event(self, price: float, is_win: bool = False) -> None:
+    def _on_stop_event(self, price: float, is_win: bool = False,
+                       pnl_usd: Optional[float] = None) -> None:
         """Central CB handler called after every trade close.
 
         Updates all three circuit-breaker systems:
@@ -864,12 +884,23 @@ class LiveHedgeBotV2:
           B) Rolling-window rate trigger  (new)
           C) Daily net-loss cap           (new)
 
+        H1: pnl_usd, when provided, is the ACTUAL net P&L from HL fills
+        (classified external close) — used instead of the worst-case SL estimate.
+        Wins offset the daily net-loss cap.
+
         Must be called BEFORE _reset_short_state so entry_price/size are still set.
         """
         now = time.time()
 
+        today = datetime.now(timezone.utc).date()
+        if today != self._session_date:           # new UTC day → reset counter
+            self._session_loss_usd = 0.0
+            self._session_date = today
+
         if is_win:
             self._consecutive_stops = 0
+            if pnl_usd is not None:
+                self._session_loss_usd += pnl_usd  # H1: wins offset the daily cap
             return
 
         # ── A+B: record this stop ─────────────────────────────────────────
@@ -878,15 +909,14 @@ class LiveHedgeBotV2:
         while self._stop_timestamps and self._stop_timestamps[0] < now - self._CB_RATE_WINDOW_SECS:
             self._stop_timestamps.popleft()
 
-        # ── C: accumulate estimated loss (gross SL loss + round-trip fee) ─
-        entry  = self.entry_price or price
-        size   = self.hedge_size_eth or 0.0
-        notional = entry * size
-        est_loss = -(notional * DEFAULT_SL_PCT) - (notional * 0.00045 * 2)
-        today = datetime.now(timezone.utc).date()
-        if today != self._session_date:           # new UTC day → reset counter
-            self._session_loss_usd = 0.0
-            self._session_date = today
+        # ── C: accumulate loss — actual fills (H1) or worst-case estimate ─
+        if pnl_usd is not None:
+            est_loss = pnl_usd
+        else:
+            entry  = self.entry_price or price
+            size   = self.hedge_size_eth or 0.0
+            notional = entry * size
+            est_loss = -(notional * DEFAULT_SL_PCT) - (notional * 0.00045 * 2)
         self._session_loss_usd += est_loss
 
         # ── Determine if any CB trigger fires ─────────────────────────────
@@ -936,6 +966,71 @@ class LiveHedgeBotV2:
         )
         print(f"🔴 [M2-39] Circuit breaker ({reason_str}) — pausing {pause_secs // 60} min",
               flush=True)
+
+    # ── H1: external close classification ────────────────────────────────────
+
+    def _classify_external_close(self, sl_oid: Optional[int],
+                                 tp_oid: Optional[int]) -> Optional[dict]:
+        """Determine the actual outcome of an externally-closed SHORT from HL fills.
+
+        Native SL/TP triggers fire on HL between polls, so almost every close is
+        "external" — previously all were counted as losses. This matches the
+        buy-back fills since open_time against the known SL/TP order IDs and
+        computes real net P&L (incl. taker fees).
+
+        Returns {close_px, pnl_usd, pnl_pct, reason, is_win} or None if fills
+        can't be read (caller falls back to the conservative loss estimate).
+        Must be called BEFORE _reset_short_state.
+        """
+        try:
+            if not self.open_time or not self.entry_price or not self.hedge_size_eth:
+                return None
+            start_ms = int(self.open_time * 1000)
+            fills = self.info.user_fills(HL_ADDRESS) or []
+            close_fills = [
+                f for f in fills
+                if f.get("coin") == "ETH"
+                and f.get("side") == "B"            # buy-back closes a SHORT
+                and int(f.get("time", 0)) >= start_ms
+            ]
+            if not close_fills:
+                return None
+            total_sz = sum(abs(float(f.get("sz", 0))) for f in close_fills)
+            if total_sz <= 0:
+                return None
+            close_px = sum(
+                float(f["px"]) * abs(float(f.get("sz", 0))) for f in close_fills
+            ) / total_sz
+
+            fill_oids = {str(f.get("oid", "")) for f in close_fills}
+            if tp_oid is not None and str(tp_oid) in fill_oids:
+                reason = "native_tp"
+            elif sl_oid is not None and str(sl_oid) in fill_oids:
+                # Trailed SL below entry is a win; classification comes from P&L below
+                reason = "native_sl"
+            else:
+                reason = "manual_or_unknown"
+
+            gross   = (self.entry_price - close_px) * self.hedge_size_eth
+            fees    = (self.entry_price + close_px) * self.hedge_size_eth * 0.00045
+            pnl_usd = gross - fees
+            pnl_pct = (self.entry_price - close_px) / self.entry_price * 100
+            result = {
+                "close_px": round(close_px, 4),
+                "pnl_usd":  round(pnl_usd, 4),
+                "pnl_pct":  round(pnl_pct, 4),
+                "reason":   reason,
+                "is_win":   pnl_usd > 0,
+            }
+            print(
+                f"🔎 [H1] External close classified: {reason} @ ${close_px:.2f} | "
+                f"net ${pnl_usd:+.2f} ({'WIN' if pnl_usd > 0 else 'LOSS'})",
+                flush=True,
+            )
+            return result
+        except Exception as e:
+            print(f"⚠️  [H1] External-close classification failed: {e}", flush=True)
+            return None
 
     def _reset_short_state(self, close_price: float):
         """Reset all short-related state after a close."""
@@ -1062,22 +1157,39 @@ class LiveHedgeBotV2:
             )
             if not found:
                 print(f"⚠️  HL sync: ETH SHORT not found — external close. Resetting.", flush=True)
+                # H1: capture order IDs before cancelling — needed for classification
+                sl_oid, tp_oid = self.hl_sl_order_id, self.hl_tp_order_id
                 # V2: cancel any orphan SL/TP orders before resetting
                 self._cancel_native_sl()
                 self._cancel_native_tp()
                 # M2-40: set cooldown before re-arm
                 self._ext_close_cooldown_until = time.time() + self._EXT_COOLDOWN_SECS
+                # H1: classify the external close from actual HL fills (win vs loss)
+                outcome = self._classify_external_close(sl_oid, tp_oid)
                 # M2-39: all CB systems updated here (before state reset)
-                self._on_stop_event(price)
+                self._on_stop_event(
+                    price,
+                    is_win=outcome["is_win"] if outcome else False,
+                    pnl_usd=outcome["pnl_usd"] if outcome else None,
+                )
                 self._reset_short_state(price)
                 log_event("stopped", price=price, details={
                     "reason":            "external_close",
                     "note":              "HL position not found during periodic sync",
                     "cooldown":          self._EXT_COOLDOWN_SECS,
                     "consecutive_stops": self._consecutive_stops,
+                    **(outcome or {"classified": "unavailable"}),
                 })
+                _oc_line = (
+                    f"Resultado real (fills HL): {outcome['reason']} | "
+                    f"cierre ${outcome['close_px']:.2f} | "
+                    f"PnL neto ${outcome['pnl_usd']:+.2f} ({'WIN' if outcome['is_win'] else 'LOSS'})\n"
+                    if outcome else
+                    "Resultado real: no se pudieron leer los fills de HL — contado como pérdida estimada.\n"
+                )
                 self.send_email("⚠️ Hedge Externally Closed (sync)",
                     f"NFT #{NFT_ID}: ETH SHORT disappeared during routine sync.\n"
+                    f"{_oc_line}"
                     f"Bot reset to IDLE — {self._EXT_COOLDOWN_SECS // 60} min cooldown before re-arm (M2-40).\n"
                     f"Consecutive stops: {self._consecutive_stops}/{self._CB_STOP_THRESHOLD}")
                 if not AUTO_REARM:
@@ -1177,6 +1289,9 @@ class LiveHedgeBotV2:
             self.short_min_price          = entry_px
             self.open_trigger             = "recovered"
             self._effective_breakeven_pct = BREAKEVEN_PCT  # M2-49: static on recovery (no ATR context)
+            # H1: actual fill time unknown — use recovery time so a later external
+            # close can still be classified from fills after this point.
+            self.open_time                = time.time()
 
             # Check for existing SL and TP orders on HL
             try:
