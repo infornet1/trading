@@ -62,9 +62,11 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 - **M2 — 1% slippage tolerance vs 1.5% stop distance. ✅ FIXED 2026-06-10.** Both modules: slippage cap 0.3% (`MAX_SLIPPAGE_PCT` / `SIGNAL_MAX_SLIPPAGE_PCT`) with one re-quote retry on an IOC miss; fill status now actually verified (top-level "ok" ≠ filled). LP bot anchors entry/SL/breakeven on the **actual fill price** instead of the poll price. Signal executor adds a stale-price guard: entry rejected if the mid is already beyond the signal SL or drifted >1% past the signal entry (`SIGNAL_MAX_ENTRY_DRIFT_PCT`).
 - **M3 — Auto-execute one-shot.** IOC miss → signal permanently `cancelled` (signal #52). Fix: 2–3 retries with fresh price inside tolerance. ⏳
 - **M4 — Redundant REST + serial wallets.** 3 read calls per order (`user_state`, `spot_user_state`, `meta()` — cacheable); wallets execute sequentially. Fix: cache `meta()`, `asyncio.gather` wallets. ⏳
-- **M5 — Stats ignore fees/funding.** `signal_lab.py::_calc_pnl` = raw × leverage, idealized fallback to signal levels; source win-rates are gross. Also `exec_leverage`/`exec_size_usdt` never saved. ⏳
+- **M5 — Stats ignore fees + exec params never saved. ✅ FIXED 2026-06-10.** All three P&L calcs (`signal_lab.py::_calc_pnl`, admin monitor exec rows, reconciler emails) now net of HL taker fees (0.045% × 2 round trip, × leverage). Auto-executions record `exec_leverage` + `exec_size_usdt` (actual notional = size × fill) — real $ P&L per trade is now computable. Admin `has_overrides` redefined: ✏️ only when exec leverage ≠ signal leverage.
 - **M6 — Standalone update matching.** Non-reply stop/target applies to most recent open signal in thread — can close the wrong trade. Fix: require pair match when present. ⏳
-- **M7 — Frequent restarts wipe trail state.** 59 orphan recoveries vs 15 starts; recovery resets `breakeven_reached`/`short_min_price` (native SL order survives). Fix: persist trail state; investigate restart frequency. ⏳
+- **M7 — Frequent restarts wipe trail state. ✅ FIXED 2026-06-10.**
+  *Persistence:* trail state (`breakeven_reached`, `short_min_price`, `current_sl_price`, `open_time`, BE%) saved atomically to `bot_state/hedge_state_{config}.json` on open/breakeven/trail-move, cleared on close, restored at recovery when entry (±0.1%) and size match the live HL position; `trail_restored` flag added to `orphan_recovered` events.
+  *Restart-frequency investigation:* NOT crashes. systemd `NRestarts=0` (zero service crashes); 12 manual deploy restarts + 3 host reboots since Apr 11; per-bot admin restarts (M2-28 endpoint) and dashboard re-arms account for the rest. Recoveries cluster exactly on heavy dev-session days (May 3: 11, May 14: 8, May 31: 6 — all documented work sessions). Conclusion: deploy churn, now harmless with persistence. Recommendation stands: batch deploys, prefer idle windows.
 
 ### LOW
 
@@ -88,4 +90,4 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 
 - **M8** — HL position panels show SL/TP *limit* px instead of trigger px (`admin.py`/`signal_lab.py` `_fetch_one`); switch to `frontend_open_orders` and read `triggerPx`. Display-only.
 
-**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 ✅ + H4 ✅ (listener restarted 2026-06-09) → M1 ✅ + M2 ✅ + L1 ✅ (API + listener restarted 2026-06-10; H4 now live on manual-execute path too). Remaining: M3–M8, L2–L5.
+**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 ✅ + H4 ✅ (listener restarted 2026-06-09) → M1 ✅ + M2 ✅ + L1 ✅ (API + listener restarted 2026-06-10) → M5 ✅ + M7 ✅ (API + listener restarted 2026-06-10). Remaining: M3, M4, M6, M8, L2–L5.

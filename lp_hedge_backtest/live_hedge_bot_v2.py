@@ -57,6 +57,14 @@ WS_STALE_SECS = 15.0                                   # WS older than this → 
 # M2: max slippage for market entries — old 1% was wider than the SL distance
 MAX_SLIPPAGE  = float(os.getenv("MAX_SLIPPAGE_PCT", "0.3")) / 100.0
 
+# M7: trail-state persistence — restarts used to reset breakeven/trail to entry
+# (59 orphan recoveries vs 15 clean starts). State is saved on every change and
+# restored at recovery when it matches the live HL position.
+STATE_DIR = os.getenv(
+    "BOT_STATE_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_state"),
+)
+
 # Entry
 TRIGGER_OFFSET = float(os.getenv("TRIGGER_OFFSET_PCT", "0.5")) / 100.0
 UPPER_BUFFER   = TRIGGER_OFFSET
@@ -243,6 +251,11 @@ class LiveHedgeBotV2:
         # ── Position sync ─────────────────────────────────────────────────────
         self.last_hl_sync = 0.0
         self.last_lp_sync = 0.0
+
+        # M7: trail-state file (one per config; NFT id when standalone)
+        self._state_path = os.path.join(
+            STATE_DIR, f"hedge_state_{CONFIG_ID or NFT_ID}.json"
+        )
 
         self.email_config = self._load_email_config()
 
@@ -757,6 +770,8 @@ class LiveHedgeBotV2:
                             "tp": round(tp_price, 4),
                         })
 
+                self._save_trail_state()  # M7
+
                 log_event("hedge_opened", price=price, details={
                     "trigger":      trigger,
                     "entry":        self.entry_price,
@@ -818,6 +833,7 @@ class LiveHedgeBotV2:
                           f"(min ${self.short_min_price:.2f} + {TRAIL_PCT*100:.1f}%)", flush=True)
                     # V2: cancel + replace native SL
                     self._replace_native_sl(self.current_sl_price)
+                    self._save_trail_state()  # M7
 
         # ── 2. Fixed TP check ──────────────────────────────────────────────
         if TP_PCT is not None:
@@ -848,6 +864,7 @@ class LiveHedgeBotV2:
 
             # V2: replace native SL at the new trail level
             self._replace_native_sl(self.current_sl_price)
+            self._save_trail_state()  # M7
 
             log_event("breakeven", price=price, pnl=pnl_est, details={
                 "sl":        round(self.current_sl_price, 4),
@@ -1139,6 +1156,61 @@ class LiveHedgeBotV2:
             print(f"⚠️  [H1] External-close classification failed: {e}", flush=True)
             return None
 
+    # ── M7: trail-state persistence ───────────────────────────────────────────
+
+    def _save_trail_state(self):
+        """Persist the trail state so a restart doesn't reset it (atomic write)."""
+        if not self.hedge_active:
+            return
+        try:
+            os.makedirs(STATE_DIR, exist_ok=True)
+            tmp = self._state_path + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump({
+                    "entry_price":             self.entry_price,
+                    "hedge_size_eth":          self.hedge_size_eth,
+                    "open_time":               self.open_time,
+                    "open_trigger":            self.open_trigger,
+                    "breakeven_reached":       self.breakeven_reached,
+                    "short_min_price":         self.short_min_price,
+                    "current_sl_price":        self.current_sl_price,
+                    "effective_breakeven_pct": self._effective_breakeven_pct,
+                    "saved_at":                time.time(),
+                }, f)
+            os.replace(tmp, self._state_path)
+        except Exception as e:
+            print(f"⚠️  [M7] Trail-state save failed: {e}", flush=True)
+
+    def _clear_trail_state(self):
+        try:
+            os.remove(self._state_path)
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            print(f"⚠️  [M7] Trail-state clear failed: {e}", flush=True)
+
+    def _load_trail_state(self, entry_px: float, size: float) -> Optional[dict]:
+        """Return saved trail state if it matches the recovered HL position
+        (entry within 0.1%, identical size) — otherwise None."""
+        try:
+            with open(self._state_path) as f:
+                st = json.load(f)
+            saved_entry = float(st.get("entry_price") or 0)
+            saved_size  = float(st.get("hedge_size_eth") or 0)
+            if (saved_entry > 0 and entry_px > 0
+                    and abs(saved_entry - entry_px) / entry_px < 0.001
+                    and abs(saved_size - size) < 1e-9):
+                return st
+            print(f"⚠️  [M7] Saved trail state doesn't match HL position "
+                  f"(saved ${saved_entry:.2f}/{saved_size} vs live ${entry_px:.2f}/{size}) — ignoring",
+                  flush=True)
+            return None
+        except FileNotFoundError:
+            return None
+        except Exception as e:
+            print(f"⚠️  [M7] Trail-state load failed: {e}", flush=True)
+            return None
+
     def _reset_short_state(self, close_price: float):
         """Reset all short-related state after a close."""
         self.hedge_active        = False
@@ -1151,6 +1223,7 @@ class LiveHedgeBotV2:
         self.reentry_guard_price = close_price * (1 + REENTRY_BUFFER)
         self.sl_close_price      = close_price
         self.price_was_above     = False
+        self._clear_trail_state()  # M7
 
     # ── M2-49: ATR-adaptive breakeven ────────────────────────────────────────
 
@@ -1386,19 +1459,37 @@ class LiveHedgeBotV2:
                 flush=True,
             )
 
-            # Recover bot state — start SL trail conservatively from entry
-            self.hedge_active             = True
-            self.entry_price              = entry_px
-            self.hedge_size_eth           = size
-            self.leverage_used            = lev_val
-            self.current_sl_price         = entry_px * (1 + DEFAULT_SL_PCT)
-            self.breakeven_reached        = False
-            self.short_min_price          = entry_px
-            self.open_trigger             = "recovered"
-            self._effective_breakeven_pct = BREAKEVEN_PCT  # M2-49: static on recovery (no ATR context)
-            # H1: actual fill time unknown — use recovery time so a later external
-            # close can still be classified from fills after this point.
-            self.open_time                = time.time()
+            # Recover bot state
+            self.hedge_active   = True
+            self.entry_price    = entry_px
+            self.hedge_size_eth = size
+            self.leverage_used  = lev_val
+
+            # M7: restore the persisted trail if it matches this position;
+            # otherwise fall back to conservative defaults from entry.
+            st = self._load_trail_state(entry_px, size)
+            if st:
+                self.breakeven_reached        = bool(st.get("breakeven_reached"))
+                self.short_min_price          = float(st.get("short_min_price") or entry_px)
+                self.current_sl_price         = float(st.get("current_sl_price")
+                                                       or entry_px * (1 + DEFAULT_SL_PCT))
+                self.open_trigger             = st.get("open_trigger") or "recovered"
+                self._effective_breakeven_pct = float(st.get("effective_breakeven_pct")
+                                                       or BREAKEVEN_PCT)
+                self.open_time                = float(st.get("open_time") or time.time())
+                print(f"♻️  [M7] Trail state restored | "
+                      f"BE={'✓' if self.breakeven_reached else '✗'} | "
+                      f"min ${self.short_min_price:.2f} | SL ${self.current_sl_price:.2f}",
+                      flush=True)
+            else:
+                self.current_sl_price         = entry_px * (1 + DEFAULT_SL_PCT)
+                self.breakeven_reached        = False
+                self.short_min_price          = entry_px
+                self.open_trigger             = "recovered"
+                self._effective_breakeven_pct = BREAKEVEN_PCT  # M2-49: static (no ATR context)
+                # H1: actual fill time unknown — use recovery time so a later
+                # external close can still be classified from fills.
+                self.open_time                = time.time()
 
             # Check for existing SL and TP orders on HL
             try:
@@ -1459,12 +1550,15 @@ class LiveHedgeBotV2:
             except Exception as e:
                 print(f"⚠️  [V2] Could not check open orders: {e}", flush=True)
 
+            self._save_trail_state()  # M7: refresh file (covers default-recovery case)
+
             log_event("orphan_recovered", price=entry_px, details={
-                "entry":   entry_px,
-                "size":    size,
-                "sl":      round(self.current_sl_price, 4),
-                "sl_oid":  self.hl_sl_order_id,
-                "tp_oid":  self.hl_tp_order_id,
+                "entry":          entry_px,
+                "size":           size,
+                "sl":             round(self.current_sl_price, 4),
+                "sl_oid":         self.hl_sl_order_id,
+                "tp_oid":         self.hl_tp_order_id,
+                "trail_restored": bool(st),  # M7
                 "note":    "Bot restarted while SHORT was open — state recovered from HL",
             })
             tp_recovery_line = (

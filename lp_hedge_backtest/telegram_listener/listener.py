@@ -193,6 +193,13 @@ async def _auto_execute_signal(signal_id: int, sig):
                 sl_order_id    = result.get("sl_order_id"),
                 tp1_order_id   = result.get("tp1_order_id"),
                 tp2_order_id   = result.get("tp2_order_id"),
+                # M5: record ACTUAL leverage + notional — required for real $ P&L
+                exec_leverage  = result.get("leverage"),
+                exec_size_usdt = (
+                    round(result["size"] * result["fill_price"], 2)
+                    if result.get("success") and result.get("size") and result.get("fill_price")
+                    else None
+                ),
             )
             db.add(execution)
 

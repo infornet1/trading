@@ -515,7 +515,8 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
             if fp and cp and sig:
                 is_short = (sig.direction or "").lower() == "short"
                 raw_pct  = ((fp - cp) / fp * 100) if is_short else ((cp - fp) / fp * 100)
-                pnl_pct  = round(raw_pct * (sig.leverage or 1), 2)
+                # M5: net of HL taker fees (0.045% × 2 round trip, × leverage)
+                pnl_pct  = round((raw_pct - 0.09) * (sig.leverage or 1), 2)
             exec_size  = float(ex.exec_size_usdt) if ex.exec_size_usdt else None
             exec_lev   = ex.exec_leverage
             notional   = round(exec_size, 2) if exec_size else (round(float(fp) * abs(float(sig.size_pct or 2) / 100), 2) if fp and sig and sig.size_pct else None)
@@ -530,7 +531,8 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
                 "leverage":          sig.leverage  if sig else None,
                 "exec_leverage":     exec_lev,
                 "exec_size_usdt":    exec_size,
-                "has_overrides":     bool(exec_lev or exec_size),
+                # M5: auto-execs now always record exec_* — flag only true overrides
+                "has_overrides":     bool(exec_lev and sig and exec_lev != sig.leverage),
                 "ts":                ex.executed_at.isoformat() + "Z",
             })
 
@@ -572,7 +574,7 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
             "fill_price":    float(ex.fill_price)     if ex.fill_price     else None,
             "exec_size_usdt":float(ex.exec_size_usdt) if ex.exec_size_usdt else None,
             "exec_leverage": ex.exec_leverage,
-            "has_overrides": bool(ex.exec_leverage or ex.exec_size_usdt),
+            "has_overrides": bool(ex.exec_leverage and sig and ex.exec_leverage != sig.leverage),
             "outcome":       ex.outcome,
             "wallet_short":  ex.hl_wallet_addr[:6] + "…" + ex.hl_wallet_addr[-4:] if ex.hl_wallet_addr else "—",
             "ts":            ex.executed_at.isoformat() + "Z",

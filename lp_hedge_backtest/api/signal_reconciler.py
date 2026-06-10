@@ -203,7 +203,8 @@ async def _reconcile_once() -> None:
         pnl_pct = None
         if fp:
             raw     = ((fp - close_price) / fp) if is_short else ((close_price - fp) / fp)
-            pnl_pct = round(raw * (signal.leverage or 1) * 100, 2)
+            # M5: net of HL taker fees (0.045% × 2 round trip)
+            pnl_pct = round((raw - 0.0009) * (signal.leverage or 1) * 100, 2)
 
         sign = "+" if (pnl_pct or 0) >= 0 else ""
         print(

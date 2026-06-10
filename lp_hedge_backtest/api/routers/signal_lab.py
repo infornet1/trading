@@ -404,10 +404,14 @@ async def get_signal_price(
         return {"symbol": sym, "price": None, "available": False, "error": str(e)}
 
 
+_HL_TAKER_FEE = 0.00045  # per side; round trip = 0.09% of notional
+
+
 def _calc_pnl(direction: str, leverage: int, fill_price: float,
               close_price: float | None, status: str,
               stoploss: float | None, targets: list) -> float | None:
-    """Estimate P&L % using actual close price when available, else signal levels."""
+    """Estimate P&L % using actual close price when available, else signal levels.
+    M5: net of HL taker fees — gross numbers overstated results by 0.09% × leverage."""
     is_long    = direction == "long"
     actual_close = close_price
     if not actual_close:
@@ -418,7 +422,7 @@ def _calc_pnl(direction: str, leverage: int, fill_price: float,
         else:
             return None
     raw = (actual_close - fill_price) / fill_price if is_long else (fill_price - actual_close) / fill_price
-    return round(raw * leverage * 100, 2)
+    return round((raw - 2 * _HL_TAKER_FEE) * leverage * 100, 2)
 
 
 @router.get("/history")
