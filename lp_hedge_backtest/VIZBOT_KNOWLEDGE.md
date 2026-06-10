@@ -1,6 +1,6 @@
 # VIZBOT Knowledge Base — Platform Features & Bot Internals
 # Auto-loaded by the AI assistant. Keep up to date with each release.
-# Last updated: 2026-06-09 (Signal Lab fixes: executed signals never age out of active bucket; auto-execute all-fail → signal marked cancelled; source filter chip UI)
+# Last updated: 2026-06-10 (Performance & profitability audit — ALL 17 findings H1–H6/M1–M8/L1–L5 fixed and deployed; see "Performance Audit — June 2026" section and AUDIT_PERFORMANCE_2026-06-09.md)
 
 ---
 
@@ -14,13 +14,15 @@
 ### V2 Engine (live_hedge_bot_v2.py)
 - **Native SL**: placed as a standalone trigger order on HL (`tpsl="sl"`, `grouping="na"`) immediately after every hedge opens. Triggers even if bot process is dead. Uses whole-dollar rounding; `limit_px = trigger * 1.03` (3% above, ensures fill).
 - **Native TP**: placed as a standalone trigger order on HL (`tpsl="tp"`, `grouping="na"`) at open when `TP_PCT` is configured. `limit_px = trigger * 0.97` (3% below, buys back at discount). Both native orders are cancelled before any code-path market close to prevent double-fill. **Live-validated 2026-04-22:** Config 20 `hedge_opened` at 13:48 UTC confirmed `tp_oid: 392796553319` in event details.
-- Includes **crash recovery**: on startup the bot checks for any open position on the HL wallet. If found, it re-adopts it — sets `hedge_active=True`, finds existing native SL/TP orders or places fresh ones, and continues monitoring.
+- Includes **crash recovery**: on startup the bot checks for any open position on the HL wallet. If found, it re-adopts it — sets `hedge_active=True`, finds existing native SL/TP orders (via `frontend_open_orders` since audit H6 — the basic endpoint omits `triggerPx`/`orderType`, so recovery used to place a duplicate SL every time) or places fresh ones, and continues monitoring. **Since audit M7 (2026-06-10)** the trail state (breakeven flag, min price, current SL) is persisted to `bot_state/hedge_state_{config}.json` and restored at recovery when entry/size match — restarts no longer reset the trail (`trail_restored: true` in `orphan_recovered` events).
+- **Price feed (audit M1, 2026-06-10)**: WS `allMids` subscription (sub-second push), main loop ticks every 3s while fresh; automatic fallback to 30s REST polling if WS goes stale >15s. `USE_WS_PRICE=0` reverts. Status line shows the source (`ws`/`rest`).
+- **Entry execution (audit M2, 2026-06-10)**: market entries capped at 0.3% slippage (`MAX_SLIPPAGE_PCT`, was 1%) with one re-quote retry; fill status verified (top-level "ok" ≠ filled); entry/SL/breakeven anchored on the **actual fill price** (avgPx), not the poll price. Closes use `sz=hedge_size_eth` (audit L2) so manual trades sharing the wallet are untouched.
 - Includes **LP reconciler**: a background job runs hourly to verify each Uniswap V3 NFT still has liquidity. If LP was removed or NFT burned while the bot was stopped, the reconciler marks the config `inactive` in DB, logs an event, stops the process, and emails the admin.
 - **Circuit breaker (M2-39, enhanced 2026-05-01)**: three independent triggers, all funneled through `_on_stop_event()`:
   - **A) Escalating streak**: 3 consecutive stops → pause scales 20m → 1h → 4h depending on how many CBs fired in the prior 4-hour window (was always flat 20m).
   - **B) Rolling-window rate**: 5 stops within any 30-minute window → 1-hour pause, regardless of whether they are consecutive.
-  - **C) Daily loss cap**: if estimated session net loss (gross SL loss + round-trip fees) reaches -$5.00 USD → pause until UTC midnight.
-  - Counter increments on `sl_hit`, `trailing_stop`, **and `external_close`**. Resets on `tp_hit`. Fires a `circuit_breaker` DB event (with `session_loss_usd` field) and email. Status line shows `🔴 CIRCUIT BREAKER L2 (Xs | loss≈-$X.XX)` where L indicates escalation level.
+  - **C) Daily loss cap (recalibrated 2026-06-10, audit H2)**: dynamic — `DAILY_LOSS_CAP_STOPS` (default 3) × expected single-stop loss at the current sizing, $5 magnitude floor; `DAILY_LOSS_CAP_USD` env overrides with a fixed value. (Old flat -$5 was below ONE real stop at 1.5% SL × ~$1k notional — a single close paused the bot for the rest of the UTC day, leaving the LP unhedged.) Uses **actual net P&L** from HL fills when available; wins offset the cap.
+  - Counter increments on losses only. **Since audit H1 (2026-06-10)**: external closes are classified from HL fills (`_classify_external_close` matches buy-back OIDs vs native SL/TP order IDs, computes real net P&L incl. fees) — a trailed/TP external close counts as a WIN and resets the streak. Previously ALL 75 external closes were booked as worst-case losses, firing 13 spurious CBs. Fires a `circuit_breaker` DB event (with `session_loss_usd`) and email. Status line shows `🔴 CIRCUIT BREAKER L2 (Xs | loss≈-$X.XX)`.
   - Original live-validation 2026-04-23 20:02 UTC: Config 20, 3 consecutive external_close hits, 20-min pause enforced.
   - **Escalating pause live-validated 2026-05-01** (Config 20, ETH choppy ~$2,300–$2,320): L1 fired ~14:13 UTC → 20-min pause confirmed (next entry 14:33) ✅; L2 fired ~15:23 UTC → 1-hour pause confirmed (next entry 16:24) ✅; L3 fired ~17:05 UTC → 4-hour pause in effect (~21:05 re-entry) ✅.
   - **DB enum fix 2026-05-01**: `circuit_breaker` was missing from the MariaDB `bot_events.event_type` enum. After the `_EVENT_MAP` fix in commit `891dd10`, CB events were silently dropped (write exception caught, no DB record). Fixed via `ALTER TABLE` — but this fix was being overwritten on every API restart by the startup migration in `api/main.py` (which re-applies the full enum without `circuit_breaker`). **Permanent fix 2026-05-02 (commit `4cdf0d3`):** added `circuit_breaker` to the startup migration in `main.py` — no manual ALTER TABLE needed again, survives all future restarts.
@@ -51,7 +53,9 @@
 ### 🧪 LP Signal Lab (Copy Trading)
 - Reads Telegram signal channels (Swallow Trade - Premium) via Telethon MTProto listener.
 - Parses structured signals (pair / direction / leverage / entry / SL / TP targets) from Format A and B.
-- **Auto-execute**: when a new signal arrives, fires a real HL market order + native SL + native TP(s) for all registered wallets with `auto_execute=ON`. No user interaction required.
+- **Auto-execute**: when a new signal arrives, fires a real HL market order + native SL + native TP(s) for all registered wallets with `auto_execute=ON`. No user interaction required. **Since audit 2026-06-10**: execute task launches BEFORE the notification email (H5 — was 1–5s SMTP delay on every entry); wallets execute **concurrently** via asyncio.gather (M4); up to 3 retry attempts on transient errors like "not filled"/timeouts (M3); entry rejected if the mid already moved beyond the signal SL or drifted >1% past signal entry (M2 stale-price guard); slippage capped at 0.3% (was 1%); SL placement verified + retried, and the entry is market-closed immediately if SL can't be placed (H4 — never a naked position); actual `exec_leverage`/`exec_size_usdt` recorded per execution (M5).
+- **P&L stats (audit M5)**: all P&L figures (Signal Lab history, admin monitor, reconciler emails) are **net of HL taker fees** (0.045% × 2 round trip, × leverage). Pre-audit win rates were gross.
+- **Update matching (audit M6)**: standalone stop/target messages match by coin symbol (word boundary) among the last 5 open signals in the thread; fallback = most recent open signal.
 - **Split TP (multi-target signals)**: when a signal has 2+ targets, the position is split 50/50 — TP1 closes 50% at `targets[0]`, TP2 closes the remaining 50% at `targets[1]`. The SL is placed for the full position size with `reduce_only=True`, so after TP1 fires it auto-scales to cover only the runner. Targets[2+] are ignored (Swallow Trade uses max 2). If only one target, full size closes at TP.
 - **Leverage cap**: if signal requests leverage above HL's per-asset `maxLeverage`, executor silently caps to HL max. SL/TP prices stay unchanged; position size adjusts. Email flags the cap with `⚠️ ajustado desde Nx`.
 - **Agent key model** (same as LP Defensor): `hl_wallet_addr` = main HL account (where funds live); `hl_secret_key` = encrypted agent/API private key (different address — agent can trade but not withdraw). No address-match validation between the two.
@@ -209,6 +213,36 @@ Key improvements deployed to `live_hedge_bot_v2.py`. All user-tunable via DB col
 | **M2-44** Funding rate | Logs current 1h ETH funding rate at hedge open. Logs cumulative funding paid/received at close. Optional `USE_FUNDING_GATE` blocks entry when rate < -threshold. | `use_funding_gate` toggle + `funding_gate_pct` | OFF / 0.05% |
 
 All M2-43/44/47 dashboard strings are **fully bilingual (EN + ES)** as of 2026-06-01. Uses `t('key')` from `landing/i18n.js` — label, popover, slider ranges, sublabel, suggestion chip, active panel all localized.
+
+## Performance Audit — June 2026 (ALL 17 findings closed)
+
+Full audit of LP Defensor V2 + Signal Lab (latency, execution quality, hedge logic, signal quality, reliability) performed 2026-06-09/10. Complete record: `AUDIT_PERFORMANCE_2026-06-09.md`. All fixes deployed and live-verified the same days.
+
+**Key evidence that drove it (Config 17, Apr 11 – Jun 9):** 75/75 closes were `external_close` (native SL/TP fires before the poll) and ALL were booked as worst-case losses → 13 spurious circuit breakers + daily-cap pauses left the LP unhedged; 62/90 trades had reached breakeven (entries were good — accounting was the leak); 59 orphan recoveries (deploy churn, not crashes — systemd NRestarts=0).
+
+| ID | Fix (one-liner) |
+|----|-----------------|
+| H1 | External closes classified from HL fills → real win/loss + net P&L feeds the circuit breaker |
+| H2 | Daily loss cap dynamic (3× per-stop loss, $5 floor) instead of flat -$5 |
+| H3 | RPC errors retry w/ backoff; in-loop bounds failure keeps old range (no more sys.exit → active=False) |
+| H4 | Signal SL placement verified + retried; entry market-closed if SL fails (no naked positions) |
+| H5 | Auto-execute fires before the notification email (was 1–5s SMTP delay per entry) |
+| H6 | `frontend_open_orders` everywhere trigger orders are matched (basic endpoint omits triggerPx → duplicate SLs on all 59 recoveries) |
+| M1 | WS allMids price feed, 3s tick (REST 30s fallback) |
+| M2 | 0.3% slippage cap + re-quote retry + fill verification + fill-anchored entry + signal stale-price guard |
+| M3 | Auto-execute retries 3× on transient errors |
+| M4 | meta() cached 1h; wallets execute concurrently |
+| M5 | P&L net of taker fees everywhere; exec_leverage/exec_size_usdt recorded |
+| M6 | Standalone updates match by coin symbol |
+| M7 | Trail state persisted/restored across restarts; restart frequency = deploy churn (verified) |
+| M8 | HL position panels show SL/TP **trigger** px (was limit px = trigger×1.03) |
+| L1 | Trail cancel+replace only on ≥0.1% SL improvement |
+| L2 | Bot closes by recorded size (manual trades on same wallet untouched) |
+| L3 | ATR drops the in-progress candle |
+| L4 | Safety syncs skip when price fetch fails |
+| L5 | Shared `Info` client singletons (each construction = ~2 hidden REST calls) |
+
+**Assistant guidance:** from 2026-06-10 every close event carries real fee-net P&L (`pnl_usd`, `pnl_pct`, `is_win`, `reason` in `stopped` details; net `pnl_pct` on signal executions). First true profitability report possible after ~2–3 weeks of accumulation.
 
 ## Open Enhancement Backlog (May 2026)
 

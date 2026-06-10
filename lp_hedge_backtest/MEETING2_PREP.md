@@ -298,6 +298,34 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
+### Performance & Profitability Audit (2026-06-09/10) — ALL 17 FINDINGS CLOSED
+
+*Full audit of LP Defensor V2 + Signal Lab: latency, execution quality, hedge logic, signal quality, reliability. Complete record with evidence: `AUDIT_PERFORMANCE_2026-06-09.md`. Every fix deployed + live-verified within 48h. Commits: `6158476`, `0fad2a4`, `054842a`, `9bf7572`, `acccfcc`, `853d990`, `802c3da`.*
+
+**Headline evidence (Config 17, Apr 11 – Jun 9):** 75/75 closes were `external_close` (native SL/TP fires on HL before the 30s poll) and ALL were booked as worst-case losses → 13 spurious circuit breakers; the flat -$5 daily cap was below ONE real stop, so a single close paused the bot until UTC midnight — **the LP sat unhedged during pauses caused by phantom losses**. 62/90 trades reached breakeven → entries were good; the accounting was the leak.
+
+| ID | Sev | Fix | Status |
+|---|---|---|---|
+| H1 | High | External closes classified from HL fills → real win/loss + net P&L feeds CB/daily cap | ✅ 2026-06-09 |
+| H2 | High | Daily loss cap dynamic (3× per-stop loss, $5 floor; env override) — was flat -$5 | ✅ 2026-06-09 |
+| H3 | High | RPC retry + backoff; in-loop bounds failure keeps old range (was sys.exit → active=False, protection silently off) | ✅ 2026-06-09 |
+| H4 | High | Signal SL verified + retried after fill; entry market-closed if SL fails — never a naked position | ✅ 2026-06-09 |
+| H5 | High | Auto-execute fires before the notification email (was 1–5s SMTP delay = price drift per entry) | ✅ 2026-06-09 |
+| H6 | High | `frontend_open_orders` for trigger matching (basic endpoint omits triggerPx → duplicate SL on all 59 recoveries) | ✅ 2026-06-09 |
+| M1 | Med | WS allMids price feed, 3s tick (was 30s REST poll); auto REST fallback | ✅ 2026-06-10 |
+| M2 | Med | Slippage 0.3% (was 1%) + re-quote retry + fill verification + fill-anchored entry/SL + signal stale-price guard | ✅ 2026-06-10 |
+| M3 | Med | Auto-execute retries 3× on transient errors (signal #52 failure mode eliminated) | ✅ 2026-06-10 |
+| M4 | Med | meta() cached 1h; wallets execute concurrently (same fill moment for all) | ✅ 2026-06-10 |
+| M5 | Med | P&L net of taker fees everywhere; exec_leverage/exec_size_usdt recorded → real $ P&L computable | ✅ 2026-06-10 |
+| M6 | Med | Standalone Telegram updates match by coin symbol (wrong-trade close eliminated) | ✅ 2026-06-10 |
+| M7 | Med | Trail state persisted/restored across restarts (verified `trail_restored: true`); 59 restarts = deploy churn, NOT crashes (systemd NRestarts=0) | ✅ 2026-06-10 |
+| M8 | Med | HL position panels (admin + user) show SL/TP **trigger** px — was limit px (showed $1720 vs real $1645) | ✅ 2026-06-10 |
+| L1–L5 | Low | Trail-replace threshold; close-by-size (manual trades safe); ATR drops partial candle; syncs skip on price-fetch failure; shared Info clients | ✅ 2026-06-10 |
+
+**Investor narrative value:** (1) the platform now produces **fee-net, real-fill P&L per trade** — first true profitability report possible after 2–3 weeks of accumulation; (2) "we audited our own execution stack and closed 17 findings in 48 hours" is a maturity story DeFi Suite can't tell; (3) entry quality was validated by data (62/90 to breakeven) — the strategy thesis held, the operational layer was the leak and is now fixed.
+
+---
+
 ## Meeting 2 Narrative Strategy
 
 **Opening:** Lead with what was fixed since meeting 1 (show the list of tier 1 completions).
@@ -322,4 +350,4 @@ Full assessment performed against current `admin/admin.js` (1263 lines). Four pr
 
 ---
 
-*Last updated: 2026-06-09 — Signal Lab fixes: SL-P8a executed signals never age out of active bucket ✅; SL-P8b auto-execute all-fail → signal cancelled ✅; SL-P8c source filter chip ✅. Signal Lab win rates observed: src=3 (Mid Term) 77.8%, src=1 42.9%, src=2 37.5%. Previously (2026-06-01): i18n fix M2-43/44/47 ✅ bilingual; systemd Restart=always fix; M2-48 added (dynamic delta sizing); M2-41/42 downgraded to Low.*
+*Last updated: 2026-06-10 — Performance & profitability audit COMPLETE: all 17 findings (H1–H6, M1–M8, L1–L5) fixed, deployed and live-verified in 48h; see audit section above + `AUDIT_PERFORMANCE_2026-06-09.md`. Every close now logs fee-net real-fill P&L → first true profitability report after ~2–3 weeks. Note: pre-audit Signal Lab win rates (src=3 77.8%, src=1 42.9%, src=2 37.5%) were GROSS of fees — recompute net before quoting to investors. Previously (2026-06-09): SL-P8a/b/c Signal Lab fixes ✅.*
