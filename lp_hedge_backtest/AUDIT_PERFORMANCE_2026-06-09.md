@@ -33,9 +33,20 @@ Native SL/TP triggers on HL always fire before the 30s poll catches the level �
 *Caveat:* fills are wallet-wide — a manual ETH trade on the same wallet within the window pollutes the weighted close price (see L2).
 *Requires bot restart to take effect.*
 
-**H2 — Daily loss cap miscalibrated.** `_DAILY_LOSS_CAP_USD = -5.00` vs ~$15 real per-stop loss at 1.5% SL × ~$1k notional → even one genuine stop ends the trading day. Fix: scale cap to sizing (e.g., 3× expected per-stop loss) or per-config param. ⏳ Pending.
+**H2 — Daily loss cap miscalibrated. ✅ FIXED 2026-06-09**
+Flat `-$5` cap vs ~$15 real per-stop loss at 1.5% SL × ~$1k notional → even one genuine stop ended the trading day.
+*Fix applied:* `_daily_loss_cap()` — dynamic cap = `DAILY_LOSS_CAP_STOPS` (default 3) × expected single-stop loss at current sizing, $5 magnitude floor; `DAILY_LOSS_CAP_USD` env var overrides with a fixed value. CB event/email now shows net loss vs cap.
 
-**H3 — Transient RPC error kills bot permanently.** `fetch_position_bounds` does `sys.exit(1)` on any exception (also called from idle-loop refresh). Crash rc=1 → `bot_manager` sets `active=False` → protection silently OFF until manual re-arm. Fix: retry with backoff; only exit at initial startup; in-loop keep old bounds. ⏳ Pending.
+**H3 — Transient RPC error kills bot permanently. ✅ FIXED 2026-06-09**
+`fetch_position_bounds` did `sys.exit(1)` on any exception (also called from idle-loop refresh). Crash rc=1 → `bot_manager` sets `active=False` → protection silently OFF until manual re-arm.
+*Fix applied:* 3 retries with 5s/10s backoff; `fatal=True` only at initial startup; in-loop refresh failure keeps previous bounds and retries in 10 min, logging an `error` event.
+
+**H6 — Trigger orders invisible to `info.open_orders` (found during H2/H3 deploy). ✅ FIXED 2026-06-09**
+HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: the active SL @ $1670 returned both as `None`); only `frontend_open_orders` includes them. Three code paths filtered on those fields and therefore **never matched any trigger order**:
+1. `live_hedge_bot_v2.py::_reconcile_on_startup` — existing SL never found → **duplicate SL placed on every one of the 59 orphan recoveries**.
+2. `listener.py::_close_hl_position` — SL/TP never cancelled before market close → orphan reduce-only triggers lingered after close (could close a future position on the same coin unexpectedly).
+3. `listener.py::_fetch_orphan_report` — existing SL never detected → emergency SL duplicated it.
+*Fix applied:* all three switched to `info.frontend_open_orders`. Note: dashboard HL-position panels (`admin.py:601`, `signal_lab.py:857`) use `limitPx`/`reduceOnly` which ARE present — they work, but display the SL *limit* price (trigger×1.03) instead of the trigger price (e.g., $1720 shown vs $1670 actual) → tracked as **M8**, minor display fix.
 
 **H4 — Naked position if SL placement fails after fill (Signal Lab).** `signal_executor.py:174-179` places SL once, never validates the response; `sl_order_id=NULL` stored silently, breakeven monitor skips the row. Fix: validate, retry once, else market-close entry + loud alert. ⏳ Pending.
 
@@ -71,4 +82,6 @@ Native SL/TP triggers on HL always fire before the 30s poll catches the level �
 | H4, H5, M3, M4, M6, L5 | listener restart only — LP untouched |
 | M5 | API reload (bots respawn; check manual trade on Config 17 wallet first) |
 
-**Recommended order:** H1 ✅ → H2 → H3 → H5 + H4 → M1/M2.
+- **M8** — HL position panels show SL/TP *limit* px instead of trigger px (`admin.py`/`signal_lab.py` `_fetch_one`); switch to `frontend_open_orders` and read `triggerPx`. Display-only.
+
+**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 + H4 (listener restart; H6 listener fixes also apply then) → M1/M2.

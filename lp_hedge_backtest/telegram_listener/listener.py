@@ -366,8 +366,10 @@ def _close_hl_position(wallet_addr: str, secret_key_encrypted: str,
             return {"success": False, "error": "No open position found — may have already closed"}
 
         # Cancel open trigger orders (SL/TP) for this symbol
+        # H6: frontend_open_orders required — basic open_orders omits triggerPx,
+        # so SL/TP were never cancelled here and lingered after the close.
         try:
-            for o in info.open_orders(wallet_addr):
+            for o in info.frontend_open_orders(wallet_addr):
                 if o.get("coin") == symbol and o.get("triggerPx") is not None:
                     exchange.cancel(symbol, o["oid"])
         except Exception:
@@ -628,7 +630,9 @@ def _fetch_orphan_report(hl_wallet_addr: str) -> list[dict]:
         return []
 
     try:
-        open_orders = info.open_orders(hl_wallet_addr)
+        # H6: frontend_open_orders — basic open_orders omits triggerPx/orderType,
+        # so existing SLs were never detected and emergency SLs duplicated them.
+        open_orders = info.frontend_open_orders(hl_wallet_addr)
     except Exception:
         open_orders = []
 

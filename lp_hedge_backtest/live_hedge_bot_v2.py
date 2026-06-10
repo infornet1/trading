@@ -255,21 +255,46 @@ class LiveHedgeBotV2:
 
     # ── On-chain ───────────────────────────────────────────────────────────────
 
-    def fetch_position_bounds(self):
-        try:
-            pos = self.contract.functions.positions(NFT_ID).call()
-            self.tick_lower        = pos[5]
-            self.tick_upper        = pos[6]
-            self.liquidity         = pos[7]
-            self.lower_bound       = tick_to_price(self.tick_lower)
-            self.upper_bound       = tick_to_price(self.tick_upper)
-            self.last_bounds_fetch = time.time()
-            x_max = calc_x_max_eth(self.liquidity, self.tick_lower, self.tick_upper)
-            print(f"✅ Range: ${self.lower_bound:.2f} — ${self.upper_bound:.2f} | "
-                  f"Liquidity: {self.liquidity} | X_max: {x_max:.4f} ETH", flush=True)
-        except Exception as e:
-            print(f"❌ Error fetching position: {e}", flush=True)
+    def fetch_position_bounds(self, fatal: bool = False, retries: int = 3) -> bool:
+        """Fetch LP range/liquidity from the Uniswap position NFT.
+
+        H3: retries with backoff on RPC errors. Only exits the process when
+        fatal=True (initial startup, where no previous bounds exist). On the
+        periodic in-loop refresh a failure keeps the previous bounds — a
+        transient Arbitrum RPC blip used to sys.exit(1), which bot_manager
+        treated as a crash and set active=False, silently disabling protection.
+        """
+        last_err = None
+        for attempt in range(1, retries + 1):
+            try:
+                pos = self.contract.functions.positions(NFT_ID).call()
+                self.tick_lower        = pos[5]
+                self.tick_upper        = pos[6]
+                self.liquidity         = pos[7]
+                self.lower_bound       = tick_to_price(self.tick_lower)
+                self.upper_bound       = tick_to_price(self.tick_upper)
+                self.last_bounds_fetch = time.time()
+                x_max = calc_x_max_eth(self.liquidity, self.tick_lower, self.tick_upper)
+                print(f"✅ Range: ${self.lower_bound:.2f} — ${self.upper_bound:.2f} | "
+                      f"Liquidity: {self.liquidity} | X_max: {x_max:.4f} ETH", flush=True)
+                return True
+            except Exception as e:
+                last_err = e
+                print(f"❌ Error fetching position (attempt {attempt}/{retries}): {e}", flush=True)
+                if attempt < retries:
+                    time.sleep(5 * attempt)
+
+        if fatal:
+            print(f"❌ Could not fetch LP position at startup after {retries} attempts — exiting.", flush=True)
             sys.exit(1)
+
+        # In-loop refresh failed — keep previous bounds, retry in 10 min
+        self.last_bounds_fetch = time.time() - BOUNDS_REFRESH_H * 3600 + 600
+        print(f"⚠️  [H3] Bounds refresh failed after {retries} attempts — keeping previous range, retry in 10 min", flush=True)
+        log_event("error", details={
+            "warning": f"[H3] Bounds refresh failed ({last_err}) — keeping previous range",
+        })
+        return False
 
     def get_eth_price(self):
         try:
@@ -503,8 +528,14 @@ class LiveHedgeBotV2:
     _CB_RATE_WINDOW_SECS  = 1800  # 30-minute window
     _CB_RATE_PAUSE_SECS   = 3600  # 1-hour pause when rate trigger fires
 
-    # M2-39C: daily loss cap
-    _DAILY_LOSS_CAP_USD   = -5.00  # estimated net loss (fees included) to pause rest of UTC day
+    # M2-39C / H2: daily loss cap — pause rest of UTC day when net loss exceeds it.
+    # Dynamic by default: 3× the expected single-stop loss at current sizing
+    # (the old flat -$5 was below ONE real stop at 1.5% SL × ~$1k notional,
+    # so a single close ended the trading day and left the LP unhedged).
+    # Env DAILY_LOSS_CAP_USD overrides with a fixed value; floor is $5.
+    _DAILY_CAP_STOPS      = float(os.getenv("DAILY_LOSS_CAP_STOPS", "3"))
+    _env_cap              = os.getenv("DAILY_LOSS_CAP_USD", "").strip()
+    _DAILY_LOSS_CAP_FIXED = -abs(float(_env_cap)) if _env_cap else None  # None → dynamic
 
     # M2-40: cooldown after native SL fires between polls (external_close)
     _EXT_COOLDOWN_SECS    = 300   # 5 minutes
@@ -920,9 +951,10 @@ class LiveHedgeBotV2:
         self._session_loss_usd += est_loss
 
         # ── Determine if any CB trigger fires ─────────────────────────────
+        daily_cap   = self._daily_loss_cap()
         streak_fire = self._consecutive_stops >= self._CB_STOP_THRESHOLD
         rate_fire   = len(self._stop_timestamps) >= self._CB_RATE_THRESHOLD
-        cap_fire    = self._session_loss_usd <= self._DAILY_LOSS_CAP_USD
+        cap_fire    = self._session_loss_usd <= daily_cap
 
         if not (streak_fire or rate_fire or cap_fire):
             return
@@ -934,7 +966,8 @@ class LiveHedgeBotV2:
                 hour=23, minute=59, second=59, microsecond=0
             )
             pause_secs = max(int(midnight.timestamp() - now), 1800)
-            reason_str = (f"Daily loss cap hit (est. ${self._session_loss_usd:.2f})")
+            reason_str = (f"Daily loss cap hit (net ${self._session_loss_usd:.2f} "
+                          f"≤ cap ${daily_cap:.2f})")
             self._session_loss_usd = 0.0   # reset so it doesn't re-fire immediately
         else:
             # Escalating pause based on how many CBs fired in the last window
@@ -966,6 +999,20 @@ class LiveHedgeBotV2:
         )
         print(f"🔴 [M2-39] Circuit breaker ({reason_str}) — pausing {pause_secs // 60} min",
               flush=True)
+
+    def _daily_loss_cap(self) -> float:
+        """H2: daily net-loss cap in USD (negative).
+
+        Env DAILY_LOSS_CAP_USD wins when set; otherwise _DAILY_CAP_STOPS × the
+        expected single-stop loss (SL distance + round-trip taker fees) at the
+        sizing of the trade being closed. $5 magnitude floor.
+        Must be called BEFORE _reset_short_state so entry/size are still set.
+        """
+        if self._DAILY_LOSS_CAP_FIXED is not None:
+            return self._DAILY_LOSS_CAP_FIXED
+        notional = (self.entry_price or 0.0) * (self.hedge_size_eth or 0.0)
+        per_stop = notional * DEFAULT_SL_PCT + notional * 0.00045 * 2
+        return -max(5.0, self._DAILY_CAP_STOPS * per_stop)
 
     # ── H1: external close classification ────────────────────────────────────
 
@@ -1295,7 +1342,10 @@ class LiveHedgeBotV2:
 
             # Check for existing SL and TP orders on HL
             try:
-                open_orders = self.info.open_orders(HL_ADDRESS)
+                # H6: must be frontend_open_orders — the basic open_orders endpoint
+                # omits triggerPx/orderType, so trigger orders were never matched
+                # and every recovery placed a duplicate SL.
+                open_orders = self.info.frontend_open_orders(HL_ADDRESS)
                 trigger_orders = [
                     o for o in open_orders
                     if o.get("coin") == "ETH"
@@ -1384,7 +1434,7 @@ class LiveHedgeBotV2:
     def run(self):
         print(f"🚀 [V2] VIZNIAGO Defensor Bajista V2 starting | NFT #{NFT_ID}", flush=True)
 
-        self.fetch_position_bounds()
+        self.fetch_position_bounds(fatal=True)
 
         # V2: reconcile before entering the main loop
         self._reconcile_on_startup()
