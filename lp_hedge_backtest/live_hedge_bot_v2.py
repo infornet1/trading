@@ -48,6 +48,15 @@ CHECK_INTERVAL   = int(os.getenv("CHECK_INTERVAL",        "30"))
 CONFIG_ID        = os.getenv("CONFIG_ID")
 BOUNDS_REFRESH_H = int(os.getenv("BOUNDS_REFRESH_HOURS", "4"))
 
+# M1: WebSocket price feed — HL pushes allMids sub-second; the 30s REST poll
+# becomes the fallback when the WS goes stale. USE_WS_PRICE=0 reverts fully.
+USE_WS_PRICE  = os.getenv("USE_WS_PRICE", "1").strip() not in ("0", "false", "False")
+WS_TICK_SECS  = int(os.getenv("WS_TICK_SECS", "3"))   # loop cadence while WS is fresh
+WS_STALE_SECS = 15.0                                   # WS older than this → REST fallback
+
+# M2: max slippage for market entries — old 1% was wider than the SL distance
+MAX_SLIPPAGE  = float(os.getenv("MAX_SLIPPAGE_PCT", "0.3")) / 100.0
+
 # Entry
 TRIGGER_OFFSET = float(os.getenv("TRIGGER_OFFSET_PCT", "0.5")) / 100.0
 UPPER_BUFFER   = TRIGGER_OFFSET
@@ -164,12 +173,23 @@ class LiveHedgeBotV2:
         print(f"⚙️  [V2] Initializing VIZNIAGO Defensor Bajista V2 | NFT #{NFT_ID}", flush=True)
         self.w3       = Web3(Web3.HTTPProvider(RPC_URL))
         self.contract = self.w3.eth.contract(address=V3_POS_MANAGER, abi=V3_ABI)
-        self.info     = Info(constants.MAINNET_API_URL, skip_ws=True)
+        self.info     = Info(constants.MAINNET_API_URL, skip_ws=not USE_WS_PRICE)
         self.exchange = Exchange(
             Account.from_key(HL_SECRET_KEY),
             constants.MAINNET_API_URL,
             account_address=HL_ADDRESS,
         )
+
+        # M1: WS-pushed price (updated by callback thread; read by main loop)
+        self._ws_price: Optional[float] = None
+        self._ws_price_ts: float        = 0.0
+        self._last_status_print: float  = 0.0
+        if USE_WS_PRICE:
+            try:
+                self.info.subscribe({"type": "allMids"}, self._on_mids)
+                print("📡 [M1] WS allMids subscription active — REST poll is fallback", flush=True)
+            except Exception as e:
+                print(f"⚠️  [M1] WS subscribe failed ({e}) — REST polling only", flush=True)
 
         # ── LP position ────────────────────────────────────────────────────
         self.lower_bound       = None
@@ -296,7 +316,24 @@ class LiveHedgeBotV2:
         })
         return False
 
+    def _on_mids(self, msg):
+        """M1: WS callback (runs on the SDK's websocket thread)."""
+        try:
+            mid = msg.get("data", {}).get("mids", {}).get("ETH")
+            if mid:
+                self._ws_price    = float(mid)
+                self._ws_price_ts = time.monotonic()
+        except Exception:
+            pass
+
+    def _ws_fresh(self) -> bool:
+        return (USE_WS_PRICE and self._ws_price is not None
+                and (time.monotonic() - self._ws_price_ts) < WS_STALE_SECS)
+
     def get_eth_price(self):
+        # M1: prefer the WS-pushed mid; REST only when the WS is stale/down
+        if self._ws_fresh():
+            return self._ws_price
         try:
             return float(self.info.all_mids()["ETH"])
         except Exception:
@@ -644,7 +681,26 @@ class LiveHedgeBotV2:
                     return
 
             self.exchange.update_leverage(leverage, "ETH")
-            order = self.exchange.market_open("ETH", False, size, slippage=0.01)
+
+            # M2: 0.3% slippage cap (was 1% — wider than the SL distance) with one
+            # re-quote retry; market_open re-fetches the current mid on each call.
+            # Top-level status "ok" does NOT mean filled — must check statuses[0].
+            order  = None
+            filled = {}
+            for attempt in (1, 2):
+                order = self.exchange.market_open("ETH", False, size, slippage=MAX_SLIPPAGE)
+                if order is None:
+                    break
+                if order.get("status") == "ok":
+                    statuses = order.get("response", {}).get("data", {}).get("statuses", [{}])
+                    first    = statuses[0] if statuses else {}
+                    filled   = first.get("filled", {})
+                    if filled.get("oid"):
+                        break
+                    print(f"⚠️  [M2] Entry attempt {attempt}/2 not filled within "
+                          f"{MAX_SLIPPAGE*100:.2f}% slippage: {first}", flush=True)
+                else:
+                    print(f"⚠️  [M2] Entry attempt {attempt}/2 rejected: {order}", flush=True)
 
             if order is None:
                 print(f"❌ market_open returned None", flush=True)
@@ -653,19 +709,21 @@ class LiveHedgeBotV2:
                 })
                 return
 
-            if order["status"] == "ok":
+            if filled.get("oid"):
+                # M2: anchor entry/SL on the ACTUAL fill price, not the poll price
+                fill_px = float(filled.get("avgPx", price) or price)
                 self._margin_fail_count    = 0
                 self._margin_backoff_until = 0.0
-                self.entry_price              = price
+                self.entry_price              = fill_px
                 self.hedge_size_eth           = size
                 self.leverage_used            = leverage
                 self.hedge_active             = True
                 self.breakeven_reached        = False
-                self.short_min_price          = price
+                self.short_min_price          = fill_px
                 self.open_trigger             = trigger
-                self.current_sl_price         = price * (1 + DEFAULT_SL_PCT)
-                self._effective_breakeven_pct = self._compute_atr_breakeven(price)  # M2-49
-                self.open_time                = time.time()                          # M2-44
+                self.current_sl_price         = fill_px * (1 + DEFAULT_SL_PCT)
+                self._effective_breakeven_pct = self._compute_atr_breakeven(fill_px)  # M2-49
+                self.open_time                = time.time()                            # M2-44
 
                 print(f"✅ SHORT OPENED | Entry: ${self.entry_price:.2f} | "
                       f"SL: ${self.current_sl_price:.2f} | Trigger: {label}", flush=True)
@@ -752,7 +810,9 @@ class LiveHedgeBotV2:
             if self.breakeven_reached:
                 trail_sl = self.short_min_price * (1 + TRAIL_PCT)
                 new_sl   = min(self.entry_price, trail_sl)
-                if new_sl < self.current_sl_price:
+                # L1: only cancel+replace when the SL improves ≥0.1% — every
+                # replace has a brief no-native-SL window and costs 2 API actions
+                if new_sl < self.current_sl_price * (1 - 0.001):
                     self.current_sl_price = new_sl
                     print(f"📉 Trail SL → ${self.current_sl_price:.2f} "
                           f"(min ${self.short_min_price:.2f} + {TRAIL_PCT*100:.1f}%)", flush=True)
@@ -1555,16 +1615,12 @@ class LiveHedgeBotV2:
 
                 # ── Entry logic ──────────────────────────────────────────────
                 if not self.hedge_active:
-                    # M2-39: circuit breaker check
+                    # M2-39: circuit breaker check (shown in the status line below)
                     if now < self._circuit_breaker_until:
-                        remaining = int(self._circuit_breaker_until - now)
-                        print(f"🔴 [M2-39] Circuit breaker active — {remaining}s remaining",
-                              end="\r", flush=True)
-                    # M2-40: post-external_close cooldown check
+                        pass
+                    # M2-40: post-external_close cooldown check (status line below)
                     elif now < self._ext_close_cooldown_until:
-                        remaining = int(self._ext_close_cooldown_until - now)
-                        print(f"⏸️  [M2-40] Ext-close cooldown — {remaining}s remaining",
-                              end="\r", flush=True)
+                        pass
                     else:
                         opened = False
 
@@ -1625,13 +1681,18 @@ class LiveHedgeBotV2:
                         armed = " | ↓armed" if self.price_was_above else ""
                         short_status = f"⚪ IDLE ({guard}{armed})"
 
-                print(
-                    f"[{time.strftime('%H:%M:%S')}] ETH ${price:.2f} | "
-                    f"{zone} | {short_status} [V2]",
-                    end="\r", flush=True,
-                )
+                # M1: at the fast WS tick, throttle the status line to every 30s
+                if now - self._last_status_print >= 30:
+                    self._last_status_print = now
+                    src = "ws" if self._ws_fresh() else "rest"
+                    print(
+                        f"[{time.strftime('%H:%M:%S')}] ETH ${price:.2f} ({src}) | "
+                        f"{zone} | {short_status} [V2]",
+                        end="\r", flush=True,
+                    )
 
-            time.sleep(CHECK_INTERVAL)
+            # M1: fast cadence while the WS feed is fresh; REST interval otherwise
+            time.sleep(WS_TICK_SECS if self._ws_fresh() else CHECK_INTERVAL)
 
 
 if __name__ == "__main__":

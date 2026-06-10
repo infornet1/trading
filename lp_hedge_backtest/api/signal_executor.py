@@ -3,10 +3,17 @@ HL order placement helper for signal copy trading.
 Synchronous — wrap with asyncio.to_thread() in async contexts.
 """
 import math
+import os
 from typing import Optional
 
 # Fixed $10 notional per trade (controlled live mode). Set to None for full size_pct sizing.
 SIGNAL_TEST_NOTIONAL_USDC: float | None = 10.0
+
+# M2: execution-quality guards
+# Max slippage on the market entry (old 1% could eat most of a tight signal SL)
+MAX_SLIPPAGE_PCT    = float(os.getenv("SIGNAL_MAX_SLIPPAGE_PCT", "0.3")) / 100
+# Reject entry if the market already drifted this far past the signal entry price
+MAX_ENTRY_DRIFT_PCT = float(os.getenv("SIGNAL_MAX_ENTRY_DRIFT_PCT", "1.0")) / 100
 
 from eth_account import Account
 from hyperliquid.exchange import Exchange
@@ -143,29 +150,52 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
                 "notional":           round(size * entry, 2),
             }
 
+        # ── M2: stale-price guard — has the market run away from the signal? ──
+        try:
+            mid = float(info.all_mids().get(symbol, 0) or 0)
+        except Exception:
+            mid = 0.0  # mid unavailable — proceed; the slippage cap still protects
+        if mid > 0:
+            if (is_buy and mid <= sl_price) or (not is_buy and mid >= sl_price):
+                return {"success": False, "dry_run": False,
+                        "error": f"Price ${mid:,.6g} already beyond stoploss ${sl_price:,.6g} — entry skipped"}
+            drift = (mid - entry) / entry if is_buy else (entry - mid) / entry
+            if drift > MAX_ENTRY_DRIFT_PCT:
+                return {"success": False, "dry_run": False,
+                        "error": f"Price drifted {drift*100:.2f}% past signal entry "
+                                 f"(${entry:,.6g} → ${mid:,.6g}, max {MAX_ENTRY_DRIFT_PCT*100:.1f}%) — entry skipped"}
+
         # ── Open market position ─────────────────────────────────────────────
         exchange = Exchange(account, constants.MAINNET_API_URL, account_address=hl_wallet_addr)
         exchange.update_leverage(leverage, symbol)
-        order = exchange.market_open(symbol, is_buy, size, slippage=0.01)
 
-        if not order or order.get("status") != "ok":
-            return {"success": False, "dry_run": False, "error": f"Order failed: {order}"}
+        # M2: 0.3% slippage cap (was 1%) + one re-quote retry on an IOC miss;
+        # market_open re-fetches the current mid on each call.
+        filled = {}
+        for attempt in (1, 2):
+            order = exchange.market_open(symbol, is_buy, size, slippage=MAX_SLIPPAGE_PCT)
+            if not order or order.get("status") != "ok":
+                return {"success": False, "dry_run": False, "error": f"Order failed: {order}"}
 
-        statuses = order.get("response", {}).get("data", {}).get("statuses", [{}])
-        first    = statuses[0] if statuses else {}
-        filled   = first.get("filled", {})
-        resting  = first.get("resting", {})
+            statuses = order.get("response", {}).get("data", {}).get("statuses", [{}])
+            first    = statuses[0] if statuses else {}
+            filled   = first.get("filled", {})
+            if filled.get("oid"):
+                break
 
-        if not filled or not filled.get("oid"):
-            # Order was not filled immediately — cancel the resting entry to avoid orphans
-            resting_oid = resting.get("oid") if resting else None
+            # Not filled — cancel any resting remainder before retrying
+            resting_oid = (first.get("resting") or {}).get("oid")
             if resting_oid:
                 try:
                     exchange.cancel(symbol, resting_oid)
                 except Exception:
                     pass
+            print(f"[M2] Entry attempt {attempt}/2 not filled for {symbol} "
+                  f"(slippage cap {MAX_SLIPPAGE_PCT*100:.2f}%)", flush=True)
+
+        if not filled or not filled.get("oid"):
             return {"success": False, "dry_run": False,
-                    "error": "Order was not filled (resting) — price may have moved. Entry cancelled."}
+                    "error": "Order was not filled after 2 attempts — price may have moved. Entry cancelled."}
 
         hl_order_id = str(filled.get("oid", ""))
         fill_price  = float(filled.get("avgPx", entry) or entry)

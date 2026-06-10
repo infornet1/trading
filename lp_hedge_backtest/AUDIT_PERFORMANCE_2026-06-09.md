@@ -58,8 +58,8 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 
 ### MEDIUM
 
-- **M1 — 30s REST polling vs WebSocket.** `all_mids()` poll; entries/trail react up to 30s late. Native SL covers downside. Fix: `Info` WS `allMids` subscription. ⏳
-- **M2 — 1% slippage tolerance vs 1.5% stop distance.** `market_open(slippage=0.01)` both modules; no stale-price check before sending. Fix: 0.3% + one re-quote retry; skip if price already past SL. ⏳
+- **M1 — 30s REST polling vs WebSocket. ✅ FIXED 2026-06-10.** Bot subscribes to WS `allMids` (sub-second push); main loop ticks every 3s while the feed is fresh, falls back to 30s REST automatically if the WS goes stale (>15s). `USE_WS_PRICE=0` reverts fully; `WS_TICK_SECS` tunes cadence. Status line throttled to 30s and shows the price source (`ws`/`rest`).
+- **M2 — 1% slippage tolerance vs 1.5% stop distance. ✅ FIXED 2026-06-10.** Both modules: slippage cap 0.3% (`MAX_SLIPPAGE_PCT` / `SIGNAL_MAX_SLIPPAGE_PCT`) with one re-quote retry on an IOC miss; fill status now actually verified (top-level "ok" ≠ filled). LP bot anchors entry/SL/breakeven on the **actual fill price** instead of the poll price. Signal executor adds a stale-price guard: entry rejected if the mid is already beyond the signal SL or drifted >1% past the signal entry (`SIGNAL_MAX_ENTRY_DRIFT_PCT`).
 - **M3 — Auto-execute one-shot.** IOC miss → signal permanently `cancelled` (signal #52). Fix: 2–3 retries with fresh price inside tolerance. ⏳
 - **M4 — Redundant REST + serial wallets.** 3 read calls per order (`user_state`, `spot_user_state`, `meta()` — cacheable); wallets execute sequentially. Fix: cache `meta()`, `asyncio.gather` wallets. ⏳
 - **M5 — Stats ignore fees/funding.** `signal_lab.py::_calc_pnl` = raw × leverage, idealized fallback to signal levels; source win-rates are gross. Also `exec_leverage`/`exec_size_usdt` never saved. ⏳
@@ -68,7 +68,7 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 
 ### LOW
 
-- **L1** — Trail cancel+replace on every tick-min, no min-move threshold (brief no-SL window + API churn). Gate at ≥0.1% SL move.
+- **L1** — Trail cancel+replace on every tick-min, no min-move threshold (brief no-SL window + API churn). ✅ FIXED 2026-06-10 (bundled with M1): replace only when the SL improves ≥0.1%.
 - **L2** — `market_close("ETH")` closes the entire wallet ETH position, including manual trades sharing the wallet. Close by recorded size, `reduce_only`.
 - **L3** — ATR breakeven includes the in-progress hourly candle (mild repaint). Drop partial candle.
 - **L4** — Failed price fetch → syncs run with `price or 0` → `reentry_guard_price=0` on a real close at that moment.
@@ -88,4 +88,4 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 
 - **M8** — HL position panels show SL/TP *limit* px instead of trigger px (`admin.py`/`signal_lab.py` `_fetch_one`); switch to `frontend_open_orders` and read `triggerPx`. Display-only.
 
-**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 ✅ + H4 ✅ (listener restarted 2026-06-09; H6 listener fixes live) → M1/M2 (+ API restart to activate H4 on the manual-execute path).
+**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 ✅ + H4 ✅ (listener restarted 2026-06-09) → M1 ✅ + M2 ✅ + L1 ✅ (API + listener restarted 2026-06-10; H4 now live on manual-execute path too). Remaining: M3–M8, L2–L5.
