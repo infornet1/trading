@@ -48,9 +48,13 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 3. `listener.py::_fetch_orphan_report` — existing SL never detected → emergency SL duplicated it.
 *Fix applied:* all three switched to `info.frontend_open_orders`. Note: dashboard HL-position panels (`admin.py:601`, `signal_lab.py:857`) use `limitPx`/`reduceOnly` which ARE present — they work, but display the SL *limit* price (trigger×1.03) instead of the trigger price (e.g., $1720 shown vs $1670 actual) → tracked as **M8**, minor display fix.
 
-**H4 — Naked position if SL placement fails after fill (Signal Lab).** `signal_executor.py:174-179` places SL once, never validates the response; `sl_order_id=NULL` stored silently, breakeven monitor skips the row. Fix: validate, retry once, else market-close entry + loud alert. ⏳ Pending.
+**H4 — Naked position if SL placement fails after fill (Signal Lab). ✅ FIXED 2026-06-09**
+`signal_executor.py` placed the SL once and never validated the response; a rejected SL was stored silently as `sl_order_id=NULL` (breakeven monitor then skips the row) — naked leveraged position.
+*Fix applied:* SL placement verified, retried once; if still failing the entry is market-closed immediately and the failure email (existing path) reports it. Active for auto-execute after listener restart; the **manual** execute path (API) picks it up at the next API restart — bundle with the M1/M2 deploy.
 
-**H5 — SMTP blocks order execution.** `listener.py::save_signal` awaits the "Nueva señal" email (1–5s) BEFORE `create_task(_auto_execute_signal)`. Fix: launch execute task first, email in background. ⏳ Pending.
+**H5 — SMTP blocks order execution. ✅ FIXED 2026-06-09**
+`listener.py::save_signal` awaited the "Nueva señal" email (1–5s SMTP) BEFORE launching `_auto_execute_signal`.
+*Fix applied:* auto-execute task launches first; the email is fire-and-forget off the execution path. Per-wallet result emails inside the wallet loop still serialize wallet #2 — that's M4 (gather).
 
 ### MEDIUM
 
@@ -84,4 +88,4 @@ HL's basic `openOrders` endpoint omits `triggerPx`/`orderType` (verified live: t
 
 - **M8** — HL position panels show SL/TP *limit* px instead of trigger px (`admin.py`/`signal_lab.py` `_fetch_one`); switch to `frontend_open_orders` and read `triggerPx`. Display-only.
 
-**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 + H4 (listener restart; H6 listener fixes also apply then) → M1/M2.
+**Recommended order:** H1 ✅ → H2 ✅ → H3 ✅ → H6 ✅ (bot restarted 2026-06-09) → H5 ✅ + H4 ✅ (listener restarted 2026-06-09; H6 listener fixes live) → M1/M2 (+ API restart to activate H4 on the manual-execute path).

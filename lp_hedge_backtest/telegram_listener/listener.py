@@ -124,12 +124,16 @@ async def save_signal(msg, sig, source_id: int) -> int | None:
         await db.refresh(ev)
         ev_id = ev.id
 
-    # Email: new signal received
+    # H5: launch auto-execute FIRST — the notification email used to be awaited
+    # before this, adding 1-5s of SMTP latency (= price drift) to every entry.
+    asyncio.create_task(_auto_execute_signal(ev_id, sig))
+
+    # Email: new signal received (fire-and-forget, off the execution path)
     entry_str = f"${sig.entry:,.4f}" if sig.entry else "market"
     sl_str    = f"${sig.stoploss:,.4f}" if sig.stoploss else "—"
     tps_str   = " / ".join(f"${t:,.4f}" for t in (sig.targets or [])) or "—"
     source_name = SOURCE_NAMES.get(source_id, f"Source {source_id}")
-    await asyncio.to_thread(
+    asyncio.create_task(asyncio.to_thread(
         send_signal_email,
         f"📡 Nueva señal: {sig.pair} {sig.direction.upper()} {sig.leverage}x [{source_name}]",
         f"Señal recibida de Swallow Trade · {source_name}\n\n"
@@ -141,10 +145,7 @@ async def save_signal(msg, sig, source_id: int) -> int | None:
         f"Targets:   {tps_str}\n"
         f"Tamaño:    {sig.size_pct or 2}% del balance\n\n"
         f"Signal ID: {ev_id}",
-    )
-
-    # Auto-execute for any registered wallets with auto_execute=True
-    asyncio.create_task(_auto_execute_signal(ev_id, sig))
+    ))
     return ev_id
 
 

@@ -171,12 +171,40 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         fill_price  = float(filled.get("avgPx", entry) or entry)
 
         # ── Native SL — full size, reduce_only (covers runner after TP1 partial fill)
-        sl_resp = exchange.order(
-            symbol, close_is_buy, size, sl_price,
-            {"trigger": {"triggerPx": sl_price, "isMarket": True, "tpsl": "sl"}},
-            reduce_only=True,
-        )
-        sl_oid  = _extract_oid(sl_resp)
+        # H4: the SL is mandatory. Verify placement and retry once; if it still
+        # fails, close the entry immediately — never hold a naked leveraged
+        # position. (Previously a rejected SL was stored silently as NULL.)
+        sl_oid = None
+        sl_resp = None
+        for attempt in (1, 2):
+            try:
+                sl_resp = exchange.order(
+                    symbol, close_is_buy, size, sl_price,
+                    {"trigger": {"triggerPx": sl_price, "isMarket": True, "tpsl": "sl"}},
+                    reduce_only=True,
+                )
+                sl_oid = _extract_oid(sl_resp)
+            except Exception as sl_exc:
+                sl_resp = {"exception": str(sl_exc)}
+            if sl_oid:
+                break
+            print(f"[H4] SL placement attempt {attempt}/2 failed for {symbol}: {sl_resp}", flush=True)
+
+        if not sl_oid:
+            try:
+                close_resp = exchange.market_close(symbol)
+                if close_resp is None:
+                    closed_note = "position already gone (no emergency close needed)"
+                else:
+                    closed_note = "entry closed at market to avoid a naked position"
+            except Exception as close_exc:
+                closed_note = (f"EMERGENCY CLOSE FAILED: {close_exc} — "
+                               f"POSITION OPEN WITHOUT SL, close manually NOW")
+            return {"success": False, "dry_run": False,
+                    "hl_order_id": hl_order_id,
+                    "fill_price":  round(fill_price, 6),
+                    "error": f"SL placement failed after 2 attempts ({sl_resp}) — {closed_note}"}
+
         tp1_oid = None
         tp2_oid = None
 
