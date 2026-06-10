@@ -413,7 +413,13 @@ async def apply_update_to_db(msg, update_status: str, source_id: int) -> dict | 
             "pair":        target.pair,
             "direction":   target.direction,
         }
-        target.status = _STATUS_MAP.get(update_status, update_status)
+        if update_status == "closed":
+            # Channel said "close it" with no outcome stated: a pending signal is
+            # cancelled; an executed one gets a provisional 'stopped' that
+            # _auto_close_signal upgrades to 'tp_hit' if the fill P&L is positive.
+            target.status = "cancelled" if target.status == "pending" else "stopped"
+        else:
+            target.status = _STATUS_MAP.get(update_status, update_status)
         await db.commit()
         return info
 
@@ -492,8 +498,14 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
         print(f"[Auto-Close] Signal {signal_id}: no filled executions to close.", flush=True)
         return
 
-    label = "target_hit" if update_status == "target_hit" else "stopped"
+    if update_status == "target_hit":
+        label = "target_hit"
+    elif update_status == "closed":
+        label = "manual_close"
+    else:
+        label = "stopped"
 
+    wins = []  # manual_close: fee-net win/loss per execution → final signal status
     for execution, wallet in rows:
         print(
             f"[Auto-Close] Signal {signal_id} {pair} — closing {wallet.hl_wallet_addr[:10]}… ({label})",
@@ -520,9 +532,18 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
                     .values(close_price=result["fill_price"])
                 )
                 await db.commit()
+            if label == "manual_close" and execution.fill_price and result["fill_price"]:
+                entry = float(execution.fill_price)
+                raw = ((entry - result["fill_price"]) / entry if not is_long
+                       else (result["fill_price"] - entry) / entry)
+                wins.append(raw - 0.0009 > 0)  # net of HL taker 0.045% x 2
+            subject = {
+                "target_hit":   "✅ TP alcanzado",
+                "manual_close": "📤 Cierre indicado por canal",
+            }.get(label, "🛑 SL hit")
             await asyncio.to_thread(
                 send_signal_email,
-                f"{'✅ TP alcanzado' if label == 'target_hit' else '🛑 SL hit'}: {pair} cerrado",
+                f"{subject}: {pair} cerrado",
                 f"El canal publicó una actualización de cierre y la posición fue cerrada automáticamente.\n\n"
                 f"Par:        {pair}\n"
                 f"Dirección:  {direction.upper()}\n"
@@ -543,6 +564,16 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
                 f"Wallet: {wallet.hl_wallet_addr}\n\n"
                 f"Acción requerida: cierra la posición manualmente en Hyperliquid.",
             )
+
+    # manual_close was provisionally booked as 'stopped' — upgrade if it won
+    if label == "manual_close" and wins and any(wins):
+        async with AsyncSession_() as db:
+            await db.execute(
+                sql_update(SignalEvent)
+                .where(SignalEvent.id == signal_id)
+                .values(status="tp_hit")
+            )
+            await db.commit()
 
 
 # ── Breakeven monitor ────────────────────────────────────────────────────────
@@ -914,7 +945,7 @@ async def main():
                     flush=True,
                 )
                 # Auto-close HL position if channel signals exit on an executed trade
-                if info and info["prev_status"] == "executed" and update in ("target_hit", "stopped", "tp_hit"):
+                if info and info["prev_status"] == "executed" and update in ("target_hit", "stopped", "tp_hit", "closed"):
                     asyncio.create_task(_auto_close_signal(info, update))
 
         asyncio.create_task(_breakeven_monitor())

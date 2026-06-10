@@ -146,6 +146,14 @@ SIGNAL_UPDATES = {
     "target_hit": re.compile(r"(target\s*(hit|reached)|tp\d?\s*(hit|reached)|✅|🎯)", re.IGNORECASE),
     "partial":    re.compile(r"(tp\d|partial|50%|took\s*profit)", re.IGNORECASE),
     "cancelled":  re.compile(r"(cancel|void|invalid|ignore)", re.IGNORECASE),
+    # Explicit close instruction ("close it here", "closed this setup", "exit now").
+    # Phrases only — a bare "close"/"closing" false-positives on commentary like
+    # "close to target" or "closing in on resistance".
+    "closed":     re.compile(
+        r"(closed?\s+(it|here|now|this)|closing\s+(it|here|this)"
+        r"|exit\s+(here|now|it)|cerramos|ci[eé]rr[ae]nlo|cerrar\s+aqu[ií])",
+        re.IGNORECASE,
+    ),
 }
 
 
