@@ -418,6 +418,11 @@ async def apply_update_to_db(msg, update_status: str, source_id: int) -> dict | 
             # cancelled; an executed one gets a provisional 'stopped' that
             # _auto_close_signal upgrades to 'tp_hit' if the fill P&L is positive.
             target.status = "cancelled" if target.status == "pending" else "stopped"
+        elif update_status == "target_hit" and target.status == "executed":
+            # Provisional 'stopped' — _auto_close_signal upgrades to 'tp_hit' only
+            # if the actual close price confirms a profit. Prevents labeling a real
+            # loss as 'tp_hit' when the channel's 'target reached' claim is wrong.
+            target.status = "stopped"
         else:
             target.status = _STATUS_MAP.get(update_status, update_status)
         await db.commit()
@@ -532,13 +537,13 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
                     .values(close_price=result["fill_price"])
                 )
                 await db.commit()
-            if label == "manual_close" and execution.fill_price and result["fill_price"]:
+            if label in ("manual_close", "target_hit") and execution.fill_price and result["fill_price"]:
                 entry = float(execution.fill_price)
                 raw = ((entry - result["fill_price"]) / entry if not is_long
                        else (result["fill_price"] - entry) / entry)
                 wins.append(raw - 0.0009 > 0)  # net of HL taker 0.045% x 2
             subject = {
-                "target_hit":   "✅ TP alcanzado",
+                "target_hit":   "📤 Canal: target alcanzado",
                 "manual_close": "📤 Cierre indicado por canal",
             }.get(label, "🛑 SL hit")
             await asyncio.to_thread(
@@ -565,13 +570,15 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
                 f"Acción requerida: cierra la posición manualmente en Hyperliquid.",
             )
 
-    # manual_close was provisionally booked as 'stopped' — upgrade if it won
-    if label == "manual_close" and wins and any(wins):
+    # Both target_hit and manual_close are provisionally booked as 'stopped'.
+    # Finalize: upgrade to 'tp_hit' only if the actual close P&L is positive.
+    if label in ("manual_close", "target_hit") and wins:
+        final_status = "tp_hit" if any(wins) else "stopped"
         async with AsyncSession_() as db:
             await db.execute(
                 sql_update(SignalEvent)
                 .where(SignalEvent.id == signal_id)
-                .values(status="tp_hit")
+                .values(status=final_status)
             )
             await db.commit()
 

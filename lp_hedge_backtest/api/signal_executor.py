@@ -148,28 +148,24 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
         tp2_size     = round(size / 2, sz_decimals) if split_tps else None
         close_is_buy = not is_buy
 
-        # ── Inverted SL auto-correction ──────────────────────────────────────
-        # Some channels label SL and Target on the wrong sides (SL below entry
-        # for a SHORT, or above entry for a LONG). Detect and swap with TP1.
-        # Skip when the user supplied an explicit SL override.
+        # ── Inverted SL guard ─────────────────────────────────────────────────
+        # When SL is on the wrong side of entry the channel's direction label is
+        # unreliable (often a LONG mis-labeled SHORT or vice-versa). Do NOT
+        # silently swap — a position entered in the wrong direction will lose
+        # when the channel later calls 'target hit' at the price that is actually
+        # the loss side for us. Skip and let the user review manually.
         if not (overrides and overrides.get("sl")):
             sl_inverted = (is_buy and sl_price > entry) or (not is_buy and sl_price < entry)
             if sl_inverted:
-                tp1_on_correct_side = tp1_price and (
-                    (is_buy     and tp1_price <= entry) or
-                    (not is_buy and tp1_price >= entry)
-                )
-                if tp1_on_correct_side:
-                    sl_price, tp1_price = tp1_price, sl_price
-                    print(
-                        f"⚠️ [Executor] {symbol}: inverted SL detected — "
-                        f"auto-swapped SL↔TP1 (SL→${sl_price:.6g}, TP1→${tp1_price:.6g})",
-                        flush=True,
-                    )
-                else:
-                    return {"success": False, "dry_run": False,
-                            "error": f"Inverted SL (${sl_price:,.6g} wrong side of "
-                                     f"entry ${entry:,.6g}) — no valid TP1 to swap"}
+                return {
+                    "success": False,
+                    "dry_run": False,
+                    "error": (
+                        f"Inverted SL: ${sl_price:,.6g} is on the wrong side of "
+                        f"entry ${entry:,.6g} for a {signal.direction.upper()} — "
+                        f"channel direction may be mislabeled. Review manually."
+                    ),
+                }
 
         if dry_run:
             # Return simulated fill — no real orders placed
