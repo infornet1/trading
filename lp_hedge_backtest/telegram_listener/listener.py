@@ -40,7 +40,7 @@ from hyperliquid.utils import constants as hlc
 from api.models import SignalEvent, SignalExecution, SignalWallet
 from api.crypto import decrypt
 from api.signal_executor import place_hl_order
-from api.signal_email import send_signal_email
+from api.signal_email import send_signal_email, check_smtp, _tg_fallback
 
 API_ID   = int(os.getenv("TG_API_ID"))
 API_HASH = os.getenv("TG_API_HASH")
@@ -896,6 +896,19 @@ async def main():
     session_path = os.path.join(os.path.dirname(__file__), SESSION)
 
     await _reconcile_orphans()
+
+    # SMTP health check — catch a broken App Password before the first real alert
+    smtp_ok = await asyncio.to_thread(check_smtp)
+    if smtp_ok:
+        print("✅ [Signal Lab] SMTP health check OK", flush=True)
+    else:
+        print("🚨 [Signal Lab] SMTP health check FAILED — email notifications are DOWN!", flush=True)
+        print("🚨 [Signal Lab] Update smtp_password in email_config.json and restart.", flush=True)
+        _tg_fallback(
+            "🚨 SMTP health check FAILED",
+            "Email notifications are broken at listener startup.\n"
+            "Update smtp_password in email_config.json and restart the listener.",
+        )
 
     hl_assets = await _get_hl_assets()
     print(f"[Signal Lab Listener] HL assets loaded: {len(hl_assets)} perpetuals", flush=True)

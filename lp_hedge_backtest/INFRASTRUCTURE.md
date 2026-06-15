@@ -1,7 +1,7 @@
 # VIZNIAGO.finance — Production Infrastructure Plan
 
 > Executive overview for Digital Ocean deployment once membership and treasury wallets are live.
-> Last updated: 2026-04-05
+> Last updated: 2026-06-15
 
 ---
 
@@ -183,15 +183,35 @@ For reference — what is running today on the dev server:
 
 | Component | Current Setup |
 |---|---|
-| Server | Single VPS at `dev.ueipab.edu.ve` |
+| Server | Single VPS at `dev.ueipab.edu.ve` (shared with Odoo/Freescout) — 3.8 GB RAM |
 | API | `viznago_api.service` (systemd, FastAPI + uvicorn) |
-| Bot 1 | `live_hedge_bot.service` (NFT #5364575) |
-| Bot 2 | `live_hedge_bot_2.service` (NFT #5381818) |
-| DB | SQLite at `api/viznago.db` |
+| Bot 1 | `live_hedge_bot_v2.service` (active) |
+| DB | MariaDB (shared host instance) |
 | Frontend | Nginx serving `landing/` static files |
 | Domain path | `/trading/lp-hedge/` |
 
-Migration to production requires: SQLite → PostgreSQL, systemd services → Docker + BotManager, single server → multi-droplet topology above.
+### viznago_api.service Hardening (2026-05-23)
+
+The API was OOM-killed 3 times (reaching 1+ GB RSS). The following hardening was applied:
+
+**`/etc/systemd/system/viznago_api.service`:**
+```ini
+MemoryMax=512M        # kernel kills + restarts if exceeded — prevents droplet OOM
+MemorySwapMax=0       # fails fast, never spills into swap
+```
+```
+--limit-max-requests 1000   # uvicorn recycles worker every 1000 requests (clears fragmented heap)
+```
+
+**Memory leaks fixed in code:**
+| File | Fix |
+|---|---|
+| `api/routers/assistant.py` | `_rate` dict now evicts idle IPs — was growing unboundedly from crawlers |
+| `api/telegram_alerts.py` | Replaced nested `create_task(send_message())` with direct `await` inside `send_alert()` |
+| `api/telegram_poller.py` | Single `httpx.AsyncClient` reused across poll loop instead of creating one per iteration |
+| `api/bot_manager.py` | `_last_seen` entry cleaned up in `_tail` finally block when bot stops |
+
+Migration to production requires: MariaDB → PostgreSQL, systemd services → Docker + BotManager, single server → multi-droplet topology above.
 
 ---
 
