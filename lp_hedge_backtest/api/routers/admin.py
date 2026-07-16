@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from api.auth import get_current_admin
 from api.bot_manager import manager
 from api.database import AsyncSessionLocal
-from api.models import BotConfig, BotEvent, SignalEvent, SignalExecution, SignalUserDefault, SignalWallet, User
+from api.models import BotConfig, BotEvent, BotTrade, SignalEvent, SignalExecution, SignalUserDefault, SignalWallet, User
 
 _BASE_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _CACHE_DIR   = os.path.join(_BASE_DIR, "data_cache")
@@ -1087,3 +1087,48 @@ async def admin_users(admin: str = Depends(get_current_admin)):
             })
 
     return {"users": rows, "total": len(rows)}
+
+
+# ── Profitability aggregate (admin) ─────────────────────────────────────────
+
+@router.get("/performance")
+async def admin_performance(
+    admin: str = Depends(get_current_admin),
+    days: int = 30,
+):
+    """Platform-wide profitability aggregates for admin dashboards / investor updates."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    async with AsyncSessionLocal() as db:
+        trades_result = await db.execute(
+            select(BotTrade).where(BotTrade.closed_at >= since)
+        )
+        trades = trades_result.scalars().all()
+
+        signal_result = await db.execute(
+            select(SignalExecution).where(SignalExecution.closed_at >= since)
+        )
+        signal_execs = signal_result.scalars().all()
+
+        bot_pnl = sum((t.realized_pnl_usd or 0 for t in trades), 0)
+        bot_fees = sum((t.fees_usd or 0 for t in trades), 0)
+        bot_funding = sum((t.funding_usd or 0 for t in trades), 0)
+        signal_pnl = sum((e.realized_pnl_usd or 0 for e in signal_execs), 0)
+        signal_fees = sum((e.fees_usd or 0 for e in signal_execs), 0)
+
+        closed = [t for t in trades if t.closed_at is not None]
+        wins = sum(1 for t in closed if (t.realized_pnl_usd or 0) > 0)
+        losses = sum(1 for t in closed if (t.realized_pnl_usd or 0) < 0)
+
+        return {
+            "days": days,
+            "since": since.isoformat(),
+            "total_bot_trades": len(closed),
+            "bot_winning_trades": wins,
+            "bot_losing_trades": losses,
+            "bot_realized_pnl_usd": float(bot_pnl),
+            "bot_fees_usd": float(bot_fees),
+            "bot_funding_usd": float(bot_funding),
+            "signal_realized_pnl_usd": float(signal_pnl),
+            "signal_fees_usd": float(signal_fees),
+            "platform_net_pnl_usd": float(bot_pnl - bot_fees - bot_funding + signal_pnl - signal_fees),
+        }

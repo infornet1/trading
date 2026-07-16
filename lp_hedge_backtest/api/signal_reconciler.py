@@ -12,7 +12,8 @@ Telegram channel doesn't post a close update.
 
 import asyncio
 import calendar
-from datetime import datetime
+from datetime import datetime, timezone
+from decimal import Decimal
 
 from sqlalchemy import select, update
 
@@ -168,6 +169,8 @@ async def _reconcile_once() -> None:
         close_price = result.get("close_price")
         reason      = result.get("reason", "unknown")
 
+        now = datetime.now(timezone.utc)
+
         if close_price is None:
             print(
                 f"[Reconciler] {symbol} exec#{execution.id}: closed but no fill data — skipping",
@@ -193,11 +196,33 @@ async def _reconcile_once() -> None:
                 new_status = "tp_hit"
                 icon = "🎯"
 
+        # Compute realized P&L in USD for the profitability dashboard.
+        realized_pnl_usd = None
+        fees_usd = None
+        try:
+            fp = float(execution.fill_price) if execution.fill_price else None
+            size = float(execution.exec_size_usdt) if execution.exec_size_usdt else None
+            if fp and size and close_price:
+                raw_pnl_pct = ((fp - close_price) / fp) if is_short else ((close_price - fp) / fp)
+                fees_pct = 0.0009  # 0.045% taker × 2 sides
+                net_pnl_pct = raw_pnl_pct - fees_pct
+                leverage = float(signal.leverage or 1)
+                realized_pnl_usd = Decimal(str(size * net_pnl_pct * leverage))
+                fees_usd = Decimal(str(size * fees_pct * leverage))
+        except Exception:
+            pass
+
         async with AsyncSessionLocal() as db:
             await db.execute(
                 update(SignalExecution)
                 .where(SignalExecution.id == execution.id)
-                .values(close_price=close_price)
+                .values(
+                    close_price=close_price,
+                    realized_pnl_usd=realized_pnl_usd,
+                    fees_usd=fees_usd,
+                    closed_at=now,
+                    exit_reason=reason,
+                )
             )
             # Only update signal status if it isn't already a terminal state
             await db.execute(

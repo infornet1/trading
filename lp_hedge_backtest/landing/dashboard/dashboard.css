@@ -2695,3 +2695,170 @@
   color: var(--color-text-muted);
   font-size: 0.9rem;
 }
+
+/* ── Performance Dashboard styles ────────────────────────────────────────── */
+
+.perf-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.perf-controls label {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+.perf-controls input[type="date"] {
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: inherit;
+}
+
+.perf-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.perf-kpi-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+.perf-kpi-label {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.perf-kpi-value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.1rem;
+  color: var(--color-text-primary);
+}
+.perf-pos { color: #10b981; }
+.perf-neg { color: #f87171; }
+
+.perf-chart-row {
+  margin-bottom: 24px;
+}
+.perf-chart-box {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.perf-chart-box h4 {
+  margin: 0 0 12px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+.perf-chart {
+  width: 100%;
+  height: 300px;
+}
+
+.perf-breakdown {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+.perf-breakdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.perf-breakdown-header h4 {
+  margin: 0;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+.perf-breakdown-tabs {
+  display: flex;
+  gap: 8px;
+}
+.perf-breakdown-tab {
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+.perf-breakdown-tab.active {
+  background: rgba(0, 212, 255, 0.12);
+  border-color: rgba(0, 212, 255, 0.4);
+  color: var(--color-neon-cyan);
+}
+
+.perf-journal {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.perf-journal h4 {
+  margin: 0 0 12px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.perf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.perf-table th,
+.perf-table td {
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+.perf-table th {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+}
+.perf-table td {
+  color: var(--color-text-primary);
+}
+.perf-empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 24px;
+}
+.perf-est {
+  display: inline-block;
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg-card2);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: 4px;
+}
+
+.perf-pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}

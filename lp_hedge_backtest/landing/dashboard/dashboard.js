@@ -636,6 +636,11 @@ async function onWalletConnected() {
   await saasLoadBots();
   updateWalletDropdown();
 
+  // Initialize profitability dashboard if server feature flag is enabled
+  if (window.initPerformanceDashboard) {
+    await window.initPerformanceDashboard();
+  }
+
   // Check maintenance flag and show banner if active
   checkMaintenanceStatus();
 
