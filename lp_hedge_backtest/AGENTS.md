@@ -14,7 +14,10 @@ The `.claude/settings.local.json` file that was previously in this repository ha
 
 - `.claude/` has been added to `.gitignore` and must never be committed.
 - If you need Claude-specific settings, do not recreate `settings.local.json` inside the repo.
-- The secrets that were in that file should be considered exposed and rotated.
+- The secrets that were in that file were rotated on 2026-07-16: `SECRET_KEY`, `ENCRYPTION_KEY`, and the MariaDB `viznago` password.
+- All encrypted HL API keys (`bot_configs.hl_api_key`) and Signal Lab private keys (`signal_wallets.hl_secret_key`) were re-encrypted with the new `ENCRYPTION_KEY`.
+- Hardcoded DB password fallbacks were removed from `api/database.py`, `migrations/alembic/env.py`, `telegram_listener/listener.py`, and `telegram_listener/test_signal_lab.py`.
+- If you see references to the old secrets anywhere, rotate again immediately.
 
 ---
 
