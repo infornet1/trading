@@ -247,7 +247,7 @@ Full audit of LP Defensor V2 + Signal Lab (latency, execution quality, hedge log
 | L4 | Safety syncs skip when price fetch fails |
 | L5 | Shared `Info` client singletons (each construction = ~2 hidden REST calls) |
 
-**Assistant guidance:** from 2026-06-10 every close event carries real fee-net P&L (`pnl_usd`, `pnl_pct`, `is_win`, `reason` in `stopped` details; net `pnl_pct` on signal executions). First true profitability report possible after ~2–3 weeks of accumulation.
+**Assistant guidance:** from 2026-06-10 every close event carries real fee-net P&L (`pnl_usd`, `pnl_pct`, `is_win`, `reason` in `stopped` details; net `pnl_pct` on signal executions). On 2026-07-16 the **Profitability Dashboard** shipped (D1+D2+D3): `bot_trades` and `wallet_snapshots` tables, `/performance/*` endpoints, `/admin/performance` aggregate, and a new **Rendimiento / Performance** tab in `landing/dashboard/`. Historical events were backfilled (902 trades).
 
 ## Open Enhancement Backlog (May 2026)
 
@@ -270,5 +270,38 @@ Also still open from earlier tracking:
 - **M2-10**: Auto-reactivation when balance is replenished
 - **M2-11**: Pre-trigger parameter UX (replace TRIGGER_OFFSET_PCT)
 - **M2-16**: LONG on upside breakout for Defensor Alcista (bot logic deferred)
-- **M2-35**: Platform-wide cumulative P&L stat (admin)
+- **M2-35**: Platform-wide cumulative P&L stat (admin) — ✅ Done 2026-07-16 via `/admin/performance`
 - **SL-P6**: "Usar este rango →" wires LP Range Advisor output to bot config form (dashboard receiving side not built)
+
+## Profitability Dashboard — Shipped 2026-07-16
+
+**Full implementation plan:** `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md`  
+**Dashboard URL:** `https://dev.ueipab.edu.ve/trading/lp-hedge/dashboard/index.html`
+
+### What it is
+A user-facing **Rendimiento / Performance** tab showing realized P&L, equity curve, drawdown, win rate, profit factor, fees, funding, and a trade journal across LP Defensor, FURY, Whale, and Signal Lab.
+
+### Data model
+| Table | Purpose |
+|---|---|
+| `bot_trades` | One row per closed round-trip (LP/FURY/WHALE); also tracks open positions from live events. Populated by `api/bot_manager.py` hook + `scripts/backfill_bot_trades.py`. |
+| `wallet_snapshots` | Periodic HL wallet balance snapshots for equity curve. Populated by `api/performance_worker.py` every 15 min when flag is on. |
+| `signal_executions` | Extended with `realized_pnl_usd`, `fees_usd`, `closed_at`, `exit_reason`. Populated by `api/signal_reconciler.py`. |
+
+### Feature flag
+Controlled by `PERFORMANCE_DASHBOARD_ENABLED` in `api/.env` (currently `true`). When off, the tab is hidden, `/performance/*` endpoints are not registered, and the snapshot worker does not run.
+
+### API endpoints (user-scoped)
+- `GET /performance/summary?from=&to=`
+- `GET /performance/equity-curve?from=&to=&granularity=day|hour`
+- `GET /performance/trades?from=&to=&limit=&offset=`
+- `GET /performance/breakdown?by=pair|mode|month`
+- `GET /performance/export?from=&to=` (CSV)
+
+### Admin endpoint
+- `GET /admin/performance?days=30` — platform-wide aggregate for investor updates.
+
+### Known gaps
+- Sharpe/Sortino/max-drawdown metrics reuse `src/reporting/metrics.py` logic but are not yet exposed in `/performance/summary`.
+- Mobile layout is functional but not fully polished.
+- Existing closed Signal Lab executions have `close_price` but not historical `realized_pnl_usd`; new closes will populate it.
