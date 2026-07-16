@@ -106,7 +106,7 @@ async def equity_curve(
     address: str = Depends(get_current_address),
     from_date: Optional[str] = Query(None, alias="from"),
     to_date: Optional[str] = Query(None, alias="to"),
-    granularity: str = Query("day", regex="^(day|hour)$"),
+    granularity: str = Query("day", pattern="^(day|hour)$"),
 ):
     """Time-series wallet balance snapshots for equity-curve charting."""
     from_dt = _parse_date(from_date)
@@ -190,7 +190,7 @@ async def trade_journal(
 @router.get("/breakdown")
 async def breakdown(
     address: str = Depends(get_current_address),
-    by: str = Query("pair", regex="^(pair|mode|month)$"),
+    by: str = Query("pair", pattern="^(pair|mode|month)$"),
     from_date: Optional[str] = Query(None, alias="from"),
     to_date: Optional[str] = Query(None, alias="to"),
 ):

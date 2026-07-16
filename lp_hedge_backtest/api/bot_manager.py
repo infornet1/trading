@@ -300,7 +300,7 @@ class BotManager:
         details = details or {}
         now = datetime.now(timezone.utc)
 
-        OPEN_EVENTS = {"hedge_opened", "fury_entry", "whale_new_position"}
+        OPEN_EVENTS = {"hedge_opened", "fury_entry", "whale_new_position", "orphan_recovered"}
         CLOSE_EVENTS = {"tp_hit", "sl_hit", "trailing_stop", "stopped",
                         "fury_sl", "fury_tp", "whale_closed"}
 
