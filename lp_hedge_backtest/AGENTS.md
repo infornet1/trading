@@ -4,6 +4,20 @@ Concise context for AI coding agents working on this repository.
 
 ---
 
+## ⚠️ Note to future Claude Code CLI sessions
+
+The `.claude/settings.local.json` file that was previously in this repository has been **removed and relocated** as part of a security hardening on 2026-07-16. It is now stored outside the repo at:
+
+```
+/root/.claude-settings-local-backup.json
+```
+
+- `.claude/` has been added to `.gitignore` and must never be committed.
+- If you need Claude-specific settings, do not recreate `settings.local.json` inside the repo.
+- The secrets that were in that file should be considered exposed and rotated.
+
+---
+
 ## 1. Project overview
 
 **VIZNIAGO.finance** is a DeFi SaaS that protects Uniswap v3 concentrated-liquidity positions by automatically hedging with Hyperliquid perpetual futures. It also runs standalone trading bots (FURY RSI, Whale Tracker) and a Signal Lab that copy-trades Telegram signals.
