@@ -16,7 +16,7 @@ from subprocess import PIPE, STDOUT
 from typing import Optional
 
 from api.database import AsyncSessionLocal
-from api.models import BotConfig, BotEvent
+from api.models import BotConfig, BotEvent, BotTrade
 
 # Path to bot scripts and venv Python
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -258,6 +258,7 @@ class BotManager:
         details     = record.get("details")
 
         await self._write_event(config_id, event_type, price, pnl, details)
+        await self._update_bot_trade(config_id, event_type, price, pnl, details)
         await self._broadcast(config_id, {
             "event":   event_type,
             "price":   price,
@@ -276,6 +277,135 @@ class BotManager:
         asyncio.create_task(send_alert(config_id, event_type, price, pnl, details))
 
     # ── DB helpers ────────────────────────────────────────────────────────
+
+    # ── Profitability dashboard hooks ───────────────────────────────────────
+
+    async def _update_bot_trade(self, config_id: int, event_type: str,
+                                price, pnl, details):
+        """Mirror open/close events into bot_trades for the profitability dashboard.
+
+        Failures are logged but never propagate — we must not break live bot
+        event processing because of a dashboard insert.
+        """
+        try:
+            await self._do_update_bot_trade(config_id, event_type, price, pnl, details)
+        except Exception as e:
+            print(f"[BotManager] BotTrade update error (non-fatal): {e}", flush=True)
+
+    async def _do_update_bot_trade(self, config_id: int, event_type: str,
+                                   price, pnl, details):
+        from sqlalchemy import select, update
+        from decimal import Decimal
+
+        details = details or {}
+        now = datetime.now(timezone.utc)
+
+        OPEN_EVENTS = {"hedge_opened", "fury_entry", "whale_new_position"}
+        CLOSE_EVENTS = {"tp_hit", "sl_hit", "trailing_stop", "stopped",
+                        "fury_sl", "fury_tp", "whale_closed"}
+
+        async with AsyncSessionLocal() as db:
+            # Resolve config metadata once per event.
+            cfg_result = await db.execute(
+                select(BotConfig.user_address, BotConfig.pair, BotConfig.mode)
+                .where(BotConfig.id == config_id)
+            )
+            cfg = cfg_result.one_or_none()
+            if cfg is None:
+                return
+            user_address, pair, mode = cfg
+
+            if event_type in OPEN_EVENTS:
+                # Compute side and size from event details.
+                side = details.get("side")
+                size_usd = details.get("notional") or details.get("size_usd")
+                entry_price = details.get("entry") or price
+
+                if mode in ("aragan", "avaro") and not side:
+                    side = "short"
+
+                db.add(BotTrade(
+                    config_id=config_id,
+                    user_address=user_address,
+                    mode=mode,
+                    pair=pair,
+                    side=side,
+                    entry_price=entry_price,
+                    size_usd=size_usd,
+                    opened_at=now,
+                ))
+                await db.commit()
+                return
+
+            if event_type in CLOSE_EVENTS:
+                # Try to close the most recent open trade for this config.
+                open_trade_result = await db.execute(
+                    select(BotTrade)
+                    .where(BotTrade.config_id == config_id)
+                    .where(BotTrade.closed_at.is_(None))
+                    .order_by(BotTrade.opened_at.desc())
+                    .limit(1)
+                )
+                trade = open_trade_result.scalar_one_or_none()
+
+                # Normalize PnL: FURY/WHALE already emit USD; LP bots emit %.
+                realized_pnl_usd = None
+                if pnl is not None:
+                    try:
+                        pnl_val = Decimal(str(pnl))
+                        if mode in ("aragan", "avaro"):
+                            # pnl is a percentage; convert using notional if known.
+                            size = Decimal(str(trade.size_usd)) if trade and trade.size_usd else None
+                            if size:
+                                realized_pnl_usd = size * pnl_val / Decimal("100")
+                        else:
+                            realized_pnl_usd = pnl_val
+                    except Exception:
+                        pass
+
+                fees_usd = details.get("fees_usd")
+                funding_usd = details.get("funding_usdc_net")
+                il_offset_usd = details.get("lp_value_close")  # placeholder
+
+                if trade is not None:
+                    upd = {
+                        "exit_price": price,
+                        "realized_pnl_usd": realized_pnl_usd,
+                        "fees_usd": fees_usd,
+                        "funding_usd": funding_usd,
+                        "il_offset_usd": il_offset_usd,
+                        "exit_reason": event_type,
+                        "closed_at": now,
+                    }
+                    # Compute net_pnl if we have enough data.
+                    try:
+                        r = Decimal(str(realized_pnl_usd or 0))
+                        f = Decimal(str(fees_usd or 0))
+                        fund = Decimal(str(funding_usd or 0))
+                        il = Decimal(str(il_offset_usd or 0))
+                        trade.net_pnl_usd = r - f - fund + il
+                    except Exception:
+                        pass
+                    for key, value in upd.items():
+                        setattr(trade, key, value)
+                    await db.commit()
+                else:
+                    # No matching open trade — record a closed-only estimate.
+                    db.add(BotTrade(
+                        config_id=config_id,
+                        user_address=user_address,
+                        mode=mode,
+                        pair=pair,
+                        exit_price=price,
+                        realized_pnl_usd=realized_pnl_usd,
+                        fees_usd=fees_usd,
+                        funding_usd=funding_usd,
+                        il_offset_usd=il_offset_usd,
+                        exit_reason=event_type,
+                        is_estimate=True,
+                        closed_at=now,
+                    ))
+                    await db.commit()
 
     async def _write_event(self, config_id: int, event_type: str,
                            price, pnl, details):

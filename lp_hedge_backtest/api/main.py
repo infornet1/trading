@@ -15,6 +15,7 @@ from sqlalchemy import select, text
 
 from api.database import engine, Base, AsyncSessionLocal
 from api.auth import get_current_admin
+from api.config import PERFORMANCE_DASHBOARD_ENABLED
 from api.routers import auth as auth_router
 from api.routers import bots as bots_router
 from api.routers import ws as ws_router
@@ -22,6 +23,7 @@ from api.routers import admin as admin_router
 from api.routers import assistant as assistant_router
 from api.routers import telegram as telegram_router
 from api.routers import signal_lab as signal_lab_router
+from api.routers import performance as performance_router
 
 
 async def _run_column_migrations():
@@ -257,6 +259,11 @@ async def lifespan(app: FastAPI):
     # Start signal reconciler — polls HL fills for orphaned open executions every 5 min
     from api.signal_reconciler import run_signal_reconciler
     rec_task = asyncio.create_task(run_signal_reconciler())
+    # Start profitability dashboard wallet snapshot worker (only if enabled)
+    perf_task = None
+    if PERFORMANCE_DASHBOARD_ENABLED:
+        from api.performance_worker import run_performance_worker
+        perf_task = asyncio.create_task(run_performance_worker())
     yield
     # Graceful shutdown
     tg_task.cancel()
@@ -279,6 +286,12 @@ async def lifespan(app: FastAPI):
         await rec_task
     except asyncio.CancelledError:
         pass
+    if perf_task is not None:
+        perf_task.cancel()
+        try:
+            await perf_task
+        except asyncio.CancelledError:
+            pass
     from api.bot_manager import manager
     await manager.shutdown()
     await engine.dispose()
@@ -313,6 +326,8 @@ app.include_router(admin_router.router)
 app.include_router(assistant_router.router)
 app.include_router(telegram_router.router)
 app.include_router(signal_lab_router.router)
+if PERFORMANCE_DASHBOARD_ENABLED:
+    app.include_router(performance_router.router)
 
 
 @app.get("/health")

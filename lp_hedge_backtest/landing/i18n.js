@@ -193,6 +193,11 @@ const TRANSLATIONS = {
     // ── Dashboard: tabs ───────────────────────────────────────────
     'dash.tab.active':              'Activas',
     'dash.tab.history':             'Historial',
+    'dash.tab.performance':         'Rendimiento',
+
+    // ── Dashboard: performance placeholder ────────────────────────
+    'dash.performance.title':       'Rendimiento',
+    'dash.performance.comingSoon':  'El panel de rendimiento estará disponible próximamente.',
 
     // ── Dashboard: states ─────────────────────────────────────────
     'dash.loading.text':            'Obteniendo posiciones on-chain…',
@@ -509,6 +514,11 @@ const TRANSLATIONS = {
     // ── Dashboard: tabs ───────────────────────────────────────────
     'dash.tab.active':              'Active',
     'dash.tab.history':             'History',
+    'dash.tab.performance':         'Performance',
+
+    // ── Dashboard: performance placeholder ────────────────────────
+    'dash.performance.title':       'Performance',
+    'dash.performance.comingSoon':  'The performance panel will be available soon.',
 
     // ── Dashboard: states ─────────────────────────────────────────
     'dash.loading.text':            'Fetching on-chain positions…',

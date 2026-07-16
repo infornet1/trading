@@ -293,6 +293,7 @@ window.setTab = function (tab) {
     btn.classList.toggle('tab-btn--active', btn.id === 'tab-' + tab);
   });
   renderPositions();
+  togglePerformanceSection(tab === 'performance');
 };
 
 // ── Watch Address (read-only) ─────────────────────────────────────────────
@@ -1288,6 +1289,7 @@ function renderPriceTicker() {
 
 function renderPositions() {
   if (state.activeTab === 'explore') return;
+  if (state.activeTab === 'performance') return;
   const grid = document.getElementById('positions-grid');
   grid.innerHTML = '';
 
@@ -1316,6 +1318,22 @@ function renderPositions() {
   sorted.forEach(pos => loadPositionEvents(pos.tokenId));
   // Load fee APR + projections for each position (M2-1/M2-2)
   sorted.forEach(pos => loadPositionAPR(pos));
+}
+
+function togglePerformanceSection(showPerf) {
+  const perfSection = document.getElementById('performance-section');
+  const botsSection = document.getElementById('live-bots-section');
+  const grid = document.getElementById('positions-grid');
+  if (!perfSection) return;
+  if (showPerf) {
+    perfSection.classList.remove('hidden');
+    if (botsSection) botsSection.classList.add('hidden');
+    if (grid) grid.classList.add('hidden');
+  } else {
+    perfSection.classList.add('hidden');
+    if (botsSection) botsSection.classList.remove('hidden');
+    if (grid) grid.classList.remove('hidden');
+  }
 }
 
 // ── Pool Fee APR (M2-1 / M2-2) ───────────────────────────────────────────
