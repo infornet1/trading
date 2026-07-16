@@ -7,10 +7,12 @@ import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-DB_URL = os.getenv(
-    "DB_URL",
-    "mysql+aiomysql://viznago:90GSxYu0GdSe6fzGowBA4hNOlsBK@localhost/viznago_dev"
-)
+DB_URL = os.getenv("DB_URL")
+if not DB_URL:
+    raise RuntimeError(
+        "DB_URL environment variable is required. "
+        "Set it in api/.env or the service EnvironmentFile."
+    )
 
 engine = create_async_engine(
     DB_URL,

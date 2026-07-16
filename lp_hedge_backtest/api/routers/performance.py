@@ -18,8 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.auth import get_current_address
 from api.database import AsyncSessionLocal
 from api.models import BotTrade, SignalExecution, WalletSnapshot
+from api.rate_limiter import performance_limiter
 
-router = APIRouter(prefix="/performance", tags=["performance"])
+router = APIRouter(
+    prefix="/performance",
+    tags=["performance"],
+    dependencies=[Depends(performance_limiter)],
+)
 
 
 async def _get_db() -> AsyncSession:

@@ -16,13 +16,18 @@ from api.auth import get_current_admin
 from api.bot_manager import manager
 from api.database import AsyncSessionLocal
 from api.models import BotConfig, BotEvent, BotTrade, SignalEvent, SignalExecution, SignalUserDefault, SignalWallet, User
+from api.rate_limiter import admin_limiter
 
 _BASE_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _CACHE_DIR   = os.path.join(_BASE_DIR, "data_cache")
 _TG_DIR      = os.path.join(_BASE_DIR, "telegram_listener")
 _VENV_PYTHON = os.path.join(_BASE_DIR, "venv", "bin", "python3")
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(admin_limiter)],
+)
 
 
 # ── Hyperliquid helper ──────────────────────────────────────────────────────

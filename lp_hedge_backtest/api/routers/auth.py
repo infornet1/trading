@@ -21,8 +21,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.database import get_db
 from api.models import Nonce, User
 from api import auth as jwt_utils
+from api.rate_limiter import auth_limiter
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(
+    prefix="/auth",
+    tags=["auth"],
+    dependencies=[Depends(auth_limiter)],
+)
 
 NONCE_TTL_MINUTES = 10
 _ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")

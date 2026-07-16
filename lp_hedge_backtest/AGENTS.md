@@ -140,6 +140,13 @@ node --check landing/dashboard/dashboard.js
 
 ## 7. Recent major changes (2026-07-16)
 
+### Security hardening
+- `.claude/` added to `.gitignore`; local `settings.local.json` removed from repo.
+- Hardcoded DB fallback removed from `api/database.py`; `DB_URL` is now required via env.
+- API service runs as non-root `viznago` user (systemd `User=viznago`).
+- Basic per-IP rate limiting added to `/auth/*`, `/admin/*`, and `/performance/*` endpoints.
+- `api/.env`, `bot_state/`, `data_cache/`, `backups/` set to `root:webdev` group permissions.
+
 ### Profitability Dashboard
 - New tables: `bot_trades`, `wallet_snapshots`
 - `signal_executions` extended with P&L columns (`realized_pnl_usd`, `fees_usd`, `closed_at`, `exit_reason`)
@@ -171,6 +178,7 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 git checkout pre-profitability-dashboard
 
 # DB rollback one migration
+export DB_URL="mysql+aiomysql://viznago:<pass>@localhost/viznago_dev"
 alembic downgrade -1
 
 # Full DB restore (requires backup)
@@ -186,3 +194,5 @@ If unclear on scope, always prefer the safer path:
 2. Feature-flag new functionality.
 3. Restart API only when necessary and during low-activity windows.
 4. Backup DB before schema changes.
+5. Never commit `.env`, `email_config.json`, `.claude/settings*.json`, or local state.
+6. Run the API as the `viznago` user, not root.
