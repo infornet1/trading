@@ -1,6 +1,6 @@
 # Implementation Plan: User Profitability Dashboard
 
-**Status:** Draft — pending review  
+**Status:** D1 + D2 deployed — D3 pending  
 **Owner:** TBD  
 **Target release:** TBD  
 **Last updated:** 2026-07-16
@@ -112,14 +112,14 @@ class WalletSnapshot(Base):
 ```
 
 #### 5.1.2 Backfill `bot_trades` from existing events
-- [ ] Write a one-off backfill script (e.g. `scripts/backfill_bot_trades.py`).
+- [ ] Write a one-off backfill script (e.g. `scripts/backfill_bot_trades.py`).  *(deferred to D3)*
 - [ ] Pair `hedge_opened` events with `tp_hit` / `sl_hit` / `trailing_stop` / `hedge_closed` events per `config_id`.
 - [ ] Extract from `details` JSON: `entry_price`, `exit_price`, `size`, `fees`, `funding`, `lp_chg_pct`, `hedge_offset_pct`, `net_pct`.
 - [ ] Insert one `BotTrade` row per closed round-trip.
 - [ ] Flag rows with incomplete data (`is_estimate = True`) for transparency.
 
 #### 5.1.3 Real-time trade recorder
-- [ ] Update `api/bot_manager.py` event parser to upsert `BotTrade` rows when close events are received.
+- [x] Update `api/bot_manager.py` event parser to upsert `BotTrade` rows when close events are received.
 - [ ] Keep backfill script idempotent so it can be re-run safely.
 
 #### 5.1.4 Wallet snapshot background task
@@ -134,13 +134,13 @@ class WalletSnapshot(Base):
 
 Create a new router `api/routers/performance.py` and register it in `api/main.py`.
 
-| Endpoint | Purpose |
+| Endpoint | Status |
 |---|---|
-| `GET /performance/summary?from=&to=` | KPI cards for the authenticated user |
-| `GET /performance/equity-curve?from=&to=&granularity=day` | Time-series equity + drawdown |
-| `GET /performance/trades?from=&to=&limit=100&offset=0` | Paginated trade journal |
-| `GET /performance/breakdown?by=bot\|pair\|month\|product` | Aggregated tables |
-| `GET /performance/export?format=csv&from=&to=` | CSV export |
+| `GET /performance/summary?from=&to=` | ✅ Implemented |
+| `GET /performance/equity-curve?from=&to=&granularity=day` | ✅ Implemented |
+| `GET /performance/trades?from=&to=&limit=100&offset=0` | ✅ Implemented |
+| `GET /performance/breakdown?by=pair\|mode\|month` | ✅ Implemented |
+| `GET /performance/export?format=csv&from=&to=` | ✅ Implemented |
 
 #### 5.2.1 `GET /performance/summary`
 Return:
@@ -183,7 +183,8 @@ Support `by=bot`, `by=pair`, `by=month`, `by=product`.
 Generate CSV in-memory and stream the response.
 
 #### 5.2.6 Aggregation implementation notes
-- Use `WalletSnapshot` to build equity DataFrame; call `src/reporting/metrics.py::calculate_metrics()` for Sharpe/Sortino/drawdown.
+- Use `WalletSnapshot` to build equity curve and drawdown.
+- `src/reporting/metrics.py::calculate_metrics()` to be wired in D3 for Sharpe/Sortino.
 - Win rate = count(`realized_pnl_usd > 0`) / total closed trades.
 - Profit factor = sum(gains) / abs(sum(losses)).
 - Unrealized P&L = sum of live HL positions from existing endpoints.
@@ -191,7 +192,7 @@ Generate CSV in-memory and stream the response.
 
 ---
 
-### Phase 3 — Signal Lab realized P&L fix (estimated 0.5–1 day)
+### Phase 3 — Signal Lab realized P&L fix (deferred to D3)
 
 - [ ] Update `api/signal_reconciler.py` or signal executor to fetch actual HL fills via `user_fills()` when a signal closes.
 - [ ] Populate `SignalExecution.close_price`, `realized_pnl_usd`, `fees_usd`, `closed_at`, `exit_reason`.
@@ -201,9 +202,12 @@ Generate CSV in-memory and stream the response.
 
 ### Phase 4 — Frontend MVP (estimated 2–3 days)
 
-#### 5.4.1 Dashboard tab
-- [ ] Add **Rendimiento / Performance** tab in `landing/dashboard/index.html` next to **Activas / Historial**.
-- [ ] Load chart library via CDN. Recommendation: **Lightweight Charts™** for equity/drawdown, **ApexCharts** for bar breakdowns.
+#### 5.4.1 Dashboard tab (D2 done — D3 will wire data)
+- [x] Add **Rendimiento / Performance** tab in `landing/dashboard/index.html` (hidden behind flag).
+- [x] Load chart library via CDN (Lightweight Charts™).
+- [ ] Render KPI cards, equity curve, drawdown, breakdown tables, trade journal.
+- [ ] Wire API calls in `landing/dashboard/profitability.js`.
+- [ ] Enable tab when `PERFORMANCE_DASHBOARD_ENABLED=true`.
 
 #### 5.4.2 New JS module
 - [ ] Create `landing/dashboard/profitability.js` with functions:
