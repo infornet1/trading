@@ -45,7 +45,9 @@ from api.signal_email import send_signal_email, check_smtp, _tg_fallback
 API_ID   = int(os.getenv("TG_API_ID"))
 API_HASH = os.getenv("TG_API_HASH")
 SESSION  = os.getenv("TG_SESSION", "viznago_listener")
-DB_URL   = os.getenv("DB_URL", "mysql+aiomysql://viznago:90GSxYu0GdSe6fzGowBA4hNOlsBK@localhost/viznago_dev")
+DB_URL   = os.getenv("DB_URL")
+if not DB_URL:
+    raise RuntimeError("DB_URL environment variable is required")
 
 CHANNEL_ID          = 1951769926
 SHORT_TERM_THREAD   = 7     # Short-Term signals (thread 7)

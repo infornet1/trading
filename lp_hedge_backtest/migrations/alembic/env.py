@@ -24,10 +24,9 @@ target_metadata = Base.metadata
 
 def _get_database_url():
     """Read DB_URL from the environment and coerce aiomysql -> pymysql for sync Alembic."""
-    url = os.getenv(
-        "DB_URL",
-        "mysql+pymysql://viznago:90GSxYu0GdSe6fzGowBA4hNOlsBK@localhost/viznago_dev",
-    )
+    url = os.getenv("DB_URL")
+    if not url:
+        raise RuntimeError("DB_URL environment variable is required")
     # Support both sync and async URL variants so the same env var works everywhere.
     url = url.replace("mysql+aiomysql://", "mysql+pymysql://")
     if url.startswith("mysql://"):

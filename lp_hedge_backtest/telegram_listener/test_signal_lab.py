@@ -35,7 +35,9 @@ from api.models import SignalEvent, SignalExecution, SignalWallet
 from api.signal_executor import place_hl_order
 from api.signal_email import send_signal_email
 
-DB_URL = os.getenv("DB_URL", "mysql+aiomysql://viznago:90GSxYu0GdSe6fzGowBA4hNOlsBK@localhost/viznago_dev")
+DB_URL = os.getenv("DB_URL")
+if not DB_URL:
+    raise RuntimeError("DB_URL environment variable is required")
 
 _PASS = "✅"
 _FAIL = "❌"
