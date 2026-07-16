@@ -19,6 +19,8 @@ Concise context for AI coding agents working on this repository.
 
 Production API runs as systemd service `viznago_api` on `127.0.0.1:8001`, proxied by nginx at `https://dev.ueipab.edu.ve/trading/lp-hedge/api/`.
 
+Dashboard URL: `https://dev.ueipab.edu.ve/trading/lp-hedge/dashboard/index.html`
+
 ---
 
 ## 2. Tech stack
@@ -39,6 +41,7 @@ Production API runs as systemd service `viznago_api` on `127.0.0.1:8001`, proxie
 - Default branch: `master`
 - Feature work: create `feature/<name>` branches
 - Tag baseline before risky deploys: `git tag -a pre-<feature> -m "..."`
+  - Example baseline tag in this repo: `pre-profitability-dashboard`
 
 ### Commits
 - Prefix commits logically: `feat(...)`, `fix(...)`, `docs(...)`, `refactor(...)`
@@ -48,6 +51,7 @@ Production API runs as systemd service `viznago_api` on `127.0.0.1:8001`, proxie
 - Existing code mixes Spanish/English. Prefer English for new code; keep user-facing i18n strings bilingual via `landing/i18n.js`.
 - Avoid bare `except Exception: pass`. Log or re-raise typed errors.
 - Do not commit secrets, `.env` files, or local state (`bot_state/`, `backups/`, `data_cache/`).
+  - `backups/` is already in `.gitignore`.
 
 ### DB changes
 - **Use Alembic** for schema changes. See `migrations/alembic/`.
@@ -105,8 +109,12 @@ journalctl -u viznago_api -f
 
 ### Syntax checks
 ```bash
-python -m py_compile api/**/*.py
+# Python
+find api -name "*.py" -exec python -m py_compile {} \;
+
+# JavaScript
 node --check landing/dashboard/profitability.js
+node --check landing/dashboard/dashboard.js
 ```
 
 ---
@@ -120,9 +128,12 @@ node --check landing/dashboard/profitability.js
 | `api/models.py` | SQLAlchemy ORM — single source of truth for tables. |
 | `api/config.py` | Feature flags. |
 | `api/routers/performance.py` | Profitability dashboard endpoints. |
+| `api/routers/admin.py` | Admin endpoints including `/admin/performance`. |
 | `api/performance_worker.py` | Wallet snapshot background task. |
 | `api/signal_reconciler.py` | Reconciles Signal Lab closes with HL fills. |
+| `scripts/backfill_bot_trades.py` | One-off backfill from `bot_events` to `bot_trades`. |
 | `src/reporting/metrics.py` | Backtest risk metrics (Sharpe, Sortino, drawdown). |
+| `landing/dashboard/profitability.js` | Performance tab frontend logic. |
 | `landing/i18n.js` | Bilingual translation keys. |
 
 ---
@@ -131,15 +142,15 @@ node --check landing/dashboard/profitability.js
 
 ### Profitability Dashboard
 - New tables: `bot_trades`, `wallet_snapshots`
-- `signal_executions` extended with P&L columns
+- `signal_executions` extended with P&L columns (`realized_pnl_usd`, `fees_usd`, `closed_at`, `exit_reason`)
 - Alembic migration: `8f300e110022`
-- Backfilled 902 historical trades
+- Backfilled 902 historical trades on 2026-07-16
 - Feature flag: `PERFORMANCE_DASHBOARD_ENABLED=true` in `api/.env`
-- Dashboard tab: **Rendimiento / Performance**
+- Dashboard tab: **Rendimiento / Performance** at `landing/dashboard/index.html`
 - Endpoints: `/performance/summary`, `/performance/equity-curve`, `/performance/trades`, `/performance/breakdown`, `/performance/export`
 - Admin endpoint: `/admin/performance`
 
-See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` for full details.
+See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` for full details.
 
 ---
 
