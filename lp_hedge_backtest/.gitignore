@@ -9,3 +9,4 @@ telegram_listener/*.png
 telegram_listener/logs/
 data_cache/
 bot_state/
+backups/

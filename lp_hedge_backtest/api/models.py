@@ -205,8 +205,51 @@ class SignalExecution(Base):
     exec_size_usdt    = Column(Numeric(12,2), nullable=True)  # override used at execute time
     executed_at       = Column(DateTime,     default=datetime.utcnow)
     outcome           = Column(Enum("pending", "filled", "failed"), default="pending")
+    # Profitability dashboard fields (nullable until fills are reconciled)
+    realized_pnl_usd  = Column(Numeric(20, 4), nullable=True)
+    fees_usd          = Column(Numeric(20, 4), nullable=True)
+    closed_at         = Column(DateTime, nullable=True)
+    exit_reason       = Column(String(20), nullable=True)
 
     signal = relationship("SignalEvent", back_populates="executions")
+
+
+class BotTrade(Base):
+    """Normalized closed round-trips for the profitability dashboard."""
+    __tablename__ = "bot_trades"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    config_id       = Column(Integer, ForeignKey("bot_configs.id", ondelete="CASCADE"), index=True)
+    user_address    = Column(String(42), index=True, nullable=False)
+    mode            = Column(String(20), nullable=False)          # aragan, avaro, fury, whale
+    pair            = Column(String(20), nullable=False)
+    side            = Column(String(10), nullable=True)           # short / long
+    entry_price     = Column(Numeric(20, 8), nullable=True)
+    exit_price      = Column(Numeric(20, 8), nullable=True)
+    size_usd        = Column(Numeric(20, 4), nullable=True)
+    realized_pnl_usd = Column(Numeric(20, 4), nullable=True)
+    fees_usd        = Column(Numeric(20, 4), nullable=True)
+    funding_usd     = Column(Numeric(20, 4), nullable=True)
+    il_offset_usd   = Column(Numeric(20, 4), nullable=True)       # LP value change during hedge
+    net_pnl_usd     = Column(Numeric(20, 4), nullable=True)       # realized_pnl + il_offset - fees - funding
+    exit_reason     = Column(String(30), nullable=True)           # tp_hit, sl_hit, trailing_stop, manual, expiry
+    is_estimate     = Column(Boolean, default=False)              # true if derived from incomplete event data
+    opened_at       = Column(DateTime, nullable=True)
+    closed_at       = Column(DateTime, nullable=True)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+
+class WalletSnapshot(Base):
+    """Periodic wallet balance snapshots used to build the equity curve."""
+    __tablename__ = "wallet_snapshots"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    user_address    = Column(String(42), index=True, nullable=False)
+    wallet_addr     = Column(String(42), index=True, nullable=True)
+    source          = Column(String(20), nullable=False)          # bot, signal_lab
+    balance_usdc    = Column(Numeric(20, 4), nullable=True)
+    margin_used_usdc = Column(Numeric(20, 4), nullable=True)
+    snapshot_at     = Column(DateTime, index=True, default=datetime.utcnow)
 
 
 class SignalWallet(Base):
