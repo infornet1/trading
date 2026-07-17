@@ -5,6 +5,7 @@ api/*.db
 tg.api
 telegram_listener/.env
 telegram_listener/*.session
+telegram_listener/*.session-journal
 telegram_listener/__pycache__/
 telegram_listener/*.jpg
 telegram_listener/*.png
