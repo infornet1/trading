@@ -168,7 +168,7 @@ node --check landing/dashboard/dashboard.js
 - `api/.env.email` (ignored by Git) overrides `EMAIL_CONFIG_PATH` so the LP hedge service and bot subprocesses use the encrypted project config.
 - WebSocket JWT query params (`/ws/{id}?token=...`) are redacted from uvicorn access logs via `api/logging_filters.py`.
 - Systemd unit file version-controlled at `deploy/viznago_api.service` and symlinked into `/etc/systemd/system/`.
-- Basic pytest suite added under `tests/`: auth, encrypted email config loading, and profitability dashboard (with DB mocked). Run with `./venv/bin/python -m pytest tests/`.
+- pytest suite under `tests/`: auth, encrypted email config loading, profitability dashboard (DB mocked), `telegram_listener.signal_parser`, and `api.bot_manager` state/event mapping. Run with `./venv/bin/python -m pytest tests/`.
 
 ### Fresh clone / deployment notes
 - The `adx_strategy_v2` directory is a Git submodule (`infornet1/Andromeda`). After cloning, run:
