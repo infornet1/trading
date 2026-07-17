@@ -166,7 +166,10 @@ async def save_signal(msg, sig, source_id: int) -> int | None:
 
 
 # M3: transient failures worth retrying — drift/balance rejections are final
-_RETRYABLE_MARKERS = ("not filled", "timeout", "timed out", "connection", "temporarily")
+_RETRYABLE_MARKERS = (
+    "not filled", "timeout", "timed out", "connection", "temporarily",
+    "502", "bad gateway", "gateway",  # HL infra hiccups
+)
 _EXEC_RETRIES      = 3
 _EXEC_RETRY_DELAY  = 2.0
 

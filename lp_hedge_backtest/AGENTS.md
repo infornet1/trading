@@ -171,6 +171,10 @@ node --check landing/dashboard/dashboard.js
 - Basic pytest suite added under `tests/`: auth, encrypted email config loading, and profitability dashboard (with DB mocked). Run with `./venv/bin/python -m pytest tests/`.
 
 ### Fresh clone / deployment notes
+- The `adx_strategy_v2` directory is a Git submodule (`infornet1/Andromeda`). After cloning, run:
+  ```bash
+  git submodule update --init --recursive
+  ```
 - `email_config.json` is **not tracked** in Git. On a new server, create and encrypt it with:
   ```bash
   export ENCRYPTION_KEY=<key>

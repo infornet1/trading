@@ -64,7 +64,7 @@ User (Browser + Rabby Wallet)
 | LP Defensor bots | ✅ Live | Spawned as `live_hedge_bot_v2.py` subprocesses by `api/bot_manager.py` (no standalone systemd unit) |
 | pydantic v2 | ✅ Installed | FastAPI-ready |
 | hyperliquid-python-sdk | ✅ Installed | Bot trades |
-| Disk | ⚠️ 79% used | 11 GB free — monitor |
+| Disk | ✅ 27% used | 114 GB free |
 | RAM | ✅ 1.9 GB free | Comfortable for alpha |
 
 ## 3.1 What Needs to Be Added
