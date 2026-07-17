@@ -74,15 +74,11 @@ User (Browser + Rabby Wallet)
 CREATE DATABASE viznago_dev;
 CREATE DATABASE viznago_prod;
 
-# New Python packages in existing venv
-venv/bin/pip install \
-    fastapi \
-    uvicorn[standard] \
-    sqlalchemy[asyncio] \
-    aiomysql \
-    python-jose[cryptography] \
-    cryptography \
-    passlib[bcrypt]
+# Install Python dependencies in existing venv
+venv/bin/pip install -r requirements.txt
+
+# For development / running tests also install:
+# venv/bin/pip install -r requirements-dev.txt
 ```
 
 No Redis, no PostgreSQL, no Docker for alpha.

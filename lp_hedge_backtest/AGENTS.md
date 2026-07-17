@@ -210,6 +210,7 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 - **CORS origins** default to dev domain + localhost; tighten for prod.
 - **API runs as `viznago`**; use `deploy/viznago_api.service` for the unit file.
 - **`requirements.txt`** is now complete and generated from the active venv (`pip freeze`). Use it for fresh installs; `requirements-dev.txt` adds the test runner.
+- **Pydantic V2 models** should use `model_config = ConfigDict(from_attributes=True)` instead of the deprecated `class Config: from_attributes = True`.
 
 ---
 
