@@ -8,3 +8,4 @@ __pycache__/
 scalping_v2/data/trades.db
 scalping_v2/logs/
 supervisor/logs/
+supervisor/reports/

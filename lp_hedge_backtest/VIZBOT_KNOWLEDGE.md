@@ -292,14 +292,16 @@ A user-facing **Rendimiento / Performance** tab showing realized P&L, equity cur
 Controlled by `PERFORMANCE_DASHBOARD_ENABLED` in `api/.env` (currently `true`). When off, the tab is hidden, `/performance/*` endpoints are not registered, and the snapshot worker does not run.
 
 ### API endpoints (user-scoped)
-- `GET /performance/summary?from=&to=`
+- `GET /performance/summary?from=&to=&include_estimates=false`
 - `GET /performance/equity-curve?from=&to=&granularity=day|hour`
-- `GET /performance/trades?from=&to=&limit=&offset=`
-- `GET /performance/breakdown?by=pair|mode|month`
-- `GET /performance/export?from=&to=` (CSV)
+- `GET /performance/trades?from=&to=&limit=&offset=&include_estimates=false`
+- `GET /performance/breakdown?by=pair|mode|month&include_estimates=false`
+- `GET /performance/export?from=&to=&include_estimates=false` (CSV)
+
+All bot-trade endpoints accept `include_estimates=true` to include whale-tracker estimate rows that are normally excluded from KPIs.
 
 ### Admin endpoint
-- `GET /admin/performance?days=30` — platform-wide aggregate for investor updates.
+- `GET /admin/performance?days=30&include_estimates=false` — platform-wide aggregate for investor updates.
 
 ### Known gaps
 - Sharpe/Sortino/max-drawdown metrics reuse `src/reporting/metrics.py` logic but are not yet exposed in `/performance/summary`.

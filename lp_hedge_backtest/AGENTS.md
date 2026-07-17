@@ -193,7 +193,7 @@ node --check landing/dashboard/dashboard.js
 - Backfilled 902 historical bot trades on 2026-07-16
 - Backfilled 82 closed Signal Lab executions on 2026-07-16; `api/signal_reconciler.py` now stores gross `realized_pnl_usd` with fees tracked separately
 - Cleaned up `bot_trades` estimates on 2026-07-16: deleted 31 empty `stopped` noise rows, enriched 380 whale estimates with `funding_usd`/`net_pnl_usd`/`pair`, and hardened `api/bot_manager.py` + `scripts/backfill_bot_trades.py` to skip future whale closed-only and empty stopped estimates
-- Profitability dashboard (`api/routers/performance.py`) and admin aggregate (`api/routers/admin.py`) now exclude `is_estimate = TRUE` bot_trades from main KPIs
+- Profitability dashboard (`api/routers/performance.py`) and admin aggregate (`api/routers/admin.py`) now exclude `is_estimate = TRUE` bot_trades from main KPIs; an `include_estimates=true` query param and dashboard toggle let users view the enriched whale estimate rows separately
 - Feature flag: `PERFORMANCE_DASHBOARD_ENABLED=true` in `api/.env`
 - Dashboard tab: **Rendimiento / Performance** at `landing/dashboard/index.html`
 - Endpoints: `/performance/summary`, `/performance/equity-curve`, `/performance/trades`, `/performance/breakdown`, `/performance/export`
