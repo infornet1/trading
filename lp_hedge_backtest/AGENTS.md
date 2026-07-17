@@ -211,6 +211,7 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 - **API runs as `viznago`**; use `deploy/viznago_api.service` for the unit file.
 - **`requirements.txt`** is now complete and generated from the active venv (`pip freeze`). Use it for fresh installs; `requirements-dev.txt` adds the test runner.
 - **Pydantic V2 models** should use `model_config = ConfigDict(from_attributes=True)` instead of the deprecated `class Config: from_attributes = True`.
+- **Telegram listener watchdog** (`telegram_listener/watchdog.sh`) sources `api/.env` so crash-alert emails can decrypt the SMTP config. If you edit `api/.env`, the running listener still needs a watchdog restart to pick up new secrets.
 
 ---
 
