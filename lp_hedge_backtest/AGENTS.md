@@ -209,7 +209,7 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 - **Automated tests** are under `tests/` and growing. Run `./venv/bin/python -m pytest tests/` before deploying changes.
 - **CORS origins** default to dev domain + localhost; tighten for prod.
 - **API runs as `viznago`**; use `deploy/viznago_api.service` for the unit file.
-- **`requirements.txt`** was incomplete before 2026-07-16; install from active venv when in doubt.
+- **`requirements.txt`** is now complete and generated from the active venv (`pip freeze`). Use it for fresh installs; `requirements-dev.txt` adds the test runner.
 
 ---
 
