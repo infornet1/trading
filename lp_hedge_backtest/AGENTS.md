@@ -206,7 +206,7 @@ node --check landing/dashboard/dashboard.js
 See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` for full details.
 
 ### Maintenance / code quality (2026-07-17)
-- Replaced all `datetime.utcnow()` calls with `datetime.now(timezone.utc)` equivalents in tracked Python files (deprecated in Python 3.14).
+- Replaced all `datetime.utcnow()` calls with `datetime.now(timezone.utc)` equivalents in tracked Python files, including `api/models.py` default/onupdate callables (deprecated in Python 3.14).
 - Signal Lab auto-execute retry logic (`telegram_listener/listener.py`) now uses exponential backoff (2s / 4s / 8s) and explicitly handles `502 Bad Gateway`.
 - pytest suite expanded to 47 tests covering auth, email config, performance dashboard, signal parser, bot manager state, and listener retry helpers.
 - Stale `live_hedge_bot.service` / `viznago_api.service` files removed from the project root; bot lifecycle is exclusively `api/bot_manager.py` subprocesses.
