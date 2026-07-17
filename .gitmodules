@@ -1,0 +1,3 @@
+[submodule "adx_strategy_v2"]
+	path = adx_strategy_v2
+	url = https://github.com/infornet1/Andromeda.git
