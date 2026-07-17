@@ -157,7 +157,7 @@ async def send_alert(config_id: int, event_type: str, price, pnl, details):
 
             msg = _build_message(event_type, bot.pair, bot.mode, price, pnl, details)
             for link in links:
-                asyncio.create_task(send_message(link.telegram_chat_id, msg))
+                await send_message(link.telegram_chat_id, msg)
 
     except Exception as e:
         print(f"[Telegram] Alert error for config {config_id}: {e}", flush=True)

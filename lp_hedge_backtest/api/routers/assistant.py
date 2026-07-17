@@ -23,10 +23,13 @@ _RATE_WINDOW = 3600  # 1 hour in seconds
 def _check_rate(ip: str) -> bool:
     now  = time.time()
     hits = [t for t in _rate.get(ip, []) if now - t < _RATE_WINDOW]
-    _rate[ip] = hits
+    if hits:
+        _rate[ip] = hits
+    elif ip in _rate:
+        del _rate[ip]  # evict idle IP — prevents unbounded growth from crawlers
     if len(hits) >= _RATE_LIMIT:
         return False
-    _rate[ip].append(now)
+    _rate[ip] = hits + [now]
     return True
 
 

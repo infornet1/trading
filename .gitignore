@@ -5,3 +5,6 @@ email_config.json
 lp_hedge_email_config.json
 __pycache__/
 *.pyc
+scalping_v2/data/trades.db
+scalping_v2/logs/
+supervisor/logs/

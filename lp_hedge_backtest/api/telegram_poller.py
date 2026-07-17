@@ -67,37 +67,37 @@ async def run_poller():
     offset = 0
     backoff = 5
 
-    while True:
-        try:
-            async with httpx.AsyncClient(timeout=_POLL_TIMEOUT + 5) as client:
+    async with httpx.AsyncClient(timeout=_POLL_TIMEOUT + 5) as client:
+        while True:
+            try:
                 r = await client.post(
                     f"{_API_BASE}/getUpdates",
                     json={"offset": offset, "timeout": _POLL_TIMEOUT, "allowed_updates": ["message"]},
                 )
-            if r.status_code != 200:
-                print(f"[TelegramPoller] HTTP {r.status_code} — retrying in {backoff}s", flush=True)
+                if r.status_code != 200:
+                    print(f"[TelegramPoller] HTTP {r.status_code} — retrying in {backoff}s", flush=True)
+                    await asyncio.sleep(backoff)
+                    continue
+
+                data = r.json()
+                if not data.get("ok"):
+                    print(f"[TelegramPoller] API error: {data} — retrying in {backoff}s", flush=True)
+                    await asyncio.sleep(backoff)
+                    continue
+
+                backoff = 5  # reset back-off on success
+                updates = data.get("result", [])
+                for update in updates:
+                    offset = update["update_id"] + 1
+                    try:
+                        await _process_update(update)
+                    except Exception as e:
+                        print(f"[TelegramPoller] Error processing update {update.get('update_id')}: {e}", flush=True)
+
+            except asyncio.CancelledError:
+                print("[TelegramPoller] Stopped", flush=True)
+                return
+            except Exception as e:
+                print(f"[TelegramPoller] Connection error: {e} — retrying in {backoff}s", flush=True)
                 await asyncio.sleep(backoff)
-                continue
-
-            data = r.json()
-            if not data.get("ok"):
-                print(f"[TelegramPoller] API error: {data} — retrying in {backoff}s", flush=True)
-                await asyncio.sleep(backoff)
-                continue
-
-            backoff = 5  # reset back-off on success
-            updates = data.get("result", [])
-            for update in updates:
-                offset = update["update_id"] + 1
-                try:
-                    await _process_update(update)
-                except Exception as e:
-                    print(f"[TelegramPoller] Error processing update {update.get('update_id')}: {e}", flush=True)
-
-        except asyncio.CancelledError:
-            print("[TelegramPoller] Stopped", flush=True)
-            return
-        except Exception as e:
-            print(f"[TelegramPoller] Connection error: {e} — retrying in {backoff}s", flush=True)
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 60)  # exponential back-off, cap at 60 s
+                backoff = min(backoff * 2, 60)  # exponential back-off, cap at 60 s
