@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -153,8 +153,7 @@ class BotConfigOut(BaseModel):
     created_at:          datetime
     updated_at:     datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BotEventOut(BaseModel):
@@ -165,8 +164,7 @@ class BotEventOut(BaseModel):
     details:        Optional[dict]
     ts:             datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
