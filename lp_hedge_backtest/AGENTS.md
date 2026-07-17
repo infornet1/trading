@@ -170,6 +170,22 @@ node --check landing/dashboard/dashboard.js
 - Systemd unit file version-controlled at `deploy/viznago_api.service` and symlinked into `/etc/systemd/system/`.
 - Basic pytest suite added under `tests/`: auth, encrypted email config loading, and profitability dashboard (with DB mocked). Run with `./venv/bin/python -m pytest tests/`.
 
+### Fresh clone / deployment notes
+- `email_config.json` is **not tracked** in Git. On a new server, create and encrypt it with:
+  ```bash
+  export ENCRYPTION_KEY=<key>
+  /var/www/dev/trading/lp_hedge_backtest/venv/bin/python - <<'PY'
+  import json, sys
+  sys.path.insert(0, '/var/www/dev/trading/lp_hedge_backtest')
+  from api.email_encrypt import encrypt_email_config
+  plain = { ... }  # smtp_server, smtp_port, smtp_username, smtp_password, sender_email
+  with open('/var/www/dev/trading/email_config.json', 'w') as f:
+      json.dump(encrypt_email_config(plain), f, indent=2)
+  PY
+  ```
+- Ensure `/var/www/dev/trading/.env.email` exists and contains `ENCRYPTION_KEY`.
+- Ensure all consumer services load `/var/www/dev/trading/.env.email` via `EnvironmentFile`.
+
 ### Profitability Dashboard
 - New tables: `bot_trades`, `wallet_snapshots`
 - `signal_executions` extended with P&L columns (`realized_pnl_usd`, `fees_usd`, `closed_at`, `exit_reason`)

@@ -50,6 +50,7 @@ async def performance_summary(
     address: str = Depends(get_current_address),
     from_date: Optional[str] = Query(None, alias="from"),
     to_date: Optional[str] = Query(None, alias="to"),
+    include_estimates: bool = Query(False),
 ):
     """High-level profitability KPIs for the authenticated user."""
     from_dt = _parse_date(from_date)
@@ -61,8 +62,9 @@ async def performance_summary(
         stmt = (
             select(BotTrade)
             .where(BotTrade.user_address == address)
-            .where(BotTrade.is_estimate.is_(False))
         )
+        if not include_estimates:
+            stmt = stmt.where(BotTrade.is_estimate.is_(False))
         if from_dt:
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
@@ -155,6 +157,7 @@ async def trade_journal(
     to_date: Optional[str] = Query(None, alias="to"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
+    include_estimates: bool = Query(False),
 ):
     """Paginated trade journal combining LP bot trades and Signal Lab executions."""
     from_dt = _parse_date(from_date)
@@ -166,8 +169,9 @@ async def trade_journal(
         stmt = (
             select(BotTrade)
             .where(BotTrade.user_address == address)
-            .where(BotTrade.is_estimate.is_(False))
         )
+        if not include_estimates:
+            stmt = stmt.where(BotTrade.is_estimate.is_(False))
         if from_dt:
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
@@ -206,6 +210,7 @@ async def breakdown(
     by: str = Query("pair", pattern="^(pair|mode|month)$"),
     from_date: Optional[str] = Query(None, alias="from"),
     to_date: Optional[str] = Query(None, alias="to"),
+    include_estimates: bool = Query(False),
 ):
     """Aggregated P&L grouped by pair, mode, or month."""
     from_dt = _parse_date(from_date)
@@ -217,8 +222,9 @@ async def breakdown(
         stmt = (
             select(BotTrade)
             .where(BotTrade.user_address == address)
-            .where(BotTrade.is_estimate.is_(False))
         )
+        if not include_estimates:
+            stmt = stmt.where(BotTrade.is_estimate.is_(False))
         if from_dt:
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
@@ -275,6 +281,7 @@ async def export_csv(
     address: str = Depends(get_current_address),
     from_date: Optional[str] = Query(None, alias="from"),
     to_date: Optional[str] = Query(None, alias="to"),
+    include_estimates: bool = Query(False),
 ):
     """Export the trade journal as CSV."""
     from_dt = _parse_date(from_date)
@@ -286,8 +293,9 @@ async def export_csv(
         stmt = (
             select(BotTrade)
             .where(BotTrade.user_address == address)
-            .where(BotTrade.is_estimate.is_(False))
         )
+        if not include_estimates:
+            stmt = stmt.where(BotTrade.is_estimate.is_(False))
         if from_dt:
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:

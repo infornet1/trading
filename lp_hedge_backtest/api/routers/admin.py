@@ -8,7 +8,7 @@ import os
 import subprocess
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import selectinload
 
@@ -1100,15 +1100,18 @@ async def admin_users(admin: str = Depends(get_current_admin)):
 async def admin_performance(
     admin: str = Depends(get_current_admin),
     days: int = 30,
+    include_estimates: bool = Query(False),
 ):
     """Platform-wide profitability aggregates for admin dashboards / investor updates."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
     async with AsyncSessionLocal() as db:
-        trades_result = await db.execute(
+        stmt = (
             select(BotTrade)
             .where(BotTrade.closed_at >= since)
-            .where(BotTrade.is_estimate.is_(False))
         )
+        if not include_estimates:
+            stmt = stmt.where(BotTrade.is_estimate.is_(False))
+        trades_result = await db.execute(stmt)
         trades = trades_result.scalars().all()
 
         signal_result = await db.execute(

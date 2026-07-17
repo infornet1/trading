@@ -233,6 +233,7 @@ const TRANSLATIONS = {
     'perf.next':            'Siguiente',
     'perf.noTrades':        'No hay operaciones cerradas en el período seleccionado.',
     'perf.noData':          'No hay datos para el período seleccionado.',
+    'perf.includeEstimates': 'Incluir estimados',
 
     // ── Dashboard: states ─────────────────────────────────────────
     'dash.loading.text':            'Obteniendo posiciones on-chain…',
@@ -589,6 +590,7 @@ const TRANSLATIONS = {
     'perf.next':            'Next',
     'perf.noTrades':        'No closed trades in the selected period.',
     'perf.noData':          'No data for the selected period.',
+    'perf.includeEstimates': 'Include estimates',
 
     // ── Dashboard: states ─────────────────────────────────────────
     'dash.loading.text':            'Fetching on-chain positions…',

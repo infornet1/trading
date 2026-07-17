@@ -20,6 +20,7 @@
     dateTo: '',
     tradeOffset: 0,
     tradeLimit: 25,
+    includeEstimates: false,
   };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -178,7 +179,8 @@
 
   async function loadSummary() {
     const params = dateParams();
-    perfState.summary = await perfFetch(`/performance/summary${params}`);
+    const est = estimateParam();
+    perfState.summary = await perfFetch(`/performance/summary${params}${est}`);
     renderSummary();
   }
 
@@ -190,14 +192,17 @@
 
   async function loadTrades() {
     const params = dateParams();
-    const data = await perfFetch(`/performance/trades${params}&limit=${perfState.tradeLimit}&offset=${perfState.tradeOffset}`);
+    const est = estimateParam();
+    const sep = params ? '&' : '?';
+    const data = await perfFetch(`/performance/trades${params}${sep}limit=${perfState.tradeLimit}&offset=${perfState.tradeOffset}${est.replace('?', '&')}`);
     perfState.trades = data.rows || [];
     renderTradeJournal();
   }
 
   async function loadBreakdown() {
     const params = dateParams();
-    perfState.breakdown = await perfFetch(`/performance/breakdown?by=${perfState.breakdownBy}${params.replace('?', '&')}`);
+    const est = estimateParam();
+    perfState.breakdown = await perfFetch(`/performance/breakdown?by=${perfState.breakdownBy}${params.replace('?', '&')}${est.replace('?', '&')}`);
     renderBreakdown();
   }
 
@@ -206,6 +211,10 @@
     if (perfState.dateFrom) parts.push(`from=${perfState.dateFrom}`);
     if (perfState.dateTo) parts.push(`to=${perfState.dateTo}`);
     return parts.length ? `?${parts.join('&')}` : '';
+  }
+
+  function estimateParam() {
+    return perfState.includeEstimates ? '&include_estimates=true' : '';
   }
 
   async function loadAllPerformanceData() {
@@ -231,6 +240,10 @@
         <input type="date" id="perf-to" value="${perfState.dateTo}">
         <button class="btn btn--primary" id="perf-refresh">${t('perf.refresh')}</button>
         <button class="btn" id="perf-export">${t('perf.exportCsv')}</button>
+        <label class="perf-toggle">
+          <input type="checkbox" id="perf-include-estimates">
+          ${t('perf.includeEstimates') || 'Incluir estimados'}
+        </label>
       </div>
       <div id="perf-kpi-grid" class="perf-kpi-grid"></div>
       <div class="perf-chart-row">
@@ -278,7 +291,16 @@
 
     document.getElementById('perf-export').addEventListener('click', () => {
       const params = dateParams();
-      window.open(`${API_BASE}/performance/export${params}`, '_blank');
+      const est = estimateParam();
+      window.open(`${API_BASE}/performance/export${params}${est}`, '_blank');
+    });
+
+    document.getElementById('perf-include-estimates').addEventListener('change', (e) => {
+      perfState.includeEstimates = e.target.checked;
+      perfState.tradeOffset = 0;
+      loadSummary();
+      loadTrades();
+      loadBreakdown();
     });
 
     document.querySelectorAll('.perf-breakdown-tab').forEach(btn => {
