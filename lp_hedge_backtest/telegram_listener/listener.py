@@ -27,6 +27,7 @@ from telethon.tl.types import PeerChannel
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 load_dotenv(os.path.join(os.path.dirname(__file__), "../api/.env"), override=False)
+load_dotenv(os.path.join(os.path.dirname(__file__), "../api/.env.email"), override=False)
 
 from signal_parser import parse_signal, parse_update
 
@@ -815,7 +816,7 @@ async def _reconcile_orphans():
         print("[Signal Lab] Reconcile: no active wallets.", flush=True)
         return
 
-    cutoff = datetime.utcnow() - timedelta(hours=8)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=8)
 
     for wallet in wallets:
         try:

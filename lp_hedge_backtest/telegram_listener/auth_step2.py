@@ -9,7 +9,7 @@ from telethon import TelegramClient
 from telethon.tl.types import PeerChannel
 from telethon.errors import SessionPasswordNeededError
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 API_ID   = int(os.getenv("TG_API_ID"))
 API_HASH = os.getenv("TG_API_HASH")

@@ -212,6 +212,7 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 - **`requirements.txt`** is now complete and generated from the active venv (`pip freeze`). Use it for fresh installs; `requirements-dev.txt` adds the test runner.
 - **Pydantic V2 models** should use `model_config = ConfigDict(from_attributes=True)` instead of the deprecated `class Config: from_attributes = True`.
 - **Telegram listener watchdog** (`telegram_listener/watchdog.sh`) sources `api/.env` so crash-alert emails can decrypt the SMTP config. If you edit `api/.env`, the running listener still needs a watchdog restart to pick up new secrets.
+- **Hyperliquid 502s** are retried automatically (`_place_with_retry` in the listener). They are usually transient; escalate only if they become frequent or persist beyond a few minutes.
 
 ---
 

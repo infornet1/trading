@@ -61,7 +61,7 @@ User (Browser + Rabby Wallet)
 | nginx | ✅ Running | SSL termination, static files |
 | MariaDB 11.8 | ✅ Running | Port 3306, used by FreeScount |
 | Python venv | ✅ Ready | `/var/www/dev/trading/lp_hedge_backtest/venv/` |
-| live_hedge_bot.service | ✅ Live | systemd, uptime 4+ days |
+| LP Defensor bots | ✅ Live | Spawned as `live_hedge_bot_v2.py` subprocesses by `api/bot_manager.py` (no standalone systemd unit) |
 | pydantic v2 | ✅ Installed | FastAPI-ready |
 | hyperliquid-python-sdk | ✅ Installed | Bot trades |
 | Disk | ⚠️ 79% used | 11 GB free — monitor |

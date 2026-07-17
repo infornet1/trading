@@ -185,7 +185,7 @@ For reference — what is running today on the dev server:
 |---|---|
 | Server | Single VPS at `dev.ueipab.edu.ve` (shared with Odoo/Freescout) — 3.8 GB RAM |
 | API | `viznago_api.service` (systemd, FastAPI + uvicorn) |
-| Bot 1 | `live_hedge_bot_v2.service` (active) |
+| Bot 1 | `live_hedge_bot_v2.py` subprocess spawned by `api/bot_manager.py` (no standalone systemd unit) |
 | DB | MariaDB (shared host instance) |
 | Frontend | Nginx serving `landing/` static files |
 | Domain path | `/trading/lp-hedge/` |

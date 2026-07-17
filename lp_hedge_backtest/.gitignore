@@ -13,3 +13,4 @@ data_cache/
 bot_state/
 backups/
 .claude/
+run_fury_backtest.py

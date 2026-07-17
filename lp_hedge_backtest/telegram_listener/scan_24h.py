@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from telethon import TelegramClient
 from telethon.tl.types import PeerChannel
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 from signal_parser import parse_signal, parse_update
 
 API_ID   = int(os.getenv("TG_API_ID"))
