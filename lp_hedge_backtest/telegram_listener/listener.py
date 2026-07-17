@@ -171,11 +171,21 @@ _RETRYABLE_MARKERS = (
     "502", "bad gateway", "gateway",  # HL infra hiccups
 )
 _EXEC_RETRIES      = 3
-_EXEC_RETRY_DELAY  = 2.0
+_EXEC_RETRY_BASE_DELAY = 2.0
+_EXEC_RETRY_MAX_DELAY  = 10.0
+
+
+def _is_retryable(error: str) -> bool:
+    return any(m in error.lower() for m in _RETRYABLE_MARKERS)
+
+
+def _retry_delay(attempt: int) -> float:
+    """Exponential backoff: 2s, 4s, 8s, capped at 10s."""
+    return min(_EXEC_RETRY_BASE_DELAY * (2 ** (attempt - 1)), _EXEC_RETRY_MAX_DELAY)
 
 
 async def _place_with_retry(wallet, signal) -> dict:
-    """M3: place_hl_order with up to 3 attempts on transient errors."""
+    """M3: place_hl_order with up to 3 attempts and exponential backoff on transient errors."""
     result: dict = {"success": False, "error": "not attempted"}
     for attempt in range(1, _EXEC_RETRIES + 1):
         result = await asyncio.to_thread(
@@ -183,15 +193,16 @@ async def _place_with_retry(wallet, signal) -> dict:
         )
         if result["success"]:
             return result
-        err = (result.get("error") or "").lower()
-        if attempt == _EXEC_RETRIES or not any(m in err for m in _RETRYABLE_MARKERS):
+        err = result.get("error") or ""
+        if attempt == _EXEC_RETRIES or not _is_retryable(err):
             return result
+        delay = _retry_delay(attempt)
         print(
             f"[Auto-Execute] ↻ retry {attempt + 1}/{_EXEC_RETRIES} for "
-            f"{signal.pair} — {result.get('error')}",
+            f"{signal.pair} in {delay:.1f}s — {err}",
             flush=True,
         )
-        await asyncio.sleep(_EXEC_RETRY_DELAY)
+        await asyncio.sleep(delay)
     return result
 
 

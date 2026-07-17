@@ -20,7 +20,7 @@ import asyncio
 import json
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
@@ -80,7 +80,7 @@ class PatchWalletRequest(BaseModel):
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 async def _expire_stale_signals(db: AsyncSession) -> int:
-    cutoff = datetime.utcnow() - timedelta(hours=SIGNAL_EXPIRY_HOURS)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=SIGNAL_EXPIRY_HOURS)
     result = await db.execute(
         update(SignalEvent)
         .where(SignalEvent.status == "pending", SignalEvent.received_at < cutoff)
@@ -91,7 +91,7 @@ async def _expire_stale_signals(db: AsyncSession) -> int:
 
 
 def _signal_to_dict(ev: SignalEvent) -> dict:
-    age_seconds = int((datetime.utcnow() - ev.received_at).total_seconds())
+    age_seconds = int((datetime.now(timezone.utc).replace(tzinfo=None) - ev.received_at).total_seconds())
     return {
         "id":          ev.id,
         "source_id":   ev.source_id,

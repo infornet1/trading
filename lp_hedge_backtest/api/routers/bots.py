@@ -5,7 +5,7 @@ All routes require a valid JWT (Authorization: Bearer <token>).
 Users can only access their own bot configs.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -590,7 +590,7 @@ async def get_events(
     await _get_own_config(config_id, address, db)  # ownership check
     q = select(BotEvent).where(BotEvent.config_id == config_id)
     if hours is not None:
-        since = datetime.utcnow() - timedelta(hours=hours)
+        since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
         q = q.where(BotEvent.ts >= since)
     result = await db.execute(
         q.order_by(desc(BotEvent.ts)).limit(limit).offset(offset)

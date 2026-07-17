@@ -168,7 +168,7 @@ node --check landing/dashboard/dashboard.js
 - `api/.env.email` (ignored by Git) overrides `EMAIL_CONFIG_PATH` so the LP hedge service and bot subprocesses use the encrypted project config.
 - WebSocket JWT query params (`/ws/{id}?token=...`) are redacted from uvicorn access logs via `api/logging_filters.py`.
 - Systemd unit file version-controlled at `deploy/viznago_api.service` and symlinked into `/etc/systemd/system/`.
-- pytest suite under `tests/`: auth, encrypted email config loading, profitability dashboard (DB mocked), `telegram_listener.signal_parser`, and `api.bot_manager` state/event mapping. Run with `./venv/bin/python -m pytest tests/`.
+- pytest suite under `tests/`: auth, encrypted email config loading, profitability dashboard (DB mocked), `telegram_listener.signal_parser`, `api.bot_manager` state/event mapping, and listener retry helpers. Run with `./venv/bin/python -m pytest tests/`.
 
 ### Fresh clone / deployment notes
 - The `adx_strategy_v2` directory is a Git submodule (`infornet1/Andromeda`). After cloning, run:
@@ -215,8 +215,9 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 - **API runs as `viznago`**; use `deploy/viznago_api.service` for the unit file.
 - **`requirements.txt`** is now complete and generated from the active venv (`pip freeze`). Use it for fresh installs; `requirements-dev.txt` adds the test runner.
 - **Pydantic V2 models** should use `model_config = ConfigDict(from_attributes=True)` instead of the deprecated `class Config: from_attributes = True`.
+- **Avoid `datetime.utcnow()`** — it is deprecated in Python 3.14. Use `datetime.now(timezone.utc).replace(tzinfo=None)` where the DB stores naive UTC timestamps.
 - **Telegram listener watchdog** (`telegram_listener/watchdog.sh`) sources `api/.env` so crash-alert emails can decrypt the SMTP config. If you edit `api/.env`, the running listener still needs a watchdog restart to pick up new secrets.
-- **Hyperliquid 502s** are retried automatically (`_place_with_retry` in the listener). They are usually transient; escalate only if they become frequent or persist beyond a few minutes.
+- **Hyperliquid 502s** are retried automatically (`_place_with_retry` in the listener) with exponential backoff (2s / 4s / 8s). They are usually transient; escalate only if they become frequent or persist beyond a few minutes.
 
 ---
 

@@ -4,7 +4,7 @@ Runs every 15 minutes alongside the LP reconciler.
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import update
 
@@ -19,7 +19,7 @@ async def run_signal_expiry() -> None:
     while True:
         await asyncio.sleep(SWEEP_INTERVAL)
         try:
-            cutoff = datetime.utcnow() - timedelta(hours=EXPIRY_HOURS)
+            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=EXPIRY_HOURS)
             async with AsyncSessionLocal() as db:
                 result = await db.execute(
                     update(SignalEvent)
