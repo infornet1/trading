@@ -247,7 +247,7 @@ Full audit of LP Defensor V2 + Signal Lab (latency, execution quality, hedge log
 | L4 | Safety syncs skip when price fetch fails |
 | L5 | Shared `Info` client singletons (each construction = ~2 hidden REST calls) |
 
-**Assistant guidance:** from 2026-06-10 every close event carries real fee-net P&L (`pnl_usd`, `pnl_pct`, `is_win`, `reason` in `stopped` details; net `pnl_pct` on signal executions). On 2026-07-16 the **Profitability Dashboard** shipped (D1+D2+D3): `bot_trades` and `wallet_snapshots` tables, `/performance/*` endpoints, `/admin/performance` aggregate, and a new **Rendimiento / Performance** tab in `landing/dashboard/`. Historical events were backfilled (902 trades).
+**Assistant guidance:** from 2026-06-10 every close event carries real fee-net P&L (`pnl_usd`, `pnl_pct`, `is_win`, `reason` in `stopped` details; net `pnl_pct` on signal executions). On 2026-07-16 the **Profitability Dashboard** shipped (D1+D2+D3): `bot_trades` and `wallet_snapshots` tables, `/performance/*` endpoints, `/admin/performance` aggregate, and a new **Rendimiento / Performance** tab in `landing/dashboard/`. Historical events were backfilled (902 bot trades + 82 Signal Lab executions), whale estimate rows were enriched and excluded from main KPIs, and a pytest suite was started under `tests/`. Also on 2026-07-16 SMTP credentials were moved out of plaintext JSON: the shared monorepo `email_config.json` is now encrypted and loaded via `/var/www/dev/trading/email_config_loader.py`.
 
 ## Open Enhancement Backlog (May 2026)
 
@@ -284,7 +284,7 @@ A user-facing **Rendimiento / Performance** tab showing realized P&L, equity cur
 ### Data model
 | Table | Purpose |
 |---|---|
-| `bot_trades` | One row per closed round-trip (LP/FURY/WHALE); also tracks open positions from live events. Populated by `api/bot_manager.py` hook + `scripts/backfill_bot_trades.py`. |
+| `bot_trades` | One row per closed round-trip (LP/FURY/WHALE); also tracks open positions from live events. `is_estimate=TRUE` rows are kept for audit but excluded from dashboard KPIs. Populated by `api/bot_manager.py` hook + `scripts/backfill_bot_trades.py`. |
 | `wallet_snapshots` | Periodic HL wallet balance snapshots for equity curve. Populated by `api/performance_worker.py` every 15 min when flag is on. |
 | `signal_executions` | Extended with `realized_pnl_usd`, `fees_usd`, `closed_at`, `exit_reason`. Populated by `api/signal_reconciler.py`. |
 

@@ -1,1 +1,7 @@
 .env
+.env.email
+email_config.json
+*.plain.backup
+lp_hedge_email_config.json
+__pycache__/
+*.pyc

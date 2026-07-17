@@ -9,8 +9,13 @@ import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
+import os
+import sys
 import json
 from typing import Dict, Optional
+
+sys.path.insert(0, '/var/www/dev/trading')
+from email_config_loader import load_email_config
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +38,10 @@ class ScalpingEmailNotifier:
             self.enabled = False
 
     def load_config(self, config_file):
-        """Load email configuration from JSON file"""
-        with open(config_file, 'r') as f:
-            config = json.load(f)
+        """Load email configuration from JSON file (supports encryption)."""
+        config = load_email_config(config_file)
+        if config is None:
+            raise FileNotFoundError(f"Email config not found: {config_file}")
 
         # SMTP settings
         self.smtp_server = config['smtp_server']

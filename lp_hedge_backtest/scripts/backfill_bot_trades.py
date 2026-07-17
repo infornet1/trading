@@ -145,7 +145,15 @@ def backfill_config(session, config_id: int, force: bool = False) -> int:
                 open_trade.closed_at = ev.ts
                 open_trade = None
             else:
-                # Closed-only estimate
+                # Closed-only estimate. Skip whale (read-only tracker) and empty
+                # stopped events that carry no usable data.
+                if mode == "whale":
+                    continue
+                if ev.event_type == "stopped" and not any([
+                    exit_price, realized_pnl_usd, fees_usd, funding_usd
+                ]):
+                    continue
+
                 trade = BotTrade(
                     config_id=config_id,
                     user_address=user_address,

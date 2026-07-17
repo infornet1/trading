@@ -1,0 +1,4 @@
+# Development / test dependencies (production deps are in active venv)
+pytest>=9.0
+pytest-asyncio>=0.25
+httpx>=0.28

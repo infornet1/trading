@@ -106,8 +106,9 @@ MIN_NOTIONAL_USD = 10.0
 HL_SYNC_INTERVAL = 300
 
 # ── Email ──────────────────────────────────────────────────────────────────────
-EMAIL_CONFIG_PATH = os.getenv("EMAIL_CONFIG_PATH", "/var/www/dev/trading/email_config.json")
-_recipients_env   = os.getenv("EMAIL_RECIPIENTS", "")
+from api.email_config import load_email_config
+
+_recipients_env = os.getenv("EMAIL_RECIPIENTS", "")
 RECIPIENTS = (
     [r.strip() for r in _recipients_env.split(",") if r.strip()]
     or ["perdomo.gustavo@gmail.com"]
@@ -257,17 +258,9 @@ class LiveHedgeBotV2:
             STATE_DIR, f"hedge_state_{CONFIG_ID or NFT_ID}.json"
         )
 
-        self.email_config = self._load_email_config()
+        self.email_config = load_email_config()
 
     # ── Email ──────────────────────────────────────────────────────────────────
-
-    def _load_email_config(self):
-        try:
-            with open(EMAIL_CONFIG_PATH) as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"⚠️  Could not load email config: {e}", flush=True)
-            return None
 
     def send_email(self, subject, body):
         if not self.email_config:

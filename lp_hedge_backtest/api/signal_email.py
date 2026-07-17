@@ -1,9 +1,6 @@
-"""
-Email notifications for Signal Lab events.
-Reuses the same email_config.json as the LP hedge bots.
+"""Email notifications for Signal Lab events.
 Falls back to Telegram push (admin chat IDs) when SMTP fails.
 """
-import json
 import os
 import smtplib
 import urllib.parse
@@ -11,7 +8,8 @@ import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-_CONFIG_PATH = os.getenv("EMAIL_CONFIG_PATH", "/var/www/dev/trading/email_config.json")
+from api.email_config import load_email_config
+
 _RECIPIENTS  = [
     r.strip()
     for r in os.getenv("EMAIL_RECIPIENTS", "perdomo.gustavo@gmail.com").split(",")
@@ -25,17 +23,9 @@ _TG_CHATS = [
 ]
 
 
-def _load_cfg():
-    try:
-        with open(_CONFIG_PATH) as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-
 def check_smtp() -> bool:
     """Returns True if SMTP credentials are currently valid."""
-    cfg = _load_cfg()
+    cfg = load_email_config()
     if not cfg:
         return False
     try:
@@ -73,7 +63,7 @@ def _tg_fallback(subject: str, body: str) -> None:
 
 def send_signal_email(subject: str, body: str) -> None:
     """Fire-and-forget email. Falls back to Telegram push on SMTP failure."""
-    cfg = _load_cfg()
+    cfg = load_email_config()
     if not cfg:
         print("[Signal Lab] Email skipped — config not found", flush=True)
         _tg_fallback(subject, body)

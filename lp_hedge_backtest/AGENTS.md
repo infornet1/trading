@@ -163,12 +163,21 @@ node --check landing/dashboard/dashboard.js
 - API service runs as non-root `viznago` user (systemd `User=viznago`).
 - Basic per-IP rate limiting added to `/auth/*`, `/admin/*`, and `/performance/*` endpoints.
 - `api/.env`, `bot_state/`, `data_cache/`, `backups/` set to `root:webdev` group permissions.
+- Project email config is encrypted at `/var/www/dev/trading/lp_hedge_email_config.json` and loaded via `api/email_config.py` / `api/email_encrypt.py`.
+- Shared monorepo email config `/var/www/dev/trading/email_config.json` is now encrypted with Fernet. A root-level loader (`/var/www/dev/trading/email_config_loader.py`) decrypts it for all sibling projects (ADX, scalping, supervisor, BTC notifier). `/var/www/dev/trading/.env.email` supplies `ENCRYPTION_KEY` to systemd services.
+- `api/.env.email` (ignored by Git) overrides `EMAIL_CONFIG_PATH` so the LP hedge service and bot subprocesses use the encrypted project config.
+- WebSocket JWT query params (`/ws/{id}?token=...`) are redacted from uvicorn access logs via `api/logging_filters.py`.
+- Systemd unit file version-controlled at `deploy/viznago_api.service` and symlinked into `/etc/systemd/system/`.
+- Basic pytest suite added under `tests/`: auth, encrypted email config loading, and profitability dashboard (with DB mocked). Run with `./venv/bin/python -m pytest tests/`.
 
 ### Profitability Dashboard
 - New tables: `bot_trades`, `wallet_snapshots`
 - `signal_executions` extended with P&L columns (`realized_pnl_usd`, `fees_usd`, `closed_at`, `exit_reason`)
 - Alembic migration: `8f300e110022`
-- Backfilled 902 historical trades on 2026-07-16
+- Backfilled 902 historical bot trades on 2026-07-16
+- Backfilled 82 closed Signal Lab executions on 2026-07-16; `api/signal_reconciler.py` now stores gross `realized_pnl_usd` with fees tracked separately
+- Cleaned up `bot_trades` estimates on 2026-07-16: deleted 31 empty `stopped` noise rows, enriched 380 whale estimates with `funding_usd`/`net_pnl_usd`/`pair`, and hardened `api/bot_manager.py` + `scripts/backfill_bot_trades.py` to skip future whale closed-only and empty stopped estimates
+- Profitability dashboard (`api/routers/performance.py`) and admin aggregate (`api/routers/admin.py`) now exclude `is_estimate = TRUE` bot_trades from main KPIs
 - Feature flag: `PERFORMANCE_DASHBOARD_ENABLED=true` in `api/.env`
 - Dashboard tab: **Rendimiento / Performance** at `landing/dashboard/index.html`
 - Endpoints: `/performance/summary`, `/performance/equity-curve`, `/performance/trades`, `/performance/breakdown`, `/performance/export`
@@ -181,9 +190,9 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 ## 8. Common pitfalls
 
 - **`api/main.py` inline migrations** run on every startup. They are idempotent but noisy; prefer Alembic for new changes.
-- **No automated tests** exist yet. Validate manually with `TestClient` or staging.
+- **Automated tests** are under `tests/` and growing. Run `./venv/bin/python -m pytest tests/` before deploying changes.
 - **CORS origins** default to dev domain + localhost; tighten for prod.
-- **API runs as root** currently; planned migration to non-root user.
+- **API runs as `viznago`**; use `deploy/viznago_api.service` for the unit file.
 - **`requirements.txt`** was incomplete before 2026-07-16; install from active venv when in doubt.
 
 ---

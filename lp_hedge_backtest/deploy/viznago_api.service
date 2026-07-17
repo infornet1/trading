@@ -1,0 +1,27 @@
+[Unit]
+Description=VIZNIAGO FURY FastAPI Service
+After=network.target mariadb.service
+Wants=mariadb.service
+
+[Service]
+Type=simple
+User=viznago
+Group=viznago
+WorkingDirectory=/var/www/dev/trading/lp_hedge_backtest
+EnvironmentFile=/var/www/dev/trading/lp_hedge_backtest/api/.env
+EnvironmentFile=-/var/www/dev/trading/lp_hedge_backtest/api/.env.email
+ExecStart=/var/www/dev/trading/lp_hedge_backtest/venv/bin/uvicorn \
+    api.main:app \
+    --host 127.0.0.1 \
+    --port 8001 \
+    --workers 1 \
+    --log-level info
+Restart=always
+RestartSec=5
+MemoryMax=2G
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=viznago-api
+
+[Install]
+WantedBy=multi-user.target

@@ -24,6 +24,10 @@ from api.routers import assistant as assistant_router
 from api.routers import telegram as telegram_router
 from api.routers import signal_lab as signal_lab_router
 from api.routers import performance as performance_router
+from api.logging_filters import install_token_redaction
+
+# Prevent WebSocket JWT query params from appearing in uvicorn access logs.
+install_token_redaction()
 
 
 async def _run_column_migrations():

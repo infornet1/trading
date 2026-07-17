@@ -1105,7 +1105,9 @@ async def admin_performance(
     since = datetime.now(timezone.utc) - timedelta(days=days)
     async with AsyncSessionLocal() as db:
         trades_result = await db.execute(
-            select(BotTrade).where(BotTrade.closed_at >= since)
+            select(BotTrade)
+            .where(BotTrade.closed_at >= since)
+            .where(BotTrade.is_estimate.is_(False))
         )
         trades = trades_result.scalars().all()
 

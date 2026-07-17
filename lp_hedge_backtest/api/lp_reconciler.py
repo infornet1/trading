@@ -25,13 +25,13 @@ from sqlalchemy import select, update
 from web3 import Web3
 
 from api.database import AsyncSessionLocal
+from api.email_config import load_email_config
 from api.models import BotConfig, BotEvent
 
 RECONCILE_INTERVAL = 3600   # seconds between full scans (1 hour)
 STARTUP_DELAY      = 90     # seconds after API boot before first scan
 
 RPC_URL           = os.getenv("ARBITRUM_RPC_URL", "https://arb1.arbitrum.io/rpc")
-EMAIL_CONFIG_PATH = os.getenv("EMAIL_CONFIG_PATH", "/var/www/dev/trading/email_config.json")
 ADMIN_EMAIL       = os.getenv("EMAIL_RECIPIENTS",  "perdomo.gustavo@gmail.com")
 
 V3_POS_MANAGER = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
@@ -188,8 +188,9 @@ async def _deactivate(cfg: BotConfig, event_type: str, note: str):
 
 def _send_admin_email(cfg: BotConfig, event_type: str, note: str):
     try:
-        with open(EMAIL_CONFIG_PATH) as f:
-            email_cfg = json.load(f)
+        email_cfg = load_email_config()
+        if not email_cfg:
+            return
 
         subject = (
             f"⚠️ [VIZNIAGO Admin] LP Removed — Config {cfg.id} Auto-Deactivated"

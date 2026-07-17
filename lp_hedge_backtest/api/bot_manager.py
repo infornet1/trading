@@ -16,6 +16,7 @@ from subprocess import PIPE, STDOUT
 from typing import Optional
 
 from api.database import AsyncSessionLocal
+from api.email_config import load_email_config
 from api.models import BotConfig, BotEvent, BotTrade
 
 # Path to bot scripts and venv Python
@@ -84,9 +85,16 @@ class BotManager:
             # Global infrastructure (set at API level, safe to inherit)
             "ARBITRUM_RPC_URL":   os.environ.get("ARBITRUM_RPC_URL",
                                     "https://arb1.arbitrum.io/rpc"),
+            "ENCRYPTION_KEY":     os.environ.get("ENCRYPTION_KEY", ""),
             "EMAIL_CONFIG_PATH":  os.environ.get("EMAIL_CONFIG_PATH",
-                                    "/var/www/dev/trading/email_config.json"),
+                                    "/var/www/dev/trading/lp_hedge_email_config.json"),
             "EMAIL_RECIPIENTS":   os.environ.get("EMAIL_RECIPIENTS", ""),
+            # SMTP credentials passed as env vars (legacy file support removed)
+            "SMTP_SERVER":        os.environ.get("SMTP_SERVER", ""),
+            "SMTP_PORT":          os.environ.get("SMTP_PORT", ""),
+            "SMTP_USERNAME":      os.environ.get("SMTP_USERNAME", ""),
+            "SMTP_PASSWORD":      os.environ.get("SMTP_PASSWORD", ""),
+            "SENDER_EMAIL":       os.environ.get("SENDER_EMAIL", ""),
             # Per-bot config — sourced exclusively from DB, not from .env
             # Whale mode has no HL credentials (read-only leaderboard); fall back to ""
             "HYPERLIQUID_SECRET_KEY":      config["hl_api_key"]     or "",
@@ -390,7 +398,16 @@ class BotManager:
                         setattr(trade, key, value)
                     await db.commit()
                 else:
-                    # No matching open trade — record a closed-only estimate.
+                    # No matching open trade — record a closed-only estimate only if
+                    # it carries enough data to be useful.
+                    if mode == "whale":
+                        # Whale tracker is read-only leaderboard; closed-only rows
+                        # cannot be matched to a real system round-trip.
+                        return
+                    if event_type == "stopped" and not any([price, realized_pnl_usd, fees_usd, funding_usd]):
+                        # LP bot stopped without any fill data — pure noise.
+                        return
+
                     db.add(BotTrade(
                         config_id=config_id,
                         user_address=user_address,
@@ -437,15 +454,13 @@ class BotManager:
 
     async def _notify_admin_lp_gone(self, config_id: int, event_type: str, details: Optional[dict]):
         """Send admin email when a bot is auto-deactivated due to LP removal."""
-        import json as _json
         import smtplib
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
         try:
-            email_path = os.environ.get("EMAIL_CONFIG_PATH",
-                                        "/var/www/dev/trading/email_config.json")
-            with open(email_path) as f:
-                cfg = _json.load(f)
+            cfg = load_email_config()
+            if not cfg:
+                return
             admin = os.environ.get("EMAIL_RECIPIENTS", "perdomo.gustavo@gmail.com")
             msg = MIMEMultipart()
             msg["From"]    = cfg["sender_email"]

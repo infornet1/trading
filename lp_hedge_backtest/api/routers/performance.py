@@ -58,7 +58,11 @@ async def performance_summary(
         to_dt = to_dt + timedelta(days=1)
 
     async with AsyncSessionLocal() as db:
-        stmt = select(BotTrade).where(BotTrade.user_address == address)
+        stmt = (
+            select(BotTrade)
+            .where(BotTrade.user_address == address)
+            .where(BotTrade.is_estimate.is_(False))
+        )
         if from_dt:
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
@@ -159,7 +163,11 @@ async def trade_journal(
         to_dt = to_dt + timedelta(days=1)
 
     async with AsyncSessionLocal() as db:
-        stmt = select(BotTrade).where(BotTrade.user_address == address)
+        stmt = (
+            select(BotTrade)
+            .where(BotTrade.user_address == address)
+            .where(BotTrade.is_estimate.is_(False))
+        )
         if from_dt:
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
@@ -206,7 +214,11 @@ async def breakdown(
         to_dt = to_dt + timedelta(days=1)
 
     async with AsyncSessionLocal() as db:
-        stmt = select(BotTrade).where(BotTrade.user_address == address)
+        stmt = (
+            select(BotTrade)
+            .where(BotTrade.user_address == address)
+            .where(BotTrade.is_estimate.is_(False))
+        )
         if from_dt:
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
@@ -271,7 +283,11 @@ async def export_csv(
         to_dt = to_dt + timedelta(days=1)
 
     async with AsyncSessionLocal() as db:
-        stmt = select(BotTrade).where(BotTrade.user_address == address)
+        stmt = (
+            select(BotTrade)
+            .where(BotTrade.user_address == address)
+            .where(BotTrade.is_estimate.is_(False))
+        )
         if from_dt:
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:

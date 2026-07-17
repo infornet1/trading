@@ -14,6 +14,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+sys.path.insert(0, '/var/www/dev/trading')
+from email_config_loader import load_email_config
+
 
 class SupervisorEmailNotifier:
     """Send email notifications for supervisor events"""
@@ -33,16 +36,25 @@ class SupervisorEmailNotifier:
                     config_path = str(config)
                     break
 
-        if config_path and Path(config_path).exists():
-            with open(config_path, 'r') as f:
-                self.config = json.load(f)
-                # Normalize config keys (handle both sender_password and smtp_password)
-                if 'smtp_password' in self.config and 'sender_password' not in self.config:
-                    self.config['sender_password'] = self.config['smtp_password']
-                if 'smtp_username' in self.config and 'sender_email' not in self.config:
-                    self.config['sender_email'] = self.config['smtp_username']
+        if config_path is None:
+            # Try multiple locations
+            possible_configs = [
+                Path("/var/www/dev/trading/supervisor/email_config.json"),
+                Path("/var/www/dev/trading/email_config.json"),
+                Path("/var/www/dev/trading/scalping_v2/email_config.json"),
+            ]
+            for config in possible_configs:
+                if config.exists():
+                    config_path = str(config)
+                    break
+
+        if config_path:
+            self.config = load_email_config(config_path) or {}
         else:
-            # Default configuration
+            self.config = {}
+
+        if not self.config:
+            # Default configuration (no password)
             self.config = {
                 'smtp_server': 'smtp.gmail.com',
                 'smtp_port': 587,
@@ -50,6 +62,12 @@ class SupervisorEmailNotifier:
                 'sender_password': os.getenv('EMAIL_PASSWORD', ''),
                 'recipient_email': os.getenv('EMAIL_RECIPIENT', 'perdomo.gustavo@gmail.com')
             }
+
+        # Normalize config keys (handle both sender_password and smtp_password)
+        if 'smtp_password' in self.config and 'sender_password' not in self.config:
+            self.config['sender_password'] = self.config['smtp_password']
+        if 'smtp_username' in self.config and 'sender_email' not in self.config:
+            self.config['sender_email'] = self.config['smtp_username']
 
         # Normalise recipient_email to always be a list
         _r = self.config.get('recipient_email', [])

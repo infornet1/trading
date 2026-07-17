@@ -1,5 +1,7 @@
 __pycache__/
 api/.env
+api/.env.email
+api/*.db
 tg.api
 telegram_listener/.env
 telegram_listener/*.session

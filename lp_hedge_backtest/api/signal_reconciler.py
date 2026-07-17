@@ -197,6 +197,8 @@ async def _reconcile_once() -> None:
                 icon = "🎯"
 
         # Compute realized P&L in USD for the profitability dashboard.
+        # realized_pnl_usd is stored GROSS (price return only); fees_usd is
+        # stored separately so performance.py can subtract them exactly once.
         realized_pnl_usd = None
         fees_usd = None
         try:
@@ -205,9 +207,8 @@ async def _reconcile_once() -> None:
             if fp and size and close_price:
                 raw_pnl_pct = ((fp - close_price) / fp) if is_short else ((close_price - fp) / fp)
                 fees_pct = 0.0009  # 0.045% taker × 2 sides
-                net_pnl_pct = raw_pnl_pct - fees_pct
                 leverage = float(signal.leverage or 1)
-                realized_pnl_usd = Decimal(str(size * net_pnl_pct * leverage))
+                realized_pnl_usd = Decimal(str(size * raw_pnl_pct * leverage))
                 fees_usd = Decimal(str(size * fees_pct * leverage))
         except Exception:
             pass
