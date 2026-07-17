@@ -2,7 +2,7 @@
 SQLAlchemy ORM models — mirrors the MariaDB schema in SAAS_PLAN.md.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     BigInteger, Boolean, Column, DateTime, Numeric,
     Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint,
@@ -11,12 +11,17 @@ from sqlalchemy.orm import relationship
 from api.database import Base
 
 
+def _utcnow() -> datetime:
+    """Return a naive UTC datetime (matches legacy datetime.utcnow() behaviour)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class User(Base):
     __tablename__ = "users"
 
     address     = Column(String(42), primary_key=True)   # 0x…
     plan        = Column(Enum("free", "starter", "pro"), default="free", nullable=False)
-    created_at  = Column(DateTime, default=datetime.utcnow)
+    created_at  = Column(DateTime, default=_utcnow)
     last_seen   = Column(DateTime, nullable=True)
 
     bot_configs   = relationship("BotConfig",    back_populates="user", cascade="all, delete-orphan")
@@ -29,7 +34,7 @@ class Nonce(Base):
     address    = Column(String(42), primary_key=True)
     nonce      = Column(String(64),  nullable=False)
     expires_at = Column(DateTime,    nullable=False)
-    created_at = Column(DateTime,    default=datetime.utcnow)
+    created_at = Column(DateTime,    default=_utcnow)
 
 
 class BotConfig(Base):
@@ -74,8 +79,8 @@ class BotConfig(Base):
     use_funding_gate    = Column(Boolean,       default=False) # M2-44: gate entry when funding too adverse
     funding_gate_pct    = Column(Numeric(5, 3), default=0.050) # M2-44: threshold % per 1h (rate < -X% blocks entry)
     active          = Column(Boolean, default=False)
-    created_at      = Column(DateTime, default=datetime.utcnow)
-    updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at      = Column(DateTime, default=_utcnow)
+    updated_at      = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user   = relationship("User",      back_populates="bot_configs")
     events = relationship("BotEvent",  back_populates="config", cascade="all, delete-orphan")
@@ -107,7 +112,7 @@ class BotEvent(Base):
     price_at_event = Column(Numeric(20, 8), nullable=True)
     pnl            = Column(Numeric(20, 8), nullable=True)
     details        = Column(JSON, nullable=True)
-    ts             = Column(DateTime, default=datetime.utcnow)
+    ts             = Column(DateTime, default=_utcnow)
 
     config = relationship("BotConfig", back_populates="events")
 
@@ -126,7 +131,7 @@ class TelegramLink(Base):
     id               = Column(Integer,    primary_key=True, autoincrement=True)
     user_address     = Column(String(42), nullable=False)
     telegram_chat_id = Column(BigInteger, nullable=False)
-    linked_at        = Column(DateTime,   default=datetime.utcnow)
+    linked_at        = Column(DateTime,   default=_utcnow)
 
 
 class Subscription(Base):
@@ -138,7 +143,7 @@ class Subscription(Base):
     active_until    = Column(DateTime, nullable=False)
     amount_usdc     = Column(Numeric(12, 2), nullable=True)
     payment_tx_hash = Column(String(66), nullable=True)
-    created_at      = Column(DateTime, default=datetime.utcnow)
+    created_at      = Column(DateTime, default=_utcnow)
 
     user = relationship("User", back_populates="subscriptions")
 
@@ -155,7 +160,7 @@ class SignalSource(Base):
     thread_id  = Column(Integer,     nullable=True)           # 7, 22, or 29
     purpose    = Column(Enum("signals", "lp_range"), nullable=False)
     active     = Column(Boolean, default=True)
-    added_at   = Column(DateTime, default=datetime.utcnow)
+    added_at   = Column(DateTime, default=_utcnow)
 
     events = relationship("SignalEvent", back_populates="source", cascade="all, delete-orphan")
 
@@ -180,7 +185,7 @@ class SignalEvent(Base):
     )
     msg_id      = Column(BigInteger,   nullable=False)         # Telegram message ID
     received_at = Column(DateTime,     nullable=False)
-    updated_at  = Column(DateTime,     default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at  = Column(DateTime,     default=_utcnow, onupdate=_utcnow)
 
     source     = relationship("SignalSource",   back_populates="events")
     executions = relationship("SignalExecution", back_populates="signal", cascade="all, delete-orphan")
@@ -203,7 +208,7 @@ class SignalExecution(Base):
     breakeven_applied = Column(Boolean,      default=False)
     exec_leverage     = Column(Integer,      nullable=True)   # override used at execute time
     exec_size_usdt    = Column(Numeric(12,2), nullable=True)  # override used at execute time
-    executed_at       = Column(DateTime,     default=datetime.utcnow)
+    executed_at       = Column(DateTime,     default=_utcnow)
     outcome           = Column(Enum("pending", "filled", "failed"), default="pending")
     # Profitability dashboard fields (nullable until fills are reconciled)
     realized_pnl_usd  = Column(Numeric(20, 4), nullable=True)
@@ -236,7 +241,7 @@ class BotTrade(Base):
     is_estimate     = Column(Boolean, default=False)              # true if derived from incomplete event data
     opened_at       = Column(DateTime, nullable=True)
     closed_at       = Column(DateTime, nullable=True)
-    created_at      = Column(DateTime, default=datetime.utcnow)
+    created_at      = Column(DateTime, default=_utcnow)
 
 
 class WalletSnapshot(Base):
@@ -249,7 +254,7 @@ class WalletSnapshot(Base):
     source          = Column(String(20), nullable=False)          # bot, signal_lab
     balance_usdc    = Column(Numeric(20, 4), nullable=True)
     margin_used_usdc = Column(Numeric(20, 4), nullable=True)
-    snapshot_at     = Column(DateTime, index=True, default=datetime.utcnow)
+    snapshot_at     = Column(DateTime, index=True, default=_utcnow)
 
 
 class SignalWallet(Base):
@@ -263,7 +268,7 @@ class SignalWallet(Base):
     user_address   = Column(String(42),  nullable=True)    # SIWE address of owner (null = admin-registered)
     auto_execute   = Column(Boolean,     default=False)
     active         = Column(Boolean,     default=True)
-    created_at     = Column(DateTime,    default=datetime.utcnow)
+    created_at     = Column(DateTime,    default=_utcnow)
 
 
 class SignalUserDefault(Base):
@@ -278,5 +283,5 @@ class SignalUserDefault(Base):
     coin         = Column(String(20),   nullable=False)
     leverage     = Column(Integer,      nullable=True)
     size_usdt    = Column(Numeric(12,2), nullable=True)
-    created_at   = Column(DateTime,     default=datetime.utcnow)
-    updated_at   = Column(DateTime,     default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at   = Column(DateTime,     default=_utcnow)
+    updated_at   = Column(DateTime,     default=_utcnow, onupdate=_utcnow)
