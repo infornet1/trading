@@ -32,6 +32,11 @@ echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Listener not running — starting...
 cd "$PROJECT"
 source venv/bin/activate
 
+# Make API env vars available to the crash-alert email script
+set -a
+source "$PROJECT/api/.env"
+set +a
+
 # Send crash alert email
 python3 -c "
 import sys; sys.path.insert(0, '.')

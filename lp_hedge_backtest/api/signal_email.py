@@ -42,13 +42,12 @@ def _tg_fallback(subject: str, body: str) -> None:
     """Push a Telegram message to admin chats when email is unavailable."""
     if not _TG_TOKEN or not _TG_CHATS:
         return
-    text = f"🔴 *[Signal Lab — email DOWN]*\n*{subject}*\n\n{body}"
+    text = f"🔴 [Signal Lab — email DOWN]\n{subject}\n\n{body}"
     for chat_id in _TG_CHATS:
         try:
             data = urllib.parse.urlencode({
-                "chat_id":    chat_id,
-                "text":       text,
-                "parse_mode": "Markdown",
+                "chat_id": chat_id,
+                "text":    text,
             }).encode()
             req = urllib.request.Request(
                 f"https://api.telegram.org/bot{_TG_TOKEN}/sendMessage",

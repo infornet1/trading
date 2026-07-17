@@ -912,11 +912,11 @@ async def main():
         print("✅ [Signal Lab] SMTP health check OK", flush=True)
     else:
         print("🚨 [Signal Lab] SMTP health check FAILED — email notifications are DOWN!", flush=True)
-        print("🚨 [Signal Lab] Update smtp_password in email_config.json and restart.", flush=True)
+        print("🚨 [Signal Lab] Check EMAIL_CONFIG_PATH / encrypted email config and restart.", flush=True)
         _tg_fallback(
             "🚨 SMTP health check FAILED",
             "Email notifications are broken at listener startup.\n"
-            "Update smtp_password in email_config.json and restart the listener.",
+            "Check EMAIL_CONFIG_PATH / encrypted email config and restart the listener.",
         )
 
     hl_assets = await _get_hl_assets()
