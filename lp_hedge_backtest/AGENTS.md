@@ -213,6 +213,9 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 - `adx_strategy_v2` registered as a Git submodule; `logs/` inside it ignored.
 - `api/.env.email` permissions hardened to `root:webdev 640`.
 
+### Operations (2026-08-02)
+- Diagnosed a silent Telegram listener outage (~3.5 days, since 2026-07-30 ~21:12 UTC): the process was alive but stuck on a half-open Telegram connection, so no signals were parsed and no Signal Lab emails were sent. Root cause and manual recovery procedure documented in "Common pitfalls" below. The listener was restarted via the watchdog (kill stale PID → cron restarts within a minute) and verified healthy.
+
 ---
 
 ## 8. Common pitfalls
@@ -226,6 +229,7 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 - **Avoid `datetime.utcnow()`** — it is deprecated in Python 3.14. Use `datetime.now(timezone.utc).replace(tzinfo=None)` where the DB stores naive UTC timestamps.
 - **Telegram listener watchdog** (`telegram_listener/watchdog.sh`) sources `api/.env` so crash-alert emails can decrypt the SMTP config. If you edit `api/.env`, the running listener still needs a watchdog restart to pick up new secrets.
 - **Hyperliquid 502s** are retried automatically (`_place_with_retry` in the listener) with exponential backoff (2s / 4s / 8s). They are usually transient; escalate only if they become frequent or persist beyond a few minutes.
+- **Telegram listener can hang silently on a stale connection.** The watchdog (`telegram_listener/watchdog.sh`) only checks process liveness, so a dead-but-half-open Telegram connection (`Server closed the connection: 0 bytes read...` in `logs/listener.log`) leaves the process alive but receiving nothing — no signals, no emails. Symptoms: log mtime stops advancing while `pgrep -f telegram_listener.listener` still returns a PID. Fix: `kill <pid>` and let the watchdog cron restart it within a minute (it sends a crash-alert email). Verify recovery: fresh `Ready. Waiting for messages...` line plus an ESTABLISHED socket to `149.154.*` (`ss -tnp | grep <new_pid>`). This happened on 2026-08-02 after ~3.5 days of silence; signals posted during the outage are missed and must be recovered manually from channel history. A log-freshness check in the watchdog is a known TODO.
 
 ---
 
