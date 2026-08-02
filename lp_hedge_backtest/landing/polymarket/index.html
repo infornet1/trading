@@ -3,17 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VIZNIAGO — Whale Tracker</title>
+  <title>VIZNIAGO — Polymarket TP/SL Bot</title>
   <link rel="icon" href="../assets/vizniago-logo.jpeg" type="image/jpeg" />
-  <meta name="description" content="Monitor top Hyperliquid traders in real-time. Detect large position opens, closes, and side flips." />
+  <meta name="description" content="Buy Polymarket outcome shares with automatic take-profit and synthetic stop-loss." />
   <link rel="stylesheet" href="../global.css" />
-  <link rel="stylesheet" href="whale.css" />
+  <link rel="stylesheet" href="../whale/whale.css" />
 </head>
 <body>
 
-  <!-- ============================================================
-       NAVBAR
-  ============================================================ -->
+  <!-- NAVBAR -->
   <nav class="navbar">
     <a href="../index.html" class="navbar-brand">
       <img src="../assets/vizniago-logo.jpeg" alt="VIZNIAGO" class="navbar-logo" />
@@ -46,14 +44,14 @@
               <span class="nav-dd-sub">Busca posiciones LP</span>
             </div>
           </a>
-          <a href="index.html" class="nav-dd-item nav-dd-item--active">
+          <a href="../whale/index.html" class="nav-dd-item">
             <span class="nav-dd-icon">🐋</span>
             <div class="nav-dd-text">
               <span class="nav-dd-label">Whale Tracker</span>
               <span class="nav-dd-sub">Señales en tiempo real</span>
             </div>
           </a>
-          <a href="../polymarket/index.html" class="nav-dd-item">
+          <a href="index.html" class="nav-dd-item nav-dd-item--active">
             <span class="nav-dd-icon">🎯</span>
             <div class="nav-dd-text">
               <span class="nav-dd-label">Polymarket TP/SL</span>
@@ -79,7 +77,6 @@
         <button class="lang-btn active" id="lang-es" onclick="setLang('es')">ES</button>
         <button class="lang-btn" id="lang-en" onclick="setLang('en')">EN</button>
       </div>
-      <!-- Wallet connect -->
       <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()">
         🟢&nbsp; Conectar Wallet
       </button>
@@ -90,183 +87,164 @@
     </div>
   </nav>
 
-  <!-- ============================================================
-       HERO HEADER
-  ============================================================ -->
+  <!-- HERO HEADER -->
   <div class="whale-hero">
-    <div class="whale-hero-icon">🐋</div>
-    <h1 class="whale-hero-title">Whale Tracker</h1>
+    <div class="whale-hero-icon">🎯</div>
+    <h1 class="whale-hero-title">Polymarket TP/SL Bot</h1>
     <p class="whale-hero-sub">
-      Monitorea los top traders de Hyperliquid en tiempo real.
-      Detecta aperturas, cierres y side flips de posiciones grandes.
+      Compra shares de un mercado de Polymarket y sal automáticamente:
+      take-profit y stop-loss sintético vigilados cada pocos segundos.
     </p>
   </div>
 
-  <!-- ============================================================
-       MAIN CONTENT
-  ============================================================ -->
+  <!-- MAIN CONTENT -->
   <main class="whale-main">
     <div class="container">
 
-      <!-- Error banner -->
       <div id="error-banner" class="alert alert-error hidden"></div>
 
-      <!-- Auth banner (shown when not signed in) -->
       <div id="auth-banner" class="alert alert-info hidden">
-        <span>🔒 Conecta tu wallet para gestionar bots de whale tracking.</span>
+        <span>🔒 Conecta tu wallet para gestionar bots de Polymarket.</span>
         <button class="btn btn-sm" style="margin-left:12px" onclick="connectWallet()">Conectar</button>
       </div>
 
-      <!-- Stats bar -->
-      <div class="wt-stats-bar" id="wt-stats-bar">
-        <div class="wt-stat">
-          <div class="wt-stat-value" id="stat-signals-today">—</div>
-          <div class="wt-stat-label">Señales hoy</div>
-        </div>
-        <div class="wt-stat">
-          <div class="wt-stat-value" id="stat-active-trackers">—</div>
-          <div class="wt-stat-label">Trackers activos</div>
-        </div>
-        <div class="wt-stat">
-          <div class="wt-stat-value" id="stat-whales-watched">—</div>
-          <div class="wt-stat-label">Whales monitoreados</div>
-        </div>
-        <div class="wt-stat">
-          <div class="wt-stat-value" id="stat-last-signal">—</div>
-          <div class="wt-stat-label">Última señal</div>
-        </div>
-      </div>
-
-      <!-- Live signals feed -->
+      <!-- Live bot feed -->
       <section class="wt-section">
         <div class="wt-section-header">
-          <div class="wt-section-title">📡 Señales en Vivo</div>
-          <div class="wt-section-meta" id="signals-updated">Actualizando…</div>
+          <div class="wt-section-title">📡 Actividad en Vivo</div>
+          <div class="wt-section-meta" id="feed-updated">—</div>
         </div>
-        <div id="signals-feed" class="signals-feed">
+        <div id="activity-feed" class="signals-feed">
           <div class="wt-empty">
-            <div class="wt-empty-icon">🌊</div>
-            <p>Sin señales aún — el tracker está sondeando…</p>
+            <div class="wt-empty-icon">🎯</div>
+            <p>Sin actividad aún — lanza un bot abajo.</p>
           </div>
         </div>
       </section>
 
-      <!-- My trackers (requires auth) -->
-      <section class="wt-section" id="my-trackers-section">
+      <!-- My bots (requires auth) -->
+      <section class="wt-section" id="my-bots-section">
         <div class="wt-section-header">
-          <div class="wt-section-title">⚙️ Mis Trackers</div>
-          <span id="my-trackers-auth-hint" class="wt-auth-hint">Conecta wallet para gestionar</span>
+          <div class="wt-section-title">⚙️ Mis Bots</div>
+          <span id="my-bots-auth-hint" class="wt-auth-hint">Conecta wallet para gestionar</span>
         </div>
-        <div id="my-trackers-list"></div>
+        <div id="my-bots-list"></div>
       </section>
 
-      <!-- Launch new tracker -->
+      <!-- Launch new bot -->
       <section class="wt-section" id="launch-section">
         <div class="wt-section-header">
-          <div class="wt-section-title">🚀 Nuevo Tracker</div>
+          <div class="wt-section-title">🚀 Nuevo Bot</div>
         </div>
 
         <div id="launch-form-wrap" class="wt-launch-form">
-          <!-- Overlay when not authed -->
           <div id="launch-overlay" class="wt-overlay">
-            <span>🔒 Conecta tu wallet para lanzar un tracker</span>
+            <span>🔒 Conecta tu wallet para lanzar un bot</span>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-
-            <div class="wt-field">
-              <label class="wt-label">
-                Leaderboard Top N
-                <span class="wt-info" tabindex="0">❓
-                  <span class="wt-popover">Número de top traders de HL (por PnL) a monitorear. <span style="color:#00d4ff">30–50 es un buen balance.</span></span>
-                </span>
-              </label>
-              <input type="number" class="wt-input" id="whale-top-n" min="5" max="100" step="5" value="30" />
-            </div>
-
-            <div class="wt-field">
-              <label class="wt-label">
-                Min Notional (USD)
-                <span class="wt-info" tabindex="0">❓
-                  <span class="wt-popover">Solo emite señales para posiciones superiores a este valor. <span style="color:#00d4ff">$50K–$100K filtra traders pequeños.</span></span>
-                </span>
-              </label>
-              <input type="number" class="wt-input" id="whale-min-notional" min="10000" max="10000000" step="10000" value="100000" />
-            </div>
-
-            <div class="wt-field">
-              <label class="wt-label">Poll Interval (seg)</label>
-              <input type="number" class="wt-input" id="whale-poll-interval" min="10" max="300" step="5" value="30" />
-            </div>
-
-            <div class="wt-field">
-              <label class="wt-label">
-                Watch Assets
-                <span class="wt-info" tabindex="0">❓
-                  <span class="wt-popover">Lista separada por comas, ej. <strong>BTC,ETH</strong>. Vacío = todos los activos.</span>
-                </span>
-              </label>
-              <input type="text" class="wt-input" id="whale-watch-assets" placeholder="BTC,ETH (vacío = todos)" />
-            </div>
-
-          </div>
-
-          <div class="wt-field" style="margin-top:10px">
+          <div class="wt-field">
             <label class="wt-label">
-              Addresses Personalizadas (opcional)
+              Token ID del mercado
               <span class="wt-info" tabindex="0">❓
-                <span class="wt-popover">Addresses 0x separadas por comas, adicionales al leaderboard. Útil para wallets whale conocidas.</span>
+                <span class="wt-popover">El <strong>clobTokenId</strong> del outcome que quieres comprar (YES o NO). Lo encuentras en la API Gamma de Polymarket o en la URL del mercado. <span style="color:#00d4ff">Ej: 551150784210…</span></span>
               </span>
             </label>
-            <input type="text" class="wt-input" id="whale-custom-addresses" placeholder="0xABC..., 0xDEF... (opcional)" />
+            <input type="text" class="wt-input" id="poly-token-id" placeholder="551150784210628855…" />
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+
+            <div class="wt-field">
+              <label class="wt-label">
+                Tamaño (USDC)
+                <span class="wt-info" tabindex="0">❓
+                  <span class="wt-popover">Cuántos USDC gastar en la entrada. Es tu exposición máxima.</span>
+                </span>
+              </label>
+              <input type="number" class="wt-input" id="poly-size-usd" min="1" step="1" value="10" />
+            </div>
+
+            <div class="wt-field">
+              <label class="wt-label">
+                Precio de entrada (opcional)
+                <span class="wt-info" tabindex="0">❓
+                  <span class="wt-popover">Vacío = orden de mercado inmediata. Con valor = orden límite GTC que espera el fill.</span>
+                </span>
+              </label>
+              <input type="number" class="wt-input" id="poly-entry-price" min="0.01" max="0.99" step="0.01" placeholder="vacío = mercado" />
+            </div>
+
+            <div class="wt-field">
+              <label class="wt-label">
+                Take-profit
+                <span class="wt-info" tabindex="0">❓
+                  <span class="wt-popover">Precio al que el bot vende todo con ganancia. <span style="color:#34d399">Ej: compra a $0.80 → TP $0.88</span></span>
+                </span>
+              </label>
+              <input type="number" class="wt-input" id="poly-tp-price" min="0.01" max="0.99" step="0.01" value="0.88" />
+            </div>
+
+            <div class="wt-field">
+              <label class="wt-label">
+                Stop-loss
+                <span class="wt-info" tabindex="0">❓
+                  <span class="wt-popover">Precio al que el bot vende todo para cortar pérdidas (stop sintético: vigila el precio y vende al cruzar el nivel). <span style="color:#f87171">Ej: compra a $0.80 → SL $0.68</span></span>
+                </span>
+              </label>
+              <input type="number" class="wt-input" id="poly-sl-price" min="0.01" max="0.99" step="0.01" value="0.68" />
+            </div>
+
+          </div>
+
+          <div id="poly-live-keys" style="display:none;margin-top:10px">
+            <div class="wt-field">
+              <label class="wt-label">Polygon funder address</label>
+              <input type="text" class="wt-input" id="poly-funder" placeholder="0x…" />
+            </div>
+            <div class="wt-field" style="margin-top:10px">
+              <label class="wt-label">
+                Polygon private key
+                <span class="wt-info" tabindex="0">❓
+                  <span class="wt-popover wt-popover--left">Se guarda <strong>encriptada (AES-256)</strong> igual que las HL API keys. Solo firma órdenes en Polymarket.</span>
+                </span>
+              </label>
+              <input type="password" class="wt-input" id="poly-private-key" placeholder="0x…" autocomplete="off" />
+            </div>
           </div>
 
           <div style="display:flex;gap:16px;margin-top:12px;align-items:center;flex-wrap:wrap">
             <label class="wt-checkbox-label">
-              <input type="checkbox" id="whale-use-ws" />
-              <span>
-                Modo WebSocket
-                <span class="wt-info" tabindex="0">❓
-                  <span class="wt-popover wt-popover--left"><strong>WebSocket</strong>: ~100–500ms latencia por fill. Ideal para copy-trading.<br><br><strong>Poll mode</strong>: snapshots cada N segundos. Más simple.</span>
-                </span>
-              </span>
-            </label>
-            <label class="wt-checkbox-label">
-              <input type="checkbox" id="whale-paper-trade" checked />
-              <span style="color:#f59e0b">📋 Solo lectura / Paper mode</span>
+              <input type="checkbox" id="poly-paper-trade" checked onchange="toggleLiveKeys()" />
+              <span style="color:#f59e0b">📋 Paper mode (sin órdenes reales)</span>
             </label>
           </div>
 
-          <button class="btn wt-launch-btn" id="whale-launch-btn" onclick="launchWhaleBot()">
-            🐋&nbsp; Launch Whale Tracker
+          <button class="btn wt-launch-btn" id="poly-launch-btn" onclick="launchPolyBot()">
+            🎯&nbsp; Launch Polymarket Bot
           </button>
-          <p id="whale-launch-error" class="wt-error-msg"></p>
+          <p id="poly-launch-error" class="wt-error-msg"></p>
         </div>
       </section>
 
     </div>
   </main>
 
-  <!-- ============================================================
-       FOOTER
-  ============================================================ -->
+  <!-- FOOTER -->
   <hr class="divider" />
   <footer>
     <div class="footer">
       <img src="../assets/vizniago-logo.jpeg" alt="VIZNIAGO" class="footer-logo" />
-      <span class="footer-text">Whale Tracker — VIZNIAGO © 2026</span>
+      <span class="footer-text">Polymarket TP/SL Bot — VIZNIAGO © 2026</span>
       <div class="footer-links">
         <a href="../dashboard/index.html" class="footer-link">LP Defensor</a>
-        <a href="../index.html" class="footer-link">Backtester</a>
+        <a href="../whale/index.html" class="footer-link">Whale Tracker</a>
       </div>
     </div>
   </footer>
 
-  <!-- ============================================================
-       SCRIPTS
-  ============================================================ -->
+  <!-- SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
-  <script src="whale.js"></script>
+  <script src="polymarket.js"></script>
   <script src="../chat-widget.js"></script>
   <script>
     function toggleMobileNav() {

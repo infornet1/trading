@@ -4,7 +4,7 @@ SQLAlchemy ORM models — mirrors the MariaDB schema in SAAS_PLAN.md.
 
 from datetime import datetime, timezone
 from sqlalchemy import (
-    BigInteger, Boolean, Column, DateTime, Numeric,
+    BigInteger, Boolean, Column, DateTime, Float, Numeric,
     Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -52,7 +52,7 @@ class BotConfig(Base):
     hedge_exchange  = Column(String(20), default="hyperliquid")
     hl_api_key      = Column(Text, nullable=True)         # AES-256 encrypted
     hl_wallet_addr  = Column(String(42), nullable=True)
-    mode            = Column(Enum("aragan", "avaro", "fury", "whale"), default="aragan")
+    mode            = Column(Enum("aragan", "avaro", "fury", "whale", "polymarket"), default="aragan")
     leverage        = Column(Integer, default=10)
     sl_pct          = Column(Numeric(5, 3), default=0.100)    # % above entry → close short
     tp_pct          = Column(Numeric(5, 3), nullable=True)    # optional fixed TP %
@@ -73,6 +73,13 @@ class BotConfig(Base):
     whale_watch_assets       = Column(String(100),  nullable=True)  # comma-separated, e.g. "BTC,ETH"
     whale_use_websocket      = Column(Boolean,      nullable=True, default=False)
     whale_oi_spike_threshold = Column(Numeric(5, 3), nullable=True, default=0.030)
+    # POLYMARKET-specific config (nullable — only used when mode='polymarket')
+    polymarket_token_id    = Column(String(80), nullable=True)  # CLOB outcome token ID
+    polymarket_side        = Column(String(8),  nullable=True, default="buy")
+    polymarket_size_usd    = Column(Float,      nullable=True)  # USDC to spend on entry
+    polymarket_entry_price = Column(Float,      nullable=True)  # null → market entry
+    polymarket_tp_price    = Column(Float,      nullable=True)  # take-profit (0-1)
+    polymarket_sl_price    = Column(Float,      nullable=True)  # stop-loss (0-1)
     paper_trade     = Column(Boolean, default=False)          # simulate trades, no real orders
     engine_v2       = Column(Boolean, default=False)          # True → launch live_hedge_bot_v2.py
     from_above_dist_pct = Column(Numeric(5, 2), default=5.00) # M2-47: max % below upper_bound for from_above entry
@@ -106,6 +113,8 @@ class BotEvent(Base):
             # WHALE events
             "whale_new_position", "whale_closed", "whale_size_increase",
             "whale_size_decrease", "whale_flip", "whale_snapshot", "whale_event",
+            # POLYMARKET events
+            "poly_entry", "poly_tp", "poly_sl",
         ),
         nullable=False,
     )

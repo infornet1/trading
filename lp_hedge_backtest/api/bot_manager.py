@@ -25,6 +25,7 @@ BOT_SCRIPT       = os.path.join(_BASE, "live_hedge_bot.py")
 BOT_V2_SCRIPT    = os.path.join(_BASE, "live_hedge_bot_v2.py")
 FURY_BOT_SCRIPT  = os.path.join(_BASE, "live_fury_bot.py")
 WHALE_BOT_SCRIPT = os.path.join(_BASE, "live_whale_bot.py")
+POLY_BOT_SCRIPT  = os.path.join(_BASE, "live_polymarket_bot.py")
 VENV_PYTHON      = os.path.join(_BASE, "venv", "bin", "python3")
 
 # Map event label from bot stdout → DB enum value
@@ -57,6 +58,10 @@ _EVENT_MAP = {
     "whale_flip":           "whale_flip",
     "whale_snapshot":       "whale_snapshot",
     "whale_event":          "whale_event",
+    # POLYMARKET events
+    "poly_entry":           "poly_entry",
+    "poly_tp":              "poly_tp",
+    "poly_sl":              "poly_sl",
 }
 
 
@@ -138,6 +143,20 @@ class BotManager:
             env["WATCH_ASSETS"]        = str(config.get("whale_watch_assets",    ""))
             env["USE_WEBSOCKET"]       = "1" if config.get("whale_use_websocket") else "0"
             env["OI_SPIKE_THRESHOLD"]  = str(config.get("whale_oi_spike_threshold", "0.03"))
+            if config.get("paper_trade"):
+                env["PAPER_TRADE"] = "1"
+        elif bot_mode == "polymarket":
+            script = POLY_BOT_SCRIPT
+            # hl_api_key column holds the Polygon private key (encrypted);
+            # hl_wallet_addr holds the Polygon funder address
+            env["POLYMARKET_PRIVATE_KEY"] = config["hl_api_key"]     or ""
+            env["POLYMARKET_FUNDER"]      = config["hl_wallet_addr"] or ""
+            env["POLYMARKET_TOKEN_ID"]    = str(config.get("polymarket_token_id", ""))
+            env["POLYMARKET_SIZE_USD"]    = str(config.get("polymarket_size_usd", "0"))
+            env["POLYMARKET_TP_PRICE"]    = str(config.get("polymarket_tp_price", "0"))
+            env["POLYMARKET_SL_PRICE"]    = str(config.get("polymarket_sl_price", "0"))
+            if config.get("polymarket_entry_price"):
+                env["POLYMARKET_ENTRY_PRICE"] = str(config["polymarket_entry_price"])
             if config.get("paper_trade"):
                 env["PAPER_TRADE"] = "1"
         else:
@@ -308,9 +327,11 @@ class BotManager:
         details = details or {}
         now = datetime.now(timezone.utc)
 
-        OPEN_EVENTS = {"hedge_opened", "fury_entry", "whale_new_position", "orphan_recovered"}
+        OPEN_EVENTS = {"hedge_opened", "fury_entry", "whale_new_position", "orphan_recovered",
+                       "poly_entry"}
         CLOSE_EVENTS = {"tp_hit", "sl_hit", "trailing_stop", "stopped",
-                        "fury_sl", "fury_tp", "whale_closed"}
+                        "fury_sl", "fury_tp", "whale_closed",
+                        "poly_tp", "poly_sl"}
 
         async with AsyncSessionLocal() as db:
             # Resolve config metadata once per event.

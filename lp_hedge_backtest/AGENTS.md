@@ -28,7 +28,7 @@ The `.claude/settings.local.json` file that was previously in this repository ha
 | Component | Location |
 |---|---|
 | Backtesting engine | `src/` |
-| Live trading bots | `live_hedge_bot*.py`, `live_fury_bot.py`, `live_whale_bot.py` |
+| Live trading bots | `live_hedge_bot*.py`, `live_fury_bot.py`, `live_whale_bot.py`, `live_polymarket_bot.py` |
 | FastAPI SaaS backend | `api/` |
 | Static frontend | `landing/` |
 | Telegram signal listener | `telegram_listener/` |
@@ -216,6 +216,23 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 ### Operations (2026-08-02)
 - Diagnosed a silent Telegram listener outage (~3.5 days, since 2026-07-30 ~21:12 UTC): the process was alive but stuck on a half-open Telegram connection, so no signals were parsed and no Signal Lab emails were sent. The listener was restarted via the watchdog and verified healthy.
 - Hardened against recurrence: `telegram_listener/listener.py` now runs a `_heartbeat` task that pings Telegram (`functions.PingRequest`) and logs `HEARTBEAT ok` every 15 min, exiting with `os._exit(1)` if the ping fails; `telegram_listener/watchdog.sh` now kills any running listener whose log is stale for >30 min (`MAX_STALE_MIN`) and restarts it. Manual recovery procedure kept in "Common pitfalls" below as a fallback.
+
+### Polymarket TP/SL bot (2026-08-02)
+- New bot mode `polymarket`: buys a Polymarket outcome token (CLOB V2, Polygon) and auto-exits at a take-profit or synthetic stop-loss.
+- Bot script: `live_polymarket_bot.py` (env-var config, `[EVENT]` contract, `PAPER_TRADE=1`, crash-safe state in `bot_state/poly_state_{config_id}.json` — a respawned bot resumes monitoring instead of re-buying).
+- SDK: official `py-clob-client-v2` (CLOB V1 was archived 2026-04-28 — do not use `py-clob-client`).
+- The Polygon private key is stored in the existing `hl_api_key` column (Fernet-encrypted) and the funder address in `hl_wallet_addr`; the frontend uses synthetic `nft_token_id = 'poly-<timestamp>'`, `chain_id = 137`, `pair = 'POLY'`.
+- Schema: Alembic migration `b2c4d6e8f0a1` — `bot_configs.mode` enum + `polymarket_*` columns, `bot_events.event_type` + `poly_entry`/`poly_tp`/`poly_sl`.
+- Events flow through `api/bot_manager.py` (`_EVENT_MAP`, `OPEN_EVENTS`/`CLOSE_EVENTS`) into `bot_trades` and the profitability dashboard like other bots.
+- Feature flag: `POLYMARKET_BOT_ENABLED` in `api/config.py` / `api/.env`.
+- Frontend: `landing/polymarket/` (mirrors the whale page; nav links added to all product pages).
+- Tests: `tests/test_polymarket_bot.py` (event map, router validation, TP/SL helpers).
+- Setup / ops notes:
+  - No Polymarket API-key signup needed — the SDK derives API creds from the Polygon private key on first start.
+  - Paper mode needs no credentials. Live credentials are entered per-bot in the launch form (funder address + private key), not in any `.env`.
+  - Funder address = the address holding USDC on Polygon; for polymarket.com accounts this is the **Polymarket proxy wallet**, not the user's EOA.
+  - The funder wallet needs USDC on Polygon and a one-time **USDC allowance approval** to the Polymarket exchange contract (already done for any wallet that has traded on polymarket.com; the bot does not set approvals itself — a first-order failure on a fresh wallet is likely this).
+  - On Stop the bot leaves the position open and keeps its state file; Restart resumes monitoring. It never emits `stopped` (that would falsely close the open `bot_trades` row).
 
 ---
 

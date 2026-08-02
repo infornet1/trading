@@ -14,6 +14,11 @@ PERFORMANCE_DASHBOARD_ENABLED = (
     in ("1", "true", "yes")
 )
 
+POLYMARKET_BOT_ENABLED = (
+    os.getenv("POLYMARKET_BOT_ENABLED", "false").strip().lower()
+    in ("1", "true", "yes")
+)
+
 
 # ── Wallet snapshot cadence (seconds) ───────────────────────────────────────
 

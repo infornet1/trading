@@ -6,6 +6,7 @@ Users can only access their own bot configs.
 """
 
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -14,6 +15,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import get_current_address
+from api.config import POLYMARKET_BOT_ENABLED
 from api.crypto import decrypt, encrypt
 from api.database import get_db
 from api.models import BotConfig, BotEvent, User
@@ -55,6 +57,13 @@ class BotConfigCreate(BaseModel):
     whale_watch_assets:      Optional[str]   = None  # comma-separated, e.g. "BTC,ETH"
     whale_use_websocket:     Optional[bool]  = False
     whale_oi_spike_threshold: Optional[float] = 0.03
+    # POLYMARKET-specific fields (required when mode='polymarket', ignored otherwise)
+    polymarket_token_id:    Optional[str]   = None  # CLOB outcome token ID
+    polymarket_side:        Optional[str]   = "buy"
+    polymarket_size_usd:    Optional[float] = None  # USDC to spend on entry
+    polymarket_entry_price: Optional[float] = None  # null → market entry
+    polymarket_tp_price:    Optional[float] = None  # take-profit (0-1)
+    polymarket_sl_price:    Optional[float] = None  # stop-loss (0-1)
     paper_trade:         bool  = False
     from_above_dist_pct: float = 5.0    # M2-47
     use_funding_gate:    bool  = False   # M2-44: Phase 2 — gate entry on adverse funding
@@ -63,8 +72,8 @@ class BotConfigCreate(BaseModel):
     @field_validator("mode")
     @classmethod
     def validate_mode(cls, v: str) -> str:
-        if v not in ("aragan", "avaro", "fury", "whale"):
-            raise ValueError("mode must be 'aragan', 'avaro', 'fury', or 'whale'")
+        if v not in ("aragan", "avaro", "fury", "whale", "polymarket"):
+            raise ValueError("mode must be 'aragan', 'avaro', 'fury', 'whale', or 'polymarket'")
         return v
 
     @field_validator("pair")
@@ -102,6 +111,13 @@ class BotConfigUpdate(BaseModel):
     whale_watch_assets:      Optional[str]   = None
     whale_use_websocket:     Optional[bool]  = None
     whale_oi_spike_threshold: Optional[float] = None
+    # POLYMARKET-specific fields
+    polymarket_token_id:    Optional[str]   = None
+    polymarket_side:        Optional[str]   = None
+    polymarket_size_usd:    Optional[float] = None
+    polymarket_entry_price: Optional[float] = None
+    polymarket_tp_price:    Optional[float] = None
+    polymarket_sl_price:    Optional[float] = None
     paper_trade:         Optional[bool]  = None
     from_above_dist_pct: Optional[float] = None  # M2-47
     use_funding_gate:    Optional[bool]  = None   # M2-44
@@ -110,8 +126,8 @@ class BotConfigUpdate(BaseModel):
     @field_validator("mode")
     @classmethod
     def validate_mode(cls, v):
-        if v is not None and v not in ("aragan", "avaro", "fury", "whale"):
-            raise ValueError("mode must be 'aragan', 'avaro', 'fury', or 'whale'")
+        if v is not None and v not in ("aragan", "avaro", "fury", "whale", "polymarket"):
+            raise ValueError("mode must be 'aragan', 'avaro', 'fury', 'whale', or 'polymarket'")
         return v
 
 
@@ -145,6 +161,12 @@ class BotConfigOut(BaseModel):
     whale_watch_assets:      Optional[str]
     whale_use_websocket:     Optional[bool]
     whale_oi_spike_threshold: Optional[float]
+    polymarket_token_id:    Optional[str]
+    polymarket_side:        Optional[str]
+    polymarket_size_usd:    Optional[float]
+    polymarket_entry_price: Optional[float]
+    polymarket_tp_price:    Optional[float]
+    polymarket_sl_price:    Optional[float]
     paper_trade:         bool
     from_above_dist_pct: float
     use_funding_gate:    bool
@@ -200,6 +222,27 @@ def _enforce_golden_rules(pair: str, mode: str, fury_symbol: Optional[str] = Non
         )
 
 
+def _enforce_polymarket_rules(body):
+    """Validate polymarket-mode config (feature-flagged product)."""
+    if getattr(body, "mode", None) != "polymarket":
+        return
+    if not POLYMARKET_BOT_ENABLED:
+        raise HTTPException(status_code=403, detail="Polymarket bots are not enabled")
+    if not body.polymarket_token_id:
+        raise HTTPException(status_code=400, detail="polymarket_token_id is required when mode is 'polymarket'")
+    if not body.polymarket_size_usd or body.polymarket_size_usd <= 0:
+        raise HTTPException(status_code=400, detail="polymarket_size_usd must be > 0")
+    tp, sl = body.polymarket_tp_price, body.polymarket_sl_price
+    if tp is None or not (0 < tp < 1):
+        raise HTTPException(status_code=400, detail="polymarket_tp_price must be between 0 and 1")
+    if sl is None or not (0 < sl < 1):
+        raise HTTPException(status_code=400, detail="polymarket_sl_price must be between 0 and 1")
+    if tp <= sl:
+        raise HTTPException(status_code=400, detail="polymarket_tp_price must be greater than polymarket_sl_price")
+    if body.polymarket_entry_price is not None and not (0 < body.polymarket_entry_price < 1):
+        raise HTTPException(status_code=400, detail="polymarket_entry_price must be between 0 and 1")
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
 @router.get("", response_model=list[BotConfigOut])
@@ -220,6 +263,7 @@ async def create_bot(
     db: AsyncSession = Depends(get_db),
 ):
     _enforce_golden_rules(body.pair, body.mode, body.fury_symbol)
+    _enforce_polymarket_rules(body)
 
     # Duplicate-hedge guard: reject if any active bot_config already watches this NFT
     existing = await db.execute(
@@ -272,6 +316,12 @@ async def create_bot(
         whale_watch_assets       = body.whale_watch_assets,
         whale_use_websocket      = body.whale_use_websocket,
         whale_oi_spike_threshold = body.whale_oi_spike_threshold,
+        polymarket_token_id    = body.polymarket_token_id,
+        polymarket_side        = body.polymarket_side,
+        polymarket_size_usd    = body.polymarket_size_usd,
+        polymarket_entry_price = body.polymarket_entry_price,
+        polymarket_tp_price    = body.polymarket_tp_price,
+        polymarket_sl_price    = body.polymarket_sl_price,
         paper_trade       = body.paper_trade,
         from_above_dist_pct = max(0.0, min(body.from_above_dist_pct, 50.0)),
         use_funding_gate    = body.use_funding_gate,
@@ -322,6 +372,20 @@ async def update_bot(
     if body.whale_watch_assets       is not None: cfg.whale_watch_assets       = body.whale_watch_assets
     if body.whale_use_websocket      is not None: cfg.whale_use_websocket      = body.whale_use_websocket
     if body.whale_oi_spike_threshold is not None: cfg.whale_oi_spike_threshold = body.whale_oi_spike_threshold
+    if body.polymarket_token_id    is not None: cfg.polymarket_token_id    = body.polymarket_token_id
+    if body.polymarket_side        is not None: cfg.polymarket_side        = body.polymarket_side
+    if body.polymarket_size_usd    is not None: cfg.polymarket_size_usd    = body.polymarket_size_usd
+    if body.polymarket_entry_price is not None: cfg.polymarket_entry_price = body.polymarket_entry_price
+    if body.polymarket_tp_price    is not None: cfg.polymarket_tp_price    = body.polymarket_tp_price
+    if body.polymarket_sl_price    is not None: cfg.polymarket_sl_price    = body.polymarket_sl_price
+    _enforce_polymarket_rules(SimpleNamespace(
+        mode=cfg.mode,
+        polymarket_token_id=cfg.polymarket_token_id,
+        polymarket_size_usd=cfg.polymarket_size_usd,
+        polymarket_entry_price=cfg.polymarket_entry_price,
+        polymarket_tp_price=cfg.polymarket_tp_price,
+        polymarket_sl_price=cfg.polymarket_sl_price,
+    ))
     if body.paper_trade       is not None: cfg.paper_trade       = body.paper_trade
     if body.from_above_dist_pct is not None: cfg.from_above_dist_pct = max(0.0, min(body.from_above_dist_pct, 50.0))
     if body.use_funding_gate    is not None: cfg.use_funding_gate    = body.use_funding_gate
@@ -643,6 +707,8 @@ async def start_bot(
     is_paper = bool(cfg.paper_trade)
     # Whale mode uses read-only HL Info API — no keys required
     if cfg.mode != "whale" and not is_paper and (not cfg.hl_api_key or not cfg.hl_wallet_addr):
+        if cfg.mode == "polymarket":
+            raise HTTPException(status_code=400, detail="Polygon private key and funder address are required (or enable paper_trade mode)")
         raise HTTPException(status_code=400, detail="HL API key and wallet address are required (or enable paper_trade mode)")
 
     from api.bot_manager import manager
@@ -677,6 +743,12 @@ async def start_bot(
         "whale_poll_interval":    str(cfg.whale_poll_interval    or 30),
         "whale_custom_addresses": cfg.whale_custom_addresses     or "",
         "whale_watch_assets":     cfg.whale_watch_assets         or "",
+        # POLYMARKET config (only used when mode='polymarket')
+        "polymarket_token_id":    cfg.polymarket_token_id    or "",
+        "polymarket_size_usd":    str(cfg.polymarket_size_usd or 0),
+        "polymarket_entry_price": str(cfg.polymarket_entry_price) if cfg.polymarket_entry_price else "",
+        "polymarket_tp_price":    str(cfg.polymarket_tp_price or 0),
+        "polymarket_sl_price":    str(cfg.polymarket_sl_price or 0),
         "paper_trade":       is_paper,
         "engine_v2":         bool(cfg.engine_v2),
         "from_above_dist_pct": str(cfg.from_above_dist_pct or 5.0),
