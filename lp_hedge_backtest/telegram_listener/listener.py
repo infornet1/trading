@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
+from telethon.tl import functions
 from telethon.tl.types import PeerChannel
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
@@ -752,6 +753,31 @@ async def _breakeven_monitor():
         await asyncio.sleep(60)
 
 
+async def _heartbeat(client):
+    """Background loop: ping Telegram every 15 minutes and log the result.
+
+    Guarantees regular writes to listener.log so the watchdog can detect a
+    hung listener via log freshness. The ping forces a real network round
+    trip — a half-open socket (see 2026-08-02 incident) fails it, and we
+    exit so the watchdog restarts the process.
+    """
+    await asyncio.sleep(60)  # stagger from startup
+    while True:
+        try:
+            await asyncio.wait_for(
+                client(functions.PingRequest(ping_id=int(time.time()))),
+                timeout=60,
+            )
+            print(f"[{datetime.now(timezone.utc):%H:%M:%S}] HEARTBEAT ok", flush=True)
+        except Exception as e:
+            print(
+                f"[HEARTBEAT] ❌ Telegram connection dead ({e}) — exiting for watchdog restart",
+                flush=True,
+            )
+            os._exit(1)
+        await asyncio.sleep(900)
+
+
 # ── Startup orphan reconciliation ────────────────────────────────────────────
 
 def _fetch_orphan_report(hl_wallet_addr: str) -> list[dict]:
@@ -986,6 +1012,7 @@ async def main():
                     asyncio.create_task(_auto_close_signal(info, update))
 
         asyncio.create_task(_breakeven_monitor())
+        asyncio.create_task(_heartbeat(client))
         print("[Signal Lab Listener] Ready. Waiting for messages...", flush=True)
         await client.run_until_disconnected()
 

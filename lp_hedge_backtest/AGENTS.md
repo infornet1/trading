@@ -214,7 +214,8 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 - `api/.env.email` permissions hardened to `root:webdev 640`.
 
 ### Operations (2026-08-02)
-- Diagnosed a silent Telegram listener outage (~3.5 days, since 2026-07-30 ~21:12 UTC): the process was alive but stuck on a half-open Telegram connection, so no signals were parsed and no Signal Lab emails were sent. Root cause and manual recovery procedure documented in "Common pitfalls" below. The listener was restarted via the watchdog (kill stale PID → cron restarts within a minute) and verified healthy.
+- Diagnosed a silent Telegram listener outage (~3.5 days, since 2026-07-30 ~21:12 UTC): the process was alive but stuck on a half-open Telegram connection, so no signals were parsed and no Signal Lab emails were sent. The listener was restarted via the watchdog and verified healthy.
+- Hardened against recurrence: `telegram_listener/listener.py` now runs a `_heartbeat` task that pings Telegram (`functions.PingRequest`) and logs `HEARTBEAT ok` every 15 min, exiting with `os._exit(1)` if the ping fails; `telegram_listener/watchdog.sh` now kills any running listener whose log is stale for >30 min (`MAX_STALE_MIN`) and restarts it. Manual recovery procedure kept in "Common pitfalls" below as a fallback.
 
 ---
 
@@ -229,7 +230,7 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
 - **Avoid `datetime.utcnow()`** — it is deprecated in Python 3.14. Use `datetime.now(timezone.utc).replace(tzinfo=None)` where the DB stores naive UTC timestamps.
 - **Telegram listener watchdog** (`telegram_listener/watchdog.sh`) sources `api/.env` so crash-alert emails can decrypt the SMTP config. If you edit `api/.env`, the running listener still needs a watchdog restart to pick up new secrets.
 - **Hyperliquid 502s** are retried automatically (`_place_with_retry` in the listener) with exponential backoff (2s / 4s / 8s). They are usually transient; escalate only if they become frequent or persist beyond a few minutes.
-- **Telegram listener can hang silently on a stale connection.** The watchdog (`telegram_listener/watchdog.sh`) only checks process liveness, so a dead-but-half-open Telegram connection (`Server closed the connection: 0 bytes read...` in `logs/listener.log`) leaves the process alive but receiving nothing — no signals, no emails. Symptoms: log mtime stops advancing while `pgrep -f telegram_listener.listener` still returns a PID. Fix: `kill <pid>` and let the watchdog cron restart it within a minute (it sends a crash-alert email). Verify recovery: fresh `Ready. Waiting for messages...` line plus an ESTABLISHED socket to `149.154.*` (`ss -tnp | grep <new_pid>`). This happened on 2026-08-02 after ~3.5 days of silence; signals posted during the outage are missed and must be recovered manually from channel history. A log-freshness check in the watchdog is a known TODO.
+- **Telegram listener stale-connection hang (auto-mitigated since 2026-08-02).** A dead-but-half-open Telegram connection (`Server closed the connection: 0 bytes read...` in `logs/listener.log`) can leave the process alive but receiving nothing. The listener now pings Telegram and logs `HEARTBEAT ok` every 15 min, and exits if the ping fails; the watchdog kills and restarts it if the log is stale >30 min. Manual fallback if that ever fails: `kill <pid>` and let the watchdog cron restart it within a minute. Verify recovery: fresh `Ready. Waiting for messages...` + `HEARTBEAT ok` lines plus an ESTABLISHED socket to `149.154.*` (`ss -tnp | grep <new_pid>`). Signals posted during any outage are missed and must be recovered manually from channel history.
 
 ---
 

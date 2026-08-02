@@ -1,11 +1,15 @@
 #!/bin/bash
 # LP Signal Lab — Listener Watchdog
 # Cron runs this every minute. Starts listener if not running.
+# Also restarts a running listener whose log has gone stale — the listener
+# writes a HEARTBEAT line every 15 min, so an old log means it is hung
+# (e.g. half-open Telegram connection, see 2026-08-02 incident).
 
 PROJECT=/var/www/dev/trading/lp_hedge_backtest
 LOG=$PROJECT/telegram_listener/logs/listener.log
 PIDFILE=$PROJECT/telegram_listener/logs/listener.pid
 PAUSE_FLAG=$PROJECT/telegram_listener/logs/.pause
+MAX_STALE_MIN=30   # > 1 heartbeat interval (15 min), < 2 missed heartbeats
 
 # Honour maintenance pause (touch .pause to suppress auto-restart)
 if [ -f "$PAUSE_FLAG" ]; then
@@ -16,7 +20,15 @@ fi
 if [ -f "$PIDFILE" ]; then
     PID=$(cat "$PIDFILE")
     if kill -0 "$PID" 2>/dev/null; then
-        exit 0   # already running, nothing to do
+        # Process alive — verify it is healthy via log freshness
+        if [ -f "$LOG" ] && [ -n "$(find "$LOG" -mmin +$MAX_STALE_MIN 2>/dev/null)" ]; then
+            echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Listener PID=$PID alive but log stale >${MAX_STALE_MIN}m (hung connection?) — killing for restart..." >> "$LOG"
+            kill "$PID" 2>/dev/null
+            sleep 5
+            kill -9 "$PID" 2>/dev/null
+        else
+            exit 0   # running and healthy, nothing to do
+        fi
     fi
     rm -f "$PIDFILE"
 fi
