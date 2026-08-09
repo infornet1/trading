@@ -16,6 +16,7 @@ import re
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 # Allow importing api.* from project root and signal_parser from telegram_listener/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -495,6 +496,37 @@ def _close_hl_position(wallet_addr: str, secret_key_encrypted: str,
         return {"success": False, "error": str(e)}
 
 
+#: HL taker fee, both sides of the round trip (0.045% × 2).
+_HL_ROUND_TRIP_FEE_PCT = 0.0009
+
+
+def _close_pnl_usd(execution, close_price: float, is_long: bool, leverage):
+    """
+    Realized P&L for a closed execution, as (realized_pnl_usd, fees_usd).
+
+    realized_pnl_usd is GROSS (price return only) and fees_usd is separate —
+    the same convention as api/signal_reconciler.py, because performance.py
+    subtracts fees itself and would double-count them otherwise.
+
+    Returns (None, None) when the inputs needed are missing (e.g. executions
+    predating exec_size_usdt), matching the reconciler's behaviour.
+    """
+    try:
+        entry = float(execution.fill_price) if execution.fill_price else None
+        size  = float(execution.exec_size_usdt) if execution.exec_size_usdt else None
+        if not (entry and size and close_price):
+            return None, None
+        lev = float(execution.exec_leverage or leverage or 1)
+        raw_pnl_pct = ((close_price - entry) / entry) if is_long else ((entry - close_price) / entry)
+        return (
+            Decimal(str(size * raw_pnl_pct * lev)),
+            Decimal(str(size * _HL_ROUND_TRIP_FEE_PCT * lev)),
+        )
+    except (TypeError, ValueError, ArithmeticError) as e:
+        print(f"[Auto-Close] ⚠️ P&L calc skipped for exec {execution.id}: {e}", flush=True)
+        return None, None
+
+
 async def _auto_close_signal(signal_info: dict, update_status: str):
     """
     Fire market closes on HL for all filled executions of a signal,
@@ -516,6 +548,9 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
             )
         )
         rows = res.all()
+        leverage = await db.scalar(
+            select(SignalEvent.leverage).where(SignalEvent.id == signal_id)
+        )
 
     if not rows:
         print(f"[Auto-Close] Signal {signal_id}: no filled executions to close.", flush=True)
@@ -547,12 +582,24 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
                 f"[Auto-Close] ✅ {pair} closed @ ${result['fill_price']} | size {result['size']}",
                 flush=True,
             )
-            # Record close price on the execution for real P&L tracking
+            # Record close price + the profitability-dashboard columns. Writing
+            # close_price alone left every channel-driven close invisible to
+            # /performance/* (12 executions between 2026-07-16 and 2026-08-03),
+            # because only api/signal_reconciler.py ever filled these in.
+            realized_pnl_usd, fees_usd = _close_pnl_usd(
+                execution, result["fill_price"], is_long, leverage
+            )
             async with AsyncSession_() as db:
                 await db.execute(
                     sql_update(SignalExecution)
                     .where(SignalExecution.id == execution.id)
-                    .values(close_price=result["fill_price"])
+                    .values(
+                        close_price=result["fill_price"],
+                        realized_pnl_usd=realized_pnl_usd,
+                        fees_usd=fees_usd,
+                        closed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        exit_reason=label,
+                    )
                 )
                 await db.commit()
             if label in ("manual_close", "target_hit") and execution.fill_price and result["fill_price"]:
@@ -603,34 +650,53 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
 
 # ── Breakeven monitor ────────────────────────────────────────────────────────
 
-def _get_open_order_ids(wallet_addr: str, symbol: str) -> set:
-    """Synchronous: return set of open order IDs for a symbol on HL."""
+# Breakeven retry tracking (in-memory): execution_id → consecutive failures.
+# Bounded so a persistent HL error cannot email every 60s, while a transient
+# one is still retried instead of being silently abandoned after one attempt.
+_BREAKEVEN_ATTEMPTS: dict = {}
+_BREAKEVEN_MAX_ATTEMPTS = 3
+
+
+def _tp1_order_status(wallet_addr: str, tp1_oid: str) -> str | None:
+    """
+    Synchronous: authoritative status of the TP1 order straight from HL
+    ('filled', 'open', 'canceled', …), or None if it could not be determined.
+
+    Never infer a fill from an order's absence in `open_orders`. That endpoint
+    can fail, and a bare `except` returning an empty set is exactly what made
+    this monitor read "TP1 missing" as "TP1 filled" during an HL 502 on
+    2026-08-09 and cancel the real stop-losses on four live positions.
+    None means "unknown" — callers must not act on it.
+    """
     try:
-        info   = _hl_info()  # L5: shared client
-        orders = info.open_orders(wallet_addr)
-        return {str(o["oid"]) for o in orders if o.get("coin") == symbol}
-    except Exception:
-        return set()
+        info = _hl_info()  # L5: shared client
+        res  = info.query_order_by_oid(wallet_addr, int(tp1_oid))
+        if not res or res.get("status") != "order":
+            return None          # unknownOid / malformed — unknown, not "filled"
+        return (res.get("order") or {}).get("status")
+    except Exception as e:
+        print(f"[Breakeven] ⚠️ TP1 status query failed (oid {tp1_oid}): {e}", flush=True)
+        return None
 
 
 def _move_sl_to_breakeven(wallet_addr: str, secret_key_encrypted: str,
                            symbol: str, is_long: bool, entry_px: float,
                            old_sl_oid: str) -> dict:
     """
-    Synchronous: cancel the original SL order and place a new one at entry price.
+    Synchronous: place a new SL at entry price, then retire the original one.
     Queries HL for current remaining position size.
+
+    Order matters: the breakeven stop goes on the book BEFORE the old stop is
+    cancelled. Cancelling first left the position completely unprotected
+    whenever the follow-up placement errored (2026-08-09). Multiple reduce-only
+    stops are safe — the tighter one triggers first and the other becomes a
+    no-op once the position is flat.
     """
     try:
         secret_key = decrypt(secret_key_encrypted)
         account    = Account.from_key(secret_key)
         info       = _hl_info()  # L5: shared client
         exchange   = Exchange(account, hlc.MAINNET_API_URL, account_address=wallet_addr)
-
-        # Cancel original SL (best-effort — may already be gone)
-        try:
-            exchange.cancel(symbol, int(old_sl_oid))
-        except Exception:
-            pass
 
         # Get current remaining position size from HL
         state          = info.user_state(wallet_addr)
@@ -642,24 +708,54 @@ def _move_sl_to_breakeven(wallet_addr: str, secret_key_encrypted: str,
                 break
 
         if remaining_size == 0:
-            return {"success": False, "error": "No remaining position to protect"}
+            return {"success": False, "permanent": True,
+                    "error": "No remaining position to protect"}
 
         close_is_buy = not is_long
         breakeven_px = round(entry_px, 6)
-        exchange.order(
+        res = exchange.order(
             symbol, close_is_buy, remaining_size, breakeven_px,
             {"trigger": {"triggerPx": breakeven_px, "isMarket": True, "tpsl": "sl"}},
             reduce_only=True,
         )
-        return {"success": True, "breakeven_px": breakeven_px, "size": remaining_size}
+        if not res or res.get("status") != "ok":
+            return {"success": False, "error": f"Breakeven SL placement failed: {res}"}
+
+        statuses = ((res.get("response") or {}).get("data") or {}).get("statuses") or []
+        errors   = [s["error"] for s in statuses if isinstance(s, dict) and s.get("error")]
+        if errors:
+            return {"success": False, "error": f"Breakeven SL rejected: {'; '.join(errors)}"}
+
+        new_sl_oid = None
+        for st in statuses:
+            if not isinstance(st, dict):
+                continue
+            slot = st.get("resting") or st.get("filled") or {}
+            if slot.get("oid"):
+                new_sl_oid = str(slot["oid"])
+                break
+
+        # Breakeven stop is live — now retire the original. Best-effort: if this
+        # fails the position is over-protected, never under-protected.
+        try:
+            exchange.cancel(symbol, int(old_sl_oid))
+        except Exception as e:
+            print(
+                f"[Breakeven] ⚠️ {symbol}: breakeven SL placed but original SL "
+                f"{old_sl_oid} could not be cancelled: {e}",
+                flush=True,
+            )
+
+        return {"success": True, "breakeven_px": breakeven_px,
+                "size": remaining_size, "new_sl_oid": new_sl_oid}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 
 async def _check_breakeven_moves():
     """
-    Check all open split-TP executions: if TP1 is no longer in open orders,
-    it has filled — cancel the original SL and place a new one at entry (breakeven).
+    Check all open split-TP executions: if HL confirms TP1 actually filled,
+    place a new SL at entry (breakeven) and retire the original one.
     """
     async with AsyncSession_() as db:
         res = await db.execute(
@@ -678,13 +774,36 @@ async def _check_breakeven_moves():
         rows = res.all()
 
     for execution, signal, wallet in rows:
-        symbol    = signal.pair.split("/")[0].upper()
-        open_oids = await asyncio.to_thread(_get_open_order_ids, wallet.hl_wallet_addr, symbol)
+        symbol = signal.pair.split("/")[0].upper()
 
-        if str(execution.tp1_order_id) in open_oids:
-            continue  # TP1 still pending — nothing to do
+        # Only a confirmed fill justifies touching a live stop-loss. 'open' means
+        # still pending, 'canceled' means gone without filling, None means HL did
+        # not answer — all three must leave the SL exactly where it is.
+        tp1_state = await asyncio.to_thread(
+            _tp1_order_status, wallet.hl_wallet_addr, execution.tp1_order_id
+        )
+        if tp1_state in (None, "open", "triggered"):
+            continue  # unknown or still pending — never act on either
 
-        # TP1 fired — move SL to entry (breakeven)
+        if tp1_state != "filled":
+            # TP1 is gone without filling (cancelled, rejected, …), so no TP1
+            # fill will ever arrive for this execution. Retire it so the monitor
+            # stops re-checking every 60s. No order is touched.
+            print(
+                f"[Breakeven] ℹ️ {signal.pair} (exec {execution.id}): TP1 "
+                f"{execution.tp1_order_id} is '{tp1_state}', not filled — SL untouched.",
+                flush=True,
+            )
+            async with AsyncSession_() as db:
+                await db.execute(
+                    sql_update(SignalExecution)
+                    .where(SignalExecution.id == execution.id)
+                    .values(breakeven_applied=True)
+                )
+                await db.commit()
+            continue
+
+        # TP1 confirmed filled — move SL to entry (breakeven)
         is_long  = signal.direction == "long"
         entry_px = float(execution.fill_price)
         print(
@@ -697,14 +816,31 @@ async def _check_breakeven_moves():
             symbol, is_long, entry_px, execution.sl_order_id,
         )
 
-        # Always mark breakeven_applied=True — prevents infinite retry loop on any outcome
-        async with AsyncSession_() as db:
-            await db.execute(
-                sql_update(SignalExecution)
-                .where(SignalExecution.id == execution.id)
-                .values(breakeven_applied=True)
-            )
-            await db.commit()
+        # Flag only on a settled outcome. Flagging unconditionally (the old
+        # behaviour) meant a single transient error permanently disabled
+        # breakeven protection for that execution.
+        settled = bool(result["success"]) or bool(result.get("permanent"))
+        if settled:
+            _BREAKEVEN_ATTEMPTS.pop(execution.id, None)
+        else:
+            attempts = _BREAKEVEN_ATTEMPTS.get(execution.id, 0) + 1
+            _BREAKEVEN_ATTEMPTS[execution.id] = attempts
+            settled = attempts >= _BREAKEVEN_MAX_ATTEMPTS
+
+        if settled:
+            values = {"breakeven_applied": True}
+            if result.get("new_sl_oid"):
+                # Keep sl_order_id pointing at the live stop so the reconciler can
+                # attribute the eventual close to 'sl' instead of falling back to
+                # price-direction inference.
+                values["sl_order_id"] = result["new_sl_oid"]
+            async with AsyncSession_() as db:
+                await db.execute(
+                    sql_update(SignalExecution)
+                    .where(SignalExecution.id == execution.id)
+                    .values(**values)
+                )
+                await db.commit()
 
         if result["success"]:
             print(
@@ -723,23 +859,34 @@ async def _check_breakeven_moves():
                 f"Wallet:    {wallet.hl_wallet_addr}\n\n"
                 f"El runner (50% restante) está protegido a costo cero.",
             )
-        elif result["error"] == "No remaining position to protect":
+        elif result.get("permanent"):
             # Both halves already closed (SL or TP2 fired) — no action needed
             print(
                 f"[Breakeven] ℹ️ {signal.pair}: position fully closed before breakeven — no action needed",
                 flush=True,
             )
         else:
-            print(f"[Breakeven] ❌ {signal.pair}: {result['error']}", flush=True)
-            await asyncio.to_thread(
-                send_signal_email,
-                f"❌ Breakeven FALLIDO: {signal.pair}",
-                f"TP1 se cumplió pero no se pudo mover el SL a breakeven.\n\n"
-                f"Par:    {signal.pair}\n"
-                f"Error:  {result['error']}\n"
-                f"Wallet: {wallet.hl_wallet_addr}\n\n"
-                f"Acción requerida: mueve el SL manualmente a ${float(execution.fill_price):,.4f}.",
+            attempts = _BREAKEVEN_ATTEMPTS.get(execution.id, 0)
+            print(
+                f"[Breakeven] ❌ {signal.pair} (exec {execution.id}, attempt "
+                f"{attempts}/{_BREAKEVEN_MAX_ATTEMPTS}): {result['error']}",
+                flush=True,
             )
+            # Email once, on give-up — not on every 60s retry (7w: no spam).
+            # The original SL is still live, so this is a degraded state, not an
+            # unprotected one.
+            if attempts >= _BREAKEVEN_MAX_ATTEMPTS:
+                await asyncio.to_thread(
+                    send_signal_email,
+                    f"❌ Breakeven FALLIDO: {signal.pair}",
+                    f"TP1 se cumplió pero no se pudo mover el SL a breakeven "
+                    f"tras {attempts} intentos.\n\n"
+                    f"Par:    {signal.pair}\n"
+                    f"Error:  {result['error']}\n"
+                    f"Wallet: {wallet.hl_wallet_addr}\n\n"
+                    f"El SL original sigue activo — la posición NO está sin protección.\n"
+                    f"Acción sugerida: mueve el SL manualmente a ${float(execution.fill_price):,.4f}.",
+                )
 
 
 async def _breakeven_monitor():
