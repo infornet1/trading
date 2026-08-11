@@ -500,7 +500,7 @@ def _close_hl_position(wallet_addr: str, secret_key_encrypted: str,
 _HL_ROUND_TRIP_FEE_PCT = 0.0009
 
 
-def _close_pnl_usd(execution, close_price: float, is_long: bool, leverage):
+def _close_pnl_usd(execution, close_price: float, is_long: bool):
     """
     Realized P&L for a closed execution, as (realized_pnl_usd, fees_usd).
 
@@ -508,19 +508,24 @@ def _close_pnl_usd(execution, close_price: float, is_long: bool, leverage):
     the same convention as api/signal_reconciler.py, because performance.py
     subtracts fees itself and would double-count them otherwise.
 
+    Takes NO leverage argument on purpose. `exec_size_usdt` is the notional
+    (size × fill_price), so leverage is already inside it; the earlier version
+    multiplied by leverage a second time and inflated every value by that
+    factor — a 20× trade recorded 20× its real P&L. Verified against HL
+    `closedPnl`: notional × price-return matches to the cent.
+
     Returns (None, None) when the inputs needed are missing (e.g. executions
     predating exec_size_usdt), matching the reconciler's behaviour.
     """
     try:
-        entry = float(execution.fill_price) if execution.fill_price else None
-        size  = float(execution.exec_size_usdt) if execution.exec_size_usdt else None
-        if not (entry and size and close_price):
+        entry    = float(execution.fill_price) if execution.fill_price else None
+        notional = float(execution.exec_size_usdt) if execution.exec_size_usdt else None
+        if not (entry and notional and close_price):
             return None, None
-        lev = float(execution.exec_leverage or leverage or 1)
         raw_pnl_pct = ((close_price - entry) / entry) if is_long else ((entry - close_price) / entry)
         return (
-            Decimal(str(size * raw_pnl_pct * lev)),
-            Decimal(str(size * _HL_ROUND_TRIP_FEE_PCT * lev)),
+            Decimal(str(notional * raw_pnl_pct)),
+            Decimal(str(notional * _HL_ROUND_TRIP_FEE_PCT)),
         )
     except (TypeError, ValueError, ArithmeticError) as e:
         print(f"[Auto-Close] ⚠️ P&L calc skipped for exec {execution.id}: {e}", flush=True)
@@ -548,9 +553,6 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
             )
         )
         rows = res.all()
-        leverage = await db.scalar(
-            select(SignalEvent.leverage).where(SignalEvent.id == signal_id)
-        )
 
     if not rows:
         print(f"[Auto-Close] Signal {signal_id}: no filled executions to close.", flush=True)
@@ -587,7 +589,7 @@ async def _auto_close_signal(signal_info: dict, update_status: str):
             # /performance/* (12 executions between 2026-07-16 and 2026-08-03),
             # because only api/signal_reconciler.py ever filled these in.
             realized_pnl_usd, fees_usd = _close_pnl_usd(
-                execution, result["fill_price"], is_long, leverage
+                execution, result["fill_price"], is_long
             )
             async with AsyncSession_() as db:
                 await db.execute(

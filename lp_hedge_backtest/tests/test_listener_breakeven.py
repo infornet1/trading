@@ -152,39 +152,57 @@ class TestMoveSlToBreakeven:
 
 
 class TestClosePnlUsd:
-    """Gross P&L with fees separate — performance.py subtracts fees itself."""
+    """
+    Gross P&L with fees separate — performance.py subtracts fees itself.
+
+    exec_size_usdt is the NOTIONAL, so P&L is notional × price-return with no
+    leverage term. Until 2026-08-11 the helper multiplied by leverage as well,
+    inflating every stored value by that factor.
+    """
 
     def test_short_win(self):
-        # $10 notional, 10x, entry 100 → close 95 = +5% gross = +$5
-        pnl, fees = _close_pnl_usd(_execution(), 95.0, is_long=False, leverage=10)
-        assert pnl == pytest.approx(Decimal("5"))
-        assert fees == pytest.approx(Decimal("0.09"))
+        # $10 notional, entry 100 → close 95 = +5% = +$0.50 gross
+        pnl, fees = _close_pnl_usd(_execution(), 95.0, is_long=False)
+        assert pnl == pytest.approx(Decimal("0.5"))
+        assert fees == pytest.approx(Decimal("0.009"))
 
     def test_short_loss(self):
-        pnl, _ = _close_pnl_usd(_execution(), 105.0, is_long=False, leverage=10)
-        assert pnl == pytest.approx(Decimal("-5"))
+        pnl, _ = _close_pnl_usd(_execution(), 105.0, is_long=False)
+        assert pnl == pytest.approx(Decimal("-0.5"))
 
     def test_long_win(self):
-        pnl, _ = _close_pnl_usd(_execution(), 105.0, is_long=True, leverage=10)
-        assert pnl == pytest.approx(Decimal("5"))
+        pnl, _ = _close_pnl_usd(_execution(), 105.0, is_long=True)
+        assert pnl == pytest.approx(Decimal("0.5"))
+
+    def test_leverage_is_not_applied(self):
+        """The regression guard: a 20× execution must not report 20× the P&L."""
+        lev20 = _close_pnl_usd(_execution(leverage=20), 95.0, is_long=False)
+        lev1  = _close_pnl_usd(_execution(leverage=1),  95.0, is_long=False)
+        assert lev20 == lev1
+        assert lev20[0] == pytest.approx(Decimal("0.5"))
+
+    def test_matches_hyperliquid_closed_pnl(self):
+        """
+        Real numbers from exec 137 (DOT, 2026-08-11), which HL reported as
+        closedPnl +0.2657 while the DB stored +2.6560 at 10× leverage.
+        """
+        execution = _execution(fill_price="0.81652", size="10.04", leverage=10)
+        pnl, _ = _close_pnl_usd(execution, 0.79492, is_long=False)
+        assert float(pnl) == pytest.approx(0.2657, abs=0.001)
 
     def test_fees_are_not_deducted_from_pnl(self):
         # Guards against double-counting: gross return, fees reported separately.
-        pnl, fees = _close_pnl_usd(_execution(), 100.0, is_long=False, leverage=10)
+        pnl, fees = _close_pnl_usd(_execution(), 100.0, is_long=False)
         assert pnl == pytest.approx(Decimal("0"))
         assert fees > 0
 
-    def test_exec_leverage_override_wins(self):
-        pnl, _ = _close_pnl_usd(_execution(leverage=2), 95.0, is_long=False, leverage=10)
-        assert pnl == pytest.approx(Decimal("1"))
+    def test_fees_are_notional_based(self):
+        pnl, fees = _close_pnl_usd(_execution(size="400"), 100.0, is_long=False)
+        assert fees == pytest.approx(Decimal("0.36"))  # 400 × 0.0009
 
     @pytest.mark.parametrize("kwargs", [{"fill_price": None}, {"size": None}])
     def test_missing_inputs_return_none(self, kwargs):
-        assert _close_pnl_usd(_execution(**kwargs), 95.0, False, 10) == (None, None)
+        assert _close_pnl_usd(_execution(**kwargs), 95.0, False) == (None, None)
 
     def test_zero_close_price_returns_none(self):
-        assert _close_pnl_usd(_execution(), 0.0, False, 10) == (None, None)
-
-    def test_missing_leverage_defaults_to_one(self):
-        pnl, _ = _close_pnl_usd(_execution(), 95.0, is_long=False, leverage=None)
-        assert pnl == pytest.approx(Decimal("0.5"))
+        assert _close_pnl_usd(_execution(), 0.0, False) == (None, None)

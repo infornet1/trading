@@ -58,6 +58,34 @@ def _extract_oid(resp) -> Optional[str]:
         return None
 
 
+#: HL perp prices allow at most 5 significant figures, and at most
+#: (MAX_DECIMALS - szDecimals) decimal places. MAX_DECIMALS is 6 for perps.
+_HL_PERP_MAX_DECIMALS = 6
+_HL_PX_SIG_FIGS       = 5
+
+
+def _round_px(px: Optional[float], sz_decimals: int) -> Optional[float]:
+    """
+    Round a trigger price to a value Hyperliquid will accept.
+
+    HL rejects perp prices carrying more than 5 significant figures with
+    'Invalid TP/SL price'. Channel signals routinely quote BTC stops like
+    65682.1 (6 sig figs), which is why signal 93 could not place its SL on
+    2026-08-10 and had to be closed at market. Whole numbers are always
+    valid, so high-priced assets simply round to the integer.
+
+    Also respects the per-asset decimal-place cap, which binds for the
+    cheap, high-szDecimals coins where 5 sig figs would allow more.
+    """
+    if not px or px <= 0:
+        return px
+    max_dp = max(0, _HL_PERP_MAX_DECIMALS - sz_decimals)
+    # Decimal places that leave exactly 5 significant figures. Negative for
+    # prices ≥ 100000, which is correct: round(123456.7, -1) → 123460.0.
+    sig_dp = (_HL_PX_SIG_FIGS - 1) - math.floor(math.log10(abs(px)))
+    return round(px, min(sig_dp, max_dp))
+
+
 def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
                    dry_run: bool = False, overrides: dict | None = None) -> dict:
     """
@@ -142,6 +170,14 @@ def place_hl_order(hl_wallet_addr: str, hl_secret_key_encrypted: str, signal,
             if overrides.get("sl"):  sl_price  = float(overrides["sl"])
             if overrides.get("tp1"): tp1_price = float(overrides["tp1"])
             if overrides.get("tp2"): tp2_price = float(overrides["tp2"])
+
+        # Snap trigger prices onto HL's tick rules before anything else reads
+        # them, so the guards below and the orders agree on the same numbers.
+        # The entry needs no such treatment: market_open() derives its own px.
+        sl_price  = _round_px(sl_price,  sz_decimals)
+        tp1_price = _round_px(tp1_price, sz_decimals)
+        tp2_price = _round_px(tp2_price, sz_decimals)
+
         split_tps    = tp2_price is not None
         # 50/50 split when two targets; full size when only one
         tp1_size     = round(size / 2, sz_decimals) if split_tps else size

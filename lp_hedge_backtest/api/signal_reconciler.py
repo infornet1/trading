@@ -199,17 +199,22 @@ async def _reconcile_once() -> None:
         # Compute realized P&L in USD for the profitability dashboard.
         # realized_pnl_usd is stored GROSS (price return only); fees_usd is
         # stored separately so performance.py can subtract them exactly once.
+        #
+        # exec_size_usdt is the NOTIONAL (size × fill_price — see signal_executor),
+        # so leverage is already embedded in it. Multiplying by leverage again —
+        # as this did until 2026-08-11 — inflated every stored value by the
+        # leverage factor (verified against HL closedPnl: a 10× trade recorded
+        # 10× its real P&L). Notional × price-return is the whole calculation.
         realized_pnl_usd = None
         fees_usd = None
         try:
             fp = float(execution.fill_price) if execution.fill_price else None
-            size = float(execution.exec_size_usdt) if execution.exec_size_usdt else None
-            if fp and size and close_price:
+            notional = float(execution.exec_size_usdt) if execution.exec_size_usdt else None
+            if fp and notional and close_price:
                 raw_pnl_pct = ((fp - close_price) / fp) if is_short else ((close_price - fp) / fp)
-                fees_pct = 0.0009  # 0.045% taker × 2 sides
-                leverage = float(signal.leverage or 1)
-                realized_pnl_usd = Decimal(str(size * raw_pnl_pct * leverage))
-                fees_usd = Decimal(str(size * fees_pct * leverage))
+                fees_pct = 0.0009  # 0.045% taker × 2 sides, on notional
+                realized_pnl_usd = Decimal(str(notional * raw_pnl_pct))
+                fees_usd = Decimal(str(notional * fees_pct))
         except Exception:
             pass
 

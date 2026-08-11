@@ -13,6 +13,12 @@ P&L uses the same convention as the reconciler and the listener:
 realized_pnl_usd is GROSS (price return only) and fees_usd is separate,
 because performance.py subtracts fees itself.
 
+There is deliberately no leverage term: exec_size_usdt is the notional
+(size × fill_price), so leverage is already embedded in it. An earlier
+version of this script multiplied by leverage again and inflated every
+value by that factor; scripts/fix_signal_pnl_leverage.py corrects the rows
+it wrote.
+
 `closed_at` is not recorded anywhere for these rows, so it is approximated
 from signal_events.updated_at — the moment the channel update flipped the
 signal's status. exit_reason is set to 'backfill' rather than a guessed
@@ -83,21 +89,22 @@ def main():
         total_pnl = total_fees = Decimal("0")
 
         for execution, signal in rows:
-            entry = execution.fill_price
-            close = execution.close_price
-            size  = execution.exec_size_usdt
-            lev   = execution.exec_leverage or signal.leverage or 1
+            entry    = execution.fill_price
+            close    = execution.close_price
+            notional = execution.exec_size_usdt
 
-            if not (entry and close and size):
+            if not (entry and close and notional):
                 print(f"{execution.id:>5} {signal.id:>4} {signal.pair:<10} "
-                      f"{'—':>10} {'—':>7} {'—':<19} skipped: missing entry/close/size")
+                      f"{'—':>10} {'—':>7} {'—':<19} skipped: missing entry/close/notional")
                 skipped += 1
                 continue
 
+            # No leverage term: exec_size_usdt is already the notional, so
+            # leverage is baked in. See _close_pnl_usd in telegram_listener.
             is_short = signal.direction != "long"
             raw_pct  = ((entry - close) / entry) if is_short else ((close - entry) / entry)
-            pnl      = size * raw_pct * Decimal(lev)
-            fees     = size * HL_ROUND_TRIP_FEE_PCT * Decimal(lev)
+            pnl      = notional * raw_pct
+            fees     = notional * HL_ROUND_TRIP_FEE_PCT
             closed_at = signal.updated_at or execution.executed_at
 
             print(f"{execution.id:>5} {signal.id:>4} {signal.pair:<10} "
