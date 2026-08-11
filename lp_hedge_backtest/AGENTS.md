@@ -148,7 +148,10 @@ node --check landing/dashboard/dashboard.js
 | `api/routers/admin.py` | Admin endpoints including `/admin/performance`. |
 | `api/performance_worker.py` | Wallet snapshot background task. |
 | `api/signal_reconciler.py` | Reconciles Signal Lab closes with HL fills. |
+| `api/signal_executor.py` | Places HL entry + native SL/TP for Signal Lab. Holds `_round_px()` and the sizing/leverage-cap logic. |
 | `scripts/backfill_bot_trades.py` | One-off backfill from `bot_events` to `bot_trades`. |
+| `scripts/backfill_signal_close_pnl.py` | One-off: fills dashboard P&L columns on listener-closed executions. |
+| `scripts/fix_signal_pnl_leverage.py` | One-off: removes the double-counted leverage factor from stored P&L. |
 | `src/reporting/metrics.py` | Backtest risk metrics (Sharpe, Sortino, drawdown). |
 | `landing/dashboard/profitability.js` | Performance tab frontend logic. |
 | `landing/i18n.js` | Bilingual translation keys. |
@@ -162,7 +165,7 @@ node --check landing/dashboard/dashboard.js
 - Hardcoded DB fallback removed from `api/database.py`; `DB_URL` is now required via env.
 - API service runs as non-root `viznago` user (systemd `User=viznago`).
 - Basic per-IP rate limiting added to `/auth/*`, `/admin/*`, and `/performance/*` endpoints.
-- `api/.env`, `bot_state/`, `data_cache/`, `backups/` set to `root:webdev` group permissions.
+- `api/.env`, `bot_state/`, `data_cache/`, `backups/` set to `root:webdev` group permissions. ⚠️ This stranded pre-existing files that the API writes: the directories are group-writable but individual `root:webdev 644` files are not, so the API (now `viznago`) can read them and not overwrite them. `data_cache/reconciler_state.json` failed hourly for ~4 weeks before this was noticed on 2026-08-11.
 - Project email config is encrypted at `/var/www/dev/trading/lp_hedge_email_config.json` and loaded via `api/email_config.py` / `api/email_encrypt.py`.
 - Shared monorepo email config `/var/www/dev/trading/email_config.json` is now encrypted with Fernet. A root-level loader (`/var/www/dev/trading/email_config_loader.py`) decrypts it for all sibling projects (ADX, scalping, supervisor, BTC notifier). `/var/www/dev/trading/.env.email` supplies `ENCRYPTION_KEY` to systemd services.
 - `api/.env.email` (ignored by Git) overrides `EMAIL_CONFIG_PATH` so the LP hedge service and bot subprocesses use the encrypted project config.
@@ -195,7 +198,7 @@ node --check landing/dashboard/dashboard.js
 - `signal_executions` extended with P&L columns (`realized_pnl_usd`, `fees_usd`, `closed_at`, `exit_reason`)
 - Alembic migration: `8f300e110022`
 - Backfilled 902 historical bot trades on 2026-07-16
-- Backfilled 82 closed Signal Lab executions on 2026-07-16; `api/signal_reconciler.py` now stores gross `realized_pnl_usd` with fees tracked separately
+- Backfilled 82 closed Signal Lab executions on 2026-07-16; `api/signal_reconciler.py` now stores gross `realized_pnl_usd` with fees tracked separately — ⚠️ but with a leverage double-count that made every dollar figure 3×–60× too large until **2026-08-11**; see "Signal Lab correctness fixes" below before trusting any P&L number recorded before that date
 - Cleaned up `bot_trades` estimates on 2026-07-16: deleted 31 empty `stopped` noise rows, enriched 380 whale estimates with `funding_usd`/`net_pnl_usd`/`pair`, and hardened `api/bot_manager.py` + `scripts/backfill_bot_trades.py` to skip future whale closed-only and empty stopped estimates
 - Profitability dashboard (`api/routers/performance.py`) and admin aggregate (`api/routers/admin.py`) now exclude `is_estimate = TRUE` bot_trades from main KPIs; an `include_estimates=true` query param and dashboard toggle let users view the enriched whale estimate rows separately
 - Feature flag: `PERFORMANCE_DASHBOARD_ENABLED=true` in `api/.env`
@@ -234,12 +237,70 @@ See `IMPLEMENTATION_PLAN_PROFITABILITY_DASHBOARD.md` and `VIZBOT_KNOWLEDGE.md` f
   - The funder wallet needs USDC on Polygon and a one-time **USDC allowance approval** to the Polymarket exchange contract (already done for any wallet that has traded on polymarket.com; the bot does not set approvals itself — a first-order failure on a fresh wallet is likely this).
   - On Stop the bot leaves the position open and keeps its state file; Restart resumes monitoring. It never emits `stopped` (that would falsely close the open `bot_trades` row).
 
+### Signal Lab correctness fixes (2026-08-09 → 2026-08-11)
+
+Four bugs found by two health checks. **None was visible in logs or service checks** — every one was
+caught by reconciling the database against Hyperliquid. Commits `6f4bb7a` and `920383e`.
+
+**1. Breakeven monitor failed open (`6f4bb7a`).** The monitor inferred "TP1 filled" from the order's
+absence in `open_orders`, and its helper caught every exception and returned an empty set — so a single
+HL 502 looked like every TP1 filling at once, and the monitor cancelled the real stop-loss on four live
+positions to place a tighter one at entry. `breakeven_applied` was then set regardless of outcome, so it
+never retried. Positions survived only because the replacement order also 502'd.
+- `_tp1_order_status()` now reads the real status via `query_order_by_oid` and returns `None` on any
+  error, unknown oid, or malformed reply. Only `"filled"` acts.
+- `_move_sl_to_breakeven()` **places the breakeven stop before cancelling the original** and validates
+  the order response. A failed placement can no longer leave a position naked.
+- `breakeven_applied` is set only on a settled outcome, with 3 bounded retries.
+- Verified in production 2026-08-11 when TP1 came back `'reduceOnlyCanceled'` — a status not explicitly
+  enumerated — and the fail-closed default correctly left the stop alone.
+- ⚠️ The 18 pre-fix "SL → breakeven" successes in the log were never audited; some fired spuriously and
+  scratched trades early. Distrust pre-2026-08-09 breakeven outcomes.
+
+**2. Channel-driven closes wrote no dashboard P&L (`6f4bb7a`).** `_auto_close_signal` wrote only
+`close_price`; the other four columns came solely from `api/signal_reconciler.py`. Because
+`api/routers/performance.py` filters on `closed_at`, every close driven by a channel update was invisible
+to `/performance/*`. Now writes all four columns. 12 executions repaired by
+`scripts/backfill_signal_close_pnl.py`.
+
+**3. Realized P&L was inflated by the leverage factor (`920383e`) — the most consequential of the four.**
+`exec_size_usdt` is the **notional** (`size × fill_price`), so leverage is already embedded in it, but
+every writer multiplied by leverage again. The dashboard overstated every dollar figure by 3×–60× from
+the day it shipped (2026-07-16) until 2026-08-11.
+- Caught by comparing to HL `closedPnl`: exec 137 (DOT, 10×) stored `+2.6560`, HL reported `+0.2657`.
+  The ratio equalled the leverage on every row.
+- Fixed in `api/signal_reconciler.py`, `telegram_listener/listener.py` (`_close_pnl_usd`, which now takes
+  **no leverage argument at all**), and `scripts/backfill_signal_close_pnl.py`.
+- **Corrected lifetime Signal Lab: gross +1.85 / fees 1.06 / net +$0.79 across 116 executions, 52 wins /
+  64 losses** — previously displayed as +$36.79. Post-fix values match HL to ±$0.0002.
+- Repaired by `scripts/fix_signal_pnl_leverage.py` (dry-run default). Rows with a recorded notional are
+  recomputed from first principles rather than divided, because `exec_leverage` frequently differs from
+  `signal.leverage` (HL caps leverage per asset) and the writers disagreed on which to use. The 46 pre-M5
+  rows have no stored notional and are verified against the old formula before being divided, so anything
+  of unknown provenance is skipped rather than guessed at.
+
+**4. HL rejected trigger prices with >5 significant figures (`920383e`).** BTC signal 93 quoted a stop of
+`65682.1`; HL rejected both attempts with `Invalid TP/SL price. asset=0`, H4 closed the entry at market,
+and the signal was skipped. Latent for months because every earlier BTC stop was a round number. New
+`_round_px()` in `api/signal_executor.py` snaps SL/TP1/TP2 onto HL's rules before the guards read them.
+
+**5. LPReconciler could not write its state file.** `data_cache/reconciler_state.json` was left
+`root:webdev` by the 2026-07-16 hardening that moved the API to the `viznago` user, so the hourly
+overwrite failed with `[Errno 13]` from 2026-07-16 to 2026-08-11. Fixed with `chown viznago:webdev`.
+
 ---
 
 ## 8. Common pitfalls
 
 - **`api/main.py` inline migrations** run on every startup. They are idempotent but noisy; prefer Alembic for new changes.
-- **Automated tests** are under `tests/` and growing. Run `./venv/bin/python -m pytest tests/` before deploying changes.
+- **Automated tests** are under `tests/` — **101 as of 2026-08-11**, and they run in under a second. Run `./venv/bin/python -m pytest tests/` before deploying changes.
+- **`exec_size_usdt` is the NOTIONAL, not margin.** It is `size × fill_price`, so leverage is already inside it. Dollar P&L is `exec_size_usdt × price_return` and fees are `exec_size_usdt × 0.0009` — **never multiply either by leverage.** Doing so is the 2026-08-11 bug that overstated the dashboard by 3×–60×. (A *percentage* return on margin legitimately does multiply by leverage — that is a different quantity from a dollar figure. Don't conflate them.)
+- **`exec_leverage` ≠ `signal.leverage`.** HL caps leverage per asset (`maxLeverage` in `meta().universe`) and the executor silently uses `min(requested, max)`. Never assume they match; prefer `exec_leverage` for what actually executed.
+- **Hyperliquid price precision.** Perp prices accept **at most 5 significant figures**, and at most `6 - szDecimals` decimal places; whole numbers are always valid. A channel stop like BTC `65682.1` is rejected with `Invalid TP/SL price. asset=0` — where `asset=0` is merely HL's index for BTC, not a failed lookup. Use `_round_px()` in `api/signal_executor.py` for any manually-priced order. Entry orders need no rounding: `market_open()` derives its own price.
+- **Never infer a fill from an order's absence, and never let an error look like a state.** `open_orders` failing, or an oid missing from it, does not mean the order filled. Query the order's actual status and return `None` on error so callers can skip. An unknown state must never be treated as an actionable one — this is what cancelled four live stop-losses on 2026-08-09.
+- **Reconcile stored money against HL, not just against the logs.** Every P&L bug found so far was invisible to service checks and log greps, and obvious the moment `signal_executions.realized_pnl_usd` was compared to `closedPnl` in HL `userFills`. Do this in every health check. A constant ratio between stored and actual is the tell.
+- **Verify a fill via HL `userFills`**, never via order presence or the `breakeven_applied` flag. Both have lied.
+- **Process ownership differs by component.** The API and the LP bot subprocesses run as **`viznago`**; the Telegram listener runs as **`root`** (started by the cron watchdog). So a root-owned file under `data_cache/` may be correct (`lp_range_latest.json`, written by the listener) or a bug (`reconciler_state.json`, written by the API). Check which process writes a file before "fixing" its ownership.
 - **CORS origins** default to dev domain + localhost; tighten for prod.
 - **API runs as `viznago`**; use `deploy/viznago_api.service` for the unit file.
 - **`requirements.txt`** is now complete and generated from the active venv (`pip freeze`). Use it for fresh installs; `requirements-dev.txt` adds the test runner.
