@@ -301,7 +301,7 @@ def main():
             errors += 1
             log(f"⚠️ monitor error ({errors}/{MAX_CONSECUTIVE_ERRORS}): {e}")
             if errors >= MAX_CONSECUTIVE_ERRORS:
-                emit("error", details={"error": str(e), "consecutive_errors": errors})
+                emit("error", details={"msg": str(e), "consecutive_errors": errors})
                 sys.exit(1)
         time.sleep(CHECK_INTERVAL)
 

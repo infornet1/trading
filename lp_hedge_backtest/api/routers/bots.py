@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import get_current_address
 from api.config import POLYMARKET_BOT_ENABLED
-from api.crypto import decrypt, encrypt
+from api.crypto import encrypt
 from api.database import get_db
 from api.models import BotConfig, BotEvent, User
 
@@ -500,7 +500,12 @@ async def hl_balance(
 
     import asyncio
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _sync)
+    try:
+        # Sync HL SDK calls can hang on a stalled connection — cap at 10s.
+        return await asyncio.wait_for(loop.run_in_executor(None, _sync), timeout=10)
+    except asyncio.TimeoutError:
+        return {"account_value": None, "total_margin_used": None,
+                "error": "HL request timed out after 10s"}
 
 
 @router.get("/{config_id}/hl-position")
@@ -578,7 +583,16 @@ async def hl_position(
 
     import asyncio
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _sync)
+    try:
+        # Sync HL SDK calls can hang on a stalled connection — cap at 10s.
+        return await asyncio.wait_for(loop.run_in_executor(None, _sync), timeout=10)
+    except asyncio.TimeoutError:
+        return {
+            "has_position": False, "coin": coin, "side": None,
+            "size": 0, "entry_px": 0, "mark_px": 0,
+            "unrealized_pnl": 0, "account_value": 0,
+            "error": "HL request timed out after 10s",
+        }
 
 
 @router.get("/public-whale-signals")
@@ -641,7 +655,7 @@ async def get_bot(
     return await _get_own_config(config_id, address, db)
 
 
-@router.get("/{config_id}/events", response_model=list[BotEventOut])
+@router.get("/{config_id}/events")
 async def get_events(
     config_id: int,
     limit: int = Query(200, le=500),
@@ -651,15 +665,25 @@ async def get_events(
     db: AsyncSession = Depends(get_db),
 ):
     from datetime import timedelta
+    from sqlalchemy import func
     await _get_own_config(config_id, address, db)  # ownership check
-    q = select(BotEvent).where(BotEvent.config_id == config_id)
+    filters = [BotEvent.config_id == config_id]
     if hours is not None:
         since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
-        q = q.where(BotEvent.ts >= since)
-    result = await db.execute(
-        q.order_by(desc(BotEvent.ts)).limit(limit).offset(offset)
+        filters.append(BotEvent.ts >= since)
+    total = await db.scalar(
+        select(func.count(BotEvent.id)).where(*filters)
     )
-    return result.scalars().all()
+    result = await db.execute(
+        select(BotEvent).where(*filters)
+        .order_by(desc(BotEvent.ts)).limit(limit).offset(offset)
+    )
+    return {
+        "total":  total or 0,
+        "rows":   [BotEventOut.model_validate(ev) for ev in result.scalars().all()],
+        "limit":  limit,
+        "offset": offset,
+    }
 
 
 @router.get("/{config_id}/status")
@@ -679,14 +703,34 @@ async def bot_status(
     )
     last = result.scalar_one_or_none()
 
+    # Most recent persisted error event (ix_bot_events_config_ts covers this scan)
+    err_result = await db.execute(
+        select(BotEvent.details)
+        .where(BotEvent.config_id == config_id)
+        .where(BotEvent.event_type == "error")
+        .order_by(desc(BotEvent.ts))
+        .limit(1)
+    )
+    err_details = err_result.scalar_one_or_none()
+    last_error = (err_details or {}).get("msg") if err_details else None
+
     from api.bot_manager import manager  # import here to avoid circular
     running = manager.is_running(config_id)
+
+    # Liveness: last stdout line timestamp (only meaningful while running)
+    seen = manager.last_seen(config_id) if running else None
+    seconds_since = (
+        (datetime.now(timezone.utc) - seen).total_seconds() if seen else None
+    )
 
     return {
         "config_id": config_id,
         "active":    cfg.active,
         "running":   running,
         "pid":       manager.pid(config_id),
+        "last_seen": seen.isoformat() if seen else None,
+        "seconds_since_output": seconds_since,
+        "last_error": last_error,
         "last_event": {
             "type": last.event_type,
             "price": float(last.price_at_event) if last.price_at_event else None,
@@ -711,51 +755,13 @@ async def start_bot(
             raise HTTPException(status_code=400, detail="Polygon private key and funder address are required (or enable paper_trade mode)")
         raise HTTPException(status_code=400, detail="HL API key and wallet address are required (or enable paper_trade mode)")
 
-    from api.bot_manager import manager
+    from api.bot_manager import manager, build_start_config
     if manager.is_running(config_id):
         return {"status": "already_running"}
 
-    config_dict = {
-        "nft_token_id":   cfg.nft_token_id,
-        "lower_bound":    str(cfg.lower_bound),
-        "upper_bound":    str(cfg.upper_bound),
-        "trigger_pct":    str(cfg.trigger_pct),
-        "hedge_ratio":    str(cfg.hedge_ratio),
-        "hl_api_key":     decrypt(cfg.hl_api_key) if cfg.hl_api_key else "",
-        "hl_wallet_addr": cfg.hl_wallet_addr or "",
-        "user_address":   cfg.user_address,
-        "mode":           cfg.mode,
-        "pair":           cfg.pair,
-        "leverage":       str(cfg.leverage   or 10),
-        "sl_pct":         str(cfg.sl_pct     or 0.1),
-        "tp_pct":         str(cfg.tp_pct)    if cfg.tp_pct else "",
-        "trailing_stop":  "1" if cfg.trailing_stop else "0",
-        "auto_rearm":     "1" if cfg.auto_rearm    else "0",
-        # FURY config (only used when mode='fury')
-        "fury_symbol":       cfg.fury_symbol       or "ETH",
-        "fury_rsi_period":   str(cfg.fury_rsi_period   or 9),
-        "fury_rsi_long_th":  str(cfg.fury_rsi_long_th  or 35),
-        "fury_rsi_short_th": str(cfg.fury_rsi_short_th or 65),
-        "fury_leverage_max": str(cfg.fury_leverage_max or 12),
-        "fury_risk_pct":     str(cfg.fury_risk_pct     or 2.0),
-        # WHALE config (only used when mode='whale')
-        "whale_top_n":            str(cfg.whale_top_n            or 50),
-        "whale_min_notional":     str(cfg.whale_min_notional     or 50000),
-        "whale_poll_interval":    str(cfg.whale_poll_interval    or 30),
-        "whale_custom_addresses": cfg.whale_custom_addresses     or "",
-        "whale_watch_assets":     cfg.whale_watch_assets         or "",
-        # POLYMARKET config (only used when mode='polymarket')
-        "polymarket_token_id":    cfg.polymarket_token_id    or "",
-        "polymarket_size_usd":    str(cfg.polymarket_size_usd or 0),
-        "polymarket_entry_price": str(cfg.polymarket_entry_price) if cfg.polymarket_entry_price else "",
-        "polymarket_tp_price":    str(cfg.polymarket_tp_price or 0),
-        "polymarket_sl_price":    str(cfg.polymarket_sl_price or 0),
-        "paper_trade":       is_paper,
-        "engine_v2":         bool(cfg.engine_v2),
-        "from_above_dist_pct": str(cfg.from_above_dist_pct or 5.0),
-        "use_funding_gate":    "1" if cfg.use_funding_gate else "0",
-        "funding_gate_pct":    str(cfg.funding_gate_pct or 0.05),
-    }
+    # Shared builder (api/bot_manager.py) — single source of truth for the
+    # config dict; the auto-restart path uses the same one.
+    config_dict = build_start_config(cfg)
     await manager.start(config_id, config_dict)
     cfg.active = True
     await db.commit()

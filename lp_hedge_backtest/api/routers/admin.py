@@ -56,7 +56,11 @@ async def _fetch_hl_balance(wallet_addr: str) -> float | None:
             return None
 
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _sync)
+    try:
+        return await asyncio.wait_for(loop.run_in_executor(None, _sync), timeout=10)
+    except asyncio.TimeoutError:
+        # Same error shape as a failed fetch — HL unreachable/slow
+        return None
 
 
 async def _fetch_hl_data(wallet_addr: str) -> dict:
@@ -249,7 +253,7 @@ async def start_whale_bots(admin: str = Depends(get_current_admin)):
 @router.post("/restart/{config_id}")
 async def restart_bot(config_id: int, admin: str = Depends(get_current_admin)):
     """Stop a bot process (if running) and re-launch it from current DB config."""
-    from api.crypto import decrypt
+    from api.bot_manager import build_start_config
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(BotConfig).where(BotConfig.id == config_id))
@@ -261,38 +265,9 @@ async def restart_bot(config_id: int, admin: str = Depends(get_current_admin)):
         if was_running:
             await manager.stop(config_id)
 
-        config_dict = {
-            "nft_token_id":              cfg.nft_token_id,
-            "lower_bound":               str(cfg.lower_bound),
-            "upper_bound":               str(cfg.upper_bound),
-            "trigger_pct":               str(cfg.trigger_pct),
-            "hedge_ratio":               str(cfg.hedge_ratio),
-            "hl_api_key":                decrypt(cfg.hl_api_key) if cfg.hl_api_key else "",
-            "hl_wallet_addr":            cfg.hl_wallet_addr or "",
-            "user_address":              cfg.user_address,
-            "mode":                      cfg.mode,
-            "pair":                      cfg.pair,
-            "leverage":                  str(cfg.leverage   or 10),
-            "sl_pct":                    str(cfg.sl_pct     or 0.1),
-            "tp_pct":                    str(cfg.tp_pct)    if cfg.tp_pct else "",
-            "trailing_stop":             "1" if cfg.trailing_stop else "0",
-            "auto_rearm":                "1" if cfg.auto_rearm    else "0",
-            "fury_symbol":               cfg.fury_symbol          or "ETH",
-            "fury_rsi_period":           str(cfg.fury_rsi_period  or 9),
-            "fury_rsi_long_th":          str(cfg.fury_rsi_long_th or 35),
-            "fury_rsi_short_th":         str(cfg.fury_rsi_short_th or 65),
-            "fury_leverage_max":         str(cfg.fury_leverage_max or 12),
-            "fury_risk_pct":             str(cfg.fury_risk_pct    or 2.0),
-            "whale_top_n":               str(cfg.whale_top_n            or 50),
-            "whale_min_notional":        str(cfg.whale_min_notional     or 50000),
-            "whale_poll_interval":       str(cfg.whale_poll_interval    or 30),
-            "whale_custom_addresses":    cfg.whale_custom_addresses     or "",
-            "whale_watch_assets":        cfg.whale_watch_assets         or "",
-            "whale_use_websocket":       bool(cfg.whale_use_websocket),
-            "whale_oi_spike_threshold":  str(cfg.whale_oi_spike_threshold or 0.03),
-            "paper_trade":               bool(cfg.paper_trade),
-            "engine_v2":                 bool(cfg.engine_v2),
-        }
+        # Shared builder (api/bot_manager.py) — single source of truth for the
+        # config dict; the user start and auto-restart paths use the same one.
+        config_dict = build_start_config(cfg)
 
         await manager.start(config_id, config_dict)
         cfg.active = True
@@ -677,7 +652,14 @@ async def admin_hl_positions(admin: str = Depends(get_current_admin)):
         except Exception:
             return []
 
-    results      = await asyncio.gather(*[asyncio.to_thread(_fetch_one, w) for w in wallets])
+    async def _guarded_fetch(wallet):
+        try:
+            return await asyncio.wait_for(asyncio.to_thread(_fetch_one, wallet), timeout=10)
+        except asyncio.TimeoutError:
+            # Same error shape as a failed fetch — HL unreachable/slow
+            return []
+
+    results      = await asyncio.gather(*[_guarded_fetch(w) for w in wallets])
     all_positions = [p for wpos in results for p in wpos]
     total_pnl     = round(sum(p["unrealized_pnl"] for p in all_positions), 4)
     return {"positions": all_positions, "total_pnl": total_pnl}

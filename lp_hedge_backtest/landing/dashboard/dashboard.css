@@ -2862,3 +2862,86 @@
   gap: 10px;
   margin-top: 12px;
 }
+
+/* Perf tab feedback: loading spinner, error/notice banner, timestamp */
+.perf-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 4px;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+.perf-spinner {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+.perf-banner {
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 14px;
+}
+.perf-banner--error {
+  background: #3b1a1a;
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+}
+.perf-banner--notice {
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid #fbbf24;
+  color: #fde68a;
+}
+.perf-updated {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+/* WebSocket connection status pill in live bot panel headers */
+.ws-status {
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ws-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.ws-status--live {
+  color: var(--color-neon-green);
+  border: 1px solid var(--color-neon-green);
+  background: rgba(0, 255, 179, 0.08);
+}
+.ws-status--connecting,
+.ws-status--reconnecting {
+  color: #fbbf24;
+  border: 1px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+}
+
+/* Bot health line (last output age / last error from /bots/{id}/status) */
+.bot-health-line {
+  font-size: 0.7rem;
+  color: #fbbf24;
+  margin: -10px 0 14px;
+}
+
+/* Human-readable detail for error events in the position event list */
+.evt-error-msg {
+  width: 100%;
+  font-size: 0.62rem;
+  font-family: monospace;
+  color: #fca5a5;
+  margin-top: 2px;
+  padding-left: 20px;
+  opacity: 0.9;
+}

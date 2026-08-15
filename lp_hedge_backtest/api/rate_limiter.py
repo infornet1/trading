@@ -64,6 +64,7 @@ class RateLimiter:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Rate limit exceeded. Please slow down.",
+                headers={"Retry-After": str(int(self.window_seconds))},
             )
 
 

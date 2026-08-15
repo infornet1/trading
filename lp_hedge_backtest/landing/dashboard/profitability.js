@@ -7,7 +7,7 @@
 (function () {
   'use strict';
 
-  const API_BASE = window.API_BASE || '/trading/lp_hedge/api';
+  const API_BASE = window.API_BASE || '/trading/lp-hedge/api';
 
   // ── State ─────────────────────────────────────────────────────────────────
   let perfState = {
@@ -15,6 +15,7 @@
     summary: null,
     equity: [],
     trades: [],
+    tradeTotal: null,   // total row count from backend (null = unknown, use heuristic)
     breakdownBy: 'pair',
     dateFrom: '',
     dateTo: '',
@@ -65,6 +66,30 @@
     from.setDate(from.getDate() - 30);
     perfState.dateTo = to.toISOString().split('T')[0];
     perfState.dateFrom = from.toISOString().split('T')[0];
+  }
+
+  // ── Feedback UI (loading spinner, error/notice banner, timestamp) ──────────
+
+  function setPerfLoading(on) {
+    document.getElementById('perf-loading')?.classList.toggle('hidden', !on);
+  }
+
+  function showPerfBanner(kind, msg) {
+    const el = document.getElementById('perf-banner');
+    if (!el) return;
+    el.classList.remove('hidden', 'perf-banner--error', 'perf-banner--notice');
+    el.classList.add(`perf-banner--${kind}`);
+    el.textContent = msg;
+  }
+
+  function clearPerfBanner() {
+    document.getElementById('perf-banner')?.classList.add('hidden');
+  }
+
+  function updatePerfTimestamp() {
+    const el = document.getElementById('perf-updated');
+    if (!el) return;
+    el.textContent = `${t('perf.updated')} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────
@@ -134,9 +159,18 @@
       });
     }
 
-    const data = perfState.equity
-      .filter(p => p.ts)
-      .map(p => ({ time: p.ts.split('T')[0], value: Number(p.equity || 0) }));
+    // Snapshots are written every 15 min → up to 96 points share the same
+    // date string. Lightweight-Charts v4 rejects duplicate `time` keys
+    // ("data must be asc ordered by time"), so keep only the LAST snapshot
+    // of each day (later Map sets overwrite) and sort ascending.
+    const byDay = new Map();
+    for (const p of perfState.equity) {
+      if (!p.ts) continue;
+      byDay.set(p.ts.split('T')[0], Number(p.equity || 0));
+    }
+    const data = [...byDay.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+      .map(([time, value]) => ({ time, value }));
 
     equitySeries.setData(data);
     equityChart.timeScale().fitContent();
@@ -163,6 +197,20 @@
         <td>${tr.exit_reason || '—'}</td>
       </tr>
     `).join('');
+  }
+
+  function updatePaginationButtons() {
+    const prev = document.getElementById('perf-prev');
+    const next = document.getElementById('perf-next');
+    if (!prev || !next) return;
+    prev.disabled = perfState.tradeOffset === 0;
+    const rows = perfState.trades.length;
+    if (perfState.tradeTotal != null) {
+      next.disabled = perfState.tradeOffset + rows >= perfState.tradeTotal;
+    } else {
+      // Heuristic fallback when the backend does not return a total count
+      next.disabled = rows < perfState.tradeLimit;
+    }
   }
 
   function renderBreakdown() {
@@ -199,7 +247,12 @@
   async function loadEquity() {
     const params = dateParams();
     perfState.equity = await perfFetch(`/performance/equity-curve${params}`);
-    renderEquityChart();
+    // A chart failure must not reject the whole load — KPIs/tables matter more.
+    try {
+      renderEquityChart();
+    } catch (e) {
+      console.error('[Performance] Equity chart render failed:', e);
+    }
   }
 
   async function loadTrades() {
@@ -208,7 +261,9 @@
     const sep = params ? '&' : '?';
     const data = await perfFetch(`/performance/trades${params}${sep}limit=${perfState.tradeLimit}&offset=${perfState.tradeOffset}${est.replace('?', '&')}`);
     perfState.trades = data.rows || [];
+    perfState.tradeTotal = typeof data.total === 'number' ? data.total : null;
     renderTradeJournal();
+    updatePaginationButtons();
   }
 
   async function loadBreakdown() {
@@ -230,12 +285,41 @@
   }
 
   async function loadAllPerformanceData() {
-    await Promise.all([
-      loadSummary(),
-      loadEquity(),
-      loadTrades(),
-      loadBreakdown(),
-    ]);
+    setPerfLoading(true);
+    try {
+      // allSettled: one failing section must not blank the others.
+      const results = await Promise.allSettled([
+        loadSummary(),
+        loadEquity(),
+        loadTrades(),
+        loadBreakdown(),
+      ]);
+      const failed = results.filter(r => r.status === 'rejected');
+      if (failed.length) {
+        console.error('[Performance] Load errors:', failed.map(f => f.reason));
+        showPerfBanner('error', t('perf.loadError'));
+      } else {
+        clearPerfBanner();
+        updatePerfTimestamp();
+      }
+    } finally {
+      setPerfLoading(false);
+    }
+  }
+
+  // Runs a partial refresh (toggle/tab/pagination) with inline error reporting.
+  // On failure the previous data stays visible and a banner is shown.
+  async function guarded(promise) {
+    try {
+      await promise;
+      clearPerfBanner();
+      updatePerfTimestamp();
+      return true;
+    } catch (err) {
+      console.error('[Performance]', err);
+      showPerfBanner('error', t('perf.loadError'));
+      return false;
+    }
   }
 
   // ── Initialization ────────────────────────────────────────────────────────
@@ -256,6 +340,12 @@
           <input type="checkbox" id="perf-include-estimates">
           ${t('perf.includeEstimates') || 'Incluir estimados'}
         </label>
+        <span id="perf-updated" class="perf-updated"></span>
+      </div>
+      <div id="perf-banner" class="perf-banner hidden"></div>
+      <div id="perf-loading" class="perf-loading hidden">
+        <div class="spinner perf-spinner"></div>
+        <span>${t('perf.loading')}</span>
       </div>
       <div id="perf-kpi-grid" class="perf-kpi-grid"></div>
       <div class="perf-chart-row">
@@ -301,18 +391,47 @@
       loadAllPerformanceData();
     });
 
-    document.getElementById('perf-export').addEventListener('click', () => {
-      const params = dateParams();
-      const est = estimateParam();
-      window.open(`${API_BASE}/performance/export${params}${est}`, '_blank');
+    document.getElementById('perf-export').addEventListener('click', async () => {
+      const btn = document.getElementById('perf-export');
+      const qs = new URLSearchParams();
+      if (perfState.dateFrom) qs.set('from', perfState.dateFrom);
+      if (perfState.dateTo) qs.set('to', perfState.dateTo);
+      if (perfState.includeEstimates) qs.set('include_estimates', 'true');
+      if (btn) btn.disabled = true;
+      try {
+        // window.open cannot send the Authorization header — fetch + blob instead
+        const res = await fetch(`${API_BASE}/performance/export?${qs.toString()}`, {
+          headers: { Authorization: `Bearer ${getJwt()}` },
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const truncated = res.headers.get('X-Truncated') === 'true';
+        const totalRows = res.headers.get('X-Total-Rows');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `vizniago_performance_${perfState.dateFrom || 'all'}_${perfState.dateTo || 'all'}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        if (truncated) {
+          showPerfBanner('notice', t('perf.exportTruncated').replace('{total}', totalRows || '?'));
+        } else {
+          clearPerfBanner();
+        }
+      } catch (err) {
+        console.error('[Performance] Export failed:', err);
+        showPerfBanner('error', t('perf.exportError'));
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     });
 
     document.getElementById('perf-include-estimates').addEventListener('change', (e) => {
       perfState.includeEstimates = e.target.checked;
       perfState.tradeOffset = 0;
-      loadSummary();
-      loadTrades();
-      loadBreakdown();
+      guarded(Promise.all([loadSummary(), loadTrades(), loadBreakdown()]));
     });
 
     document.querySelectorAll('.perf-breakdown-tab').forEach(btn => {
@@ -320,17 +439,21 @@
         perfState.breakdownBy = btn.dataset.by;
         document.querySelectorAll('.perf-breakdown-tab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        loadBreakdown();
+        guarded(loadBreakdown());
       });
     });
 
-    document.getElementById('perf-prev').addEventListener('click', () => {
-      perfState.tradeOffset = Math.max(0, perfState.tradeOffset - perfState.tradeLimit);
-      loadTrades();
+    document.getElementById('perf-prev').addEventListener('click', async () => {
+      const prevOffset = perfState.tradeOffset;
+      perfState.tradeOffset = Math.max(0, prevOffset - perfState.tradeLimit);
+      const ok = await guarded(loadTrades());
+      if (!ok) perfState.tradeOffset = prevOffset; // revert so buttons stay truthful
     });
-    document.getElementById('perf-next').addEventListener('click', () => {
+    document.getElementById('perf-next').addEventListener('click', async () => {
+      const prevOffset = perfState.tradeOffset;
       perfState.tradeOffset += perfState.tradeLimit;
-      loadTrades();
+      const ok = await guarded(loadTrades());
+      if (!ok) perfState.tradeOffset = prevOffset;
     });
   }
 

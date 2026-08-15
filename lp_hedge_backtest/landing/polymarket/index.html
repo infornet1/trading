@@ -77,7 +77,7 @@
         <button class="lang-btn active" id="lang-es" onclick="setLang('es')">ES</button>
         <button class="lang-btn" id="lang-en" onclick="setLang('en')">EN</button>
       </div>
-      <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()">
+      <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()" data-i18n="poly.connect">
         🟢&nbsp; Conectar Wallet
       </button>
       <span id="wallet-chip" class="wallet-chip hidden"></span>
@@ -91,7 +91,7 @@
   <div class="whale-hero">
     <div class="whale-hero-icon">🎯</div>
     <h1 class="whale-hero-title">Polymarket TP/SL Bot</h1>
-    <p class="whale-hero-sub">
+    <p class="whale-hero-sub" data-i18n="poly.hero.sub">
       Compra shares de un mercado de Polymarket y sal automáticamente:
       take-profit y stop-loss sintético vigilados cada pocos segundos.
     </p>
@@ -104,20 +104,25 @@
       <div id="error-banner" class="alert alert-error hidden"></div>
 
       <div id="auth-banner" class="alert alert-info hidden">
-        <span>🔒 Conecta tu wallet para gestionar bots de Polymarket.</span>
-        <button class="btn btn-sm" style="margin-left:12px" onclick="connectWallet()">Conectar</button>
+        <span data-i18n="poly.auth.banner">🔒 Conecta tu wallet para gestionar tus bots. Los bots en ejecución siguen corriendo aunque tu sesión expire.</span>
+        <button class="btn btn-sm" style="margin-left:12px" onclick="connectWallet()" data-i18n="poly.auth.connect">Conectar</button>
       </div>
 
       <!-- Live bot feed -->
       <section class="wt-section">
         <div class="wt-section-header">
-          <div class="wt-section-title">📡 Actividad en Vivo</div>
-          <div class="wt-section-meta" id="feed-updated">—</div>
+          <div class="wt-section-title" data-i18n="poly.feed.title">📡 Actividad en Vivo</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span id="ws-status" class="ws-status ws-status--off">
+              <span class="ws-dot"></span><span class="ws-status-text">Sin conexión</span>
+            </span>
+            <div class="wt-section-meta" id="feed-updated">—</div>
+          </div>
         </div>
         <div id="activity-feed" class="signals-feed">
           <div class="wt-empty">
             <div class="wt-empty-icon">🎯</div>
-            <p>Sin actividad aún — lanza un bot abajo.</p>
+            <p data-i18n="poly.feed.empty">Sin actividad aún — lanza un bot abajo.</p>
           </div>
         </div>
       </section>
@@ -125,8 +130,8 @@
       <!-- My bots (requires auth) -->
       <section class="wt-section" id="my-bots-section">
         <div class="wt-section-header">
-          <div class="wt-section-title">⚙️ Mis Bots</div>
-          <span id="my-bots-auth-hint" class="wt-auth-hint">Conecta wallet para gestionar</span>
+          <div class="wt-section-title" data-i18n="poly.bots.title">⚙️ Mis Bots</div>
+          <span id="my-bots-auth-hint" class="wt-auth-hint" data-i18n="poly.bots.hint">Conecta wallet para gestionar</span>
         </div>
         <div id="my-bots-list"></div>
       </section>
@@ -134,17 +139,17 @@
       <!-- Launch new bot -->
       <section class="wt-section" id="launch-section">
         <div class="wt-section-header">
-          <div class="wt-section-title">🚀 Nuevo Bot</div>
+          <div class="wt-section-title" data-i18n="poly.launch.title">🚀 Nuevo Bot</div>
         </div>
 
         <div id="launch-form-wrap" class="wt-launch-form">
           <div id="launch-overlay" class="wt-overlay">
-            <span>🔒 Conecta tu wallet para lanzar un bot</span>
+            <span data-i18n="poly.launch.overlay">🔒 Conecta tu wallet para lanzar un bot</span>
           </div>
 
           <div class="wt-field">
             <label class="wt-label">
-              Token ID del mercado
+              <span data-i18n="poly.form.token">Token ID del mercado</span>
               <span class="wt-info" tabindex="0">❓
                 <span class="wt-popover">El <strong>clobTokenId</strong> del outcome que quieres comprar (YES o NO). Lo encuentras en la API Gamma de Polymarket o en la URL del mercado. <span style="color:#00d4ff">Ej: 551150784210…</span></span>
               </span>
@@ -156,7 +161,7 @@
 
             <div class="wt-field">
               <label class="wt-label">
-                Tamaño (USDC)
+                <span data-i18n="poly.form.size">Tamaño (USDC)</span>
                 <span class="wt-info" tabindex="0">❓
                   <span class="wt-popover">Cuántos USDC gastar en la entrada. Es tu exposición máxima.</span>
                 </span>
@@ -166,17 +171,17 @@
 
             <div class="wt-field">
               <label class="wt-label">
-                Precio de entrada (opcional)
+                <span data-i18n="poly.form.entry">Precio de entrada (opcional)</span>
                 <span class="wt-info" tabindex="0">❓
                   <span class="wt-popover">Vacío = orden de mercado inmediata. Con valor = orden límite GTC que espera el fill.</span>
                 </span>
               </label>
-              <input type="number" class="wt-input" id="poly-entry-price" min="0.01" max="0.99" step="0.01" placeholder="vacío = mercado" />
+              <input type="number" class="wt-input" id="poly-entry-price" min="0.01" max="0.99" step="0.01" placeholder="vacío = mercado" data-i18n-placeholder="poly.form.entry_ph" />
             </div>
 
             <div class="wt-field">
               <label class="wt-label">
-                Take-profit
+                <span data-i18n="poly.form.tp">Take-profit</span>
                 <span class="wt-info" tabindex="0">❓
                   <span class="wt-popover">Precio al que el bot vende todo con ganancia. <span style="color:#34d399">Ej: compra a $0.80 → TP $0.88</span></span>
                 </span>
@@ -186,7 +191,7 @@
 
             <div class="wt-field">
               <label class="wt-label">
-                Stop-loss
+                <span data-i18n="poly.form.sl">Stop-loss</span>
                 <span class="wt-info" tabindex="0">❓
                   <span class="wt-popover">Precio al que el bot vende todo para cortar pérdidas (stop sintético: vigila el precio y vende al cruzar el nivel). <span style="color:#f87171">Ej: compra a $0.80 → SL $0.68</span></span>
                 </span>
@@ -198,12 +203,12 @@
 
           <div id="poly-live-keys" style="display:none;margin-top:10px">
             <div class="wt-field">
-              <label class="wt-label">Polygon funder address</label>
+              <label class="wt-label"><span data-i18n="poly.form.funder">Polygon funder address</span></label>
               <input type="text" class="wt-input" id="poly-funder" placeholder="0x…" />
             </div>
             <div class="wt-field" style="margin-top:10px">
               <label class="wt-label">
-                Polygon private key
+                <span data-i18n="poly.form.privkey">Polygon private key</span>
                 <span class="wt-info" tabindex="0">❓
                   <span class="wt-popover wt-popover--left">Se guarda <strong>encriptada (AES-256)</strong> igual que las HL API keys. Solo firma órdenes en Polymarket.</span>
                 </span>
@@ -215,11 +220,11 @@
           <div style="display:flex;gap:16px;margin-top:12px;align-items:center;flex-wrap:wrap">
             <label class="wt-checkbox-label">
               <input type="checkbox" id="poly-paper-trade" checked onchange="toggleLiveKeys()" />
-              <span style="color:#f59e0b">📋 Paper mode (sin órdenes reales)</span>
+              <span style="color:#f59e0b" data-i18n="poly.form.paper">📋 Paper mode (sin órdenes reales)</span>
             </label>
           </div>
 
-          <button class="btn wt-launch-btn" id="poly-launch-btn" onclick="launchPolyBot()">
+          <button class="btn wt-launch-btn" id="poly-launch-btn" onclick="launchPolyBot()" data-i18n="poly.launch.btn">
             🎯&nbsp; Launch Polymarket Bot
           </button>
           <p id="poly-launch-error" class="wt-error-msg"></p>
@@ -261,10 +266,7 @@
         btn.classList.remove('open');
       }
     });
-    function setLang(l) {
-      document.getElementById('lang-es').classList.toggle('active', l === 'es');
-      document.getElementById('lang-en').classList.toggle('active', l === 'en');
-    }
+    // setLang() is defined in polymarket.js (page-local i18n, persisted to vf_lang).
   </script>
 
 </body>

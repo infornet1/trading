@@ -337,13 +337,63 @@ no `bot_events` rows (`_SKIP_DB_EVENTS`); `bounds_refreshed` was previously misf
 reused via `series.setData(...)` with a single `resize` listener; previously every refresh leaked a
 LightweightCharts instance + window listener.
 
+### UX pass (2026-08-15)
+
+Follow-up to the performance pass: a frontend/backend/bot UX audit, fixes landed the same day.
+
+**Backend / bot manager**
+- **Fixed a severe auto-restart bug:** `_auto_restart_bots` built its config dict inline and dropped
+  `paper_trade`, all `polymarket_*` keys, and the gate/tuning columns — after any API restart a paper
+  bot respawned **LIVE** and a polymarket bot respawned with an empty token id. All three launch paths
+  now share `build_start_config(cfg)` in `api/bot_manager.py`.
+- Bot crashes now persist a `BotEvent(event_type="error")` with `details.msg = "process exited rc=N"`
+  plus a 20-line stdout ring buffer; `/bots/{id}/status` exposes `last_seen`, `seconds_since_output`,
+  and `last_error` so the UI can distinguish "alive but quiet" from "hung".
+- `stop()`/`shutdown()` no longer block the event loop (`asyncio.to_thread(proc.wait, …)`).
+- `/bots/{id}/events` returns `{total, rows, limit, offset}` (was a bare list — frontend tolerates
+  both); `/performance/trades` and `/signal-lab/history` gained `total` (history also gained `offset`);
+  `/performance/export` sends `X-Total-Rows` + `X-Truncated` headers.
+- HL SDK read endpoints (`/bots/hl-balance`, `/bots/{id}/hl-position`, signal-lab balance/positions,
+  admin balance/positions) wrapped in `asyncio.wait_for(…, timeout=10)` — they previously could hang
+  forever on a stuck HL API.
+- Missing `Authorization` header is now 401 (was FastAPI's default 403, which the frontend didn't
+  treat as session-expired); 429 responses carry `Retry-After`.
+- Unknown `[EVENT]` labels still map to `error` but keep the original label in `details.event_label`;
+  `live_polymarket_bot.py` now uses `details.msg` like the other bots.
+
+**Frontend — dashboard (`landing/dashboard/`)**
+- Equity chart fix: 15-min snapshots were mapped to date-only strings → duplicate Lightweight-Charts
+  `time` keys threw and killed the whole Performance tab render. Now deduped to one point per day,
+  and chart failures are isolated (`Promise.allSettled` + try/catch).
+- CSV export now uses `fetch` + Bearer + blob download (`window.open` always 401'd) and surfaces the
+  `X-Truncated` notice; `API_BASE` fallback typo `lp_hedge` → `lp-hedge` fixed.
+- Trade-journal Prev/Next buttons update after every load (Prev was permanently disabled); the
+  Performance tab refreshes on tab switch, shows a spinner + "last updated" time, and an inline error
+  banner instead of unhandled rejections.
+- Stop-confirm and gas modals are i18n'd (ES/EN) and close on Escape; drawer inputs (incl. the HL
+  private key field) survive auto-refresh re-renders; paper hedge bots show a PAPER tag instead of
+  LIVE; WS status pill in bot panels; error events render `details.msg`.
+
+**Frontend — whale / polymarket pages**
+- The ES/EN toggle actually works now (page-local `I18N` maps using the `vf_lang` localStorage key —
+  consolidate into `landing/i18n.js` later; keys already prefixed `whale.*`/`poly.*`).
+- Polymarket feed backfills history from `/bots/{id}/events` on load (was empty after every reload).
+- Stop/restart buttons have busy states; Stop confirms with truthful copy (Polymarket: position stays
+  OPEN, bot only stops monitoring). Both pages handle `accountsChanged`/`chainChanged`, show a WS
+  status indicator, swallow the duplicate 401 error banner, and render `details.msg` in their feeds.
+
+**Tests:** 110 (was 101) — new coverage for `build_start_config`, unknown-label preservation,
+missing-credential 401, and the rate limiter's `Retry-After`.
+
 ---
 
 ## 8. Common pitfalls
 
 - **`api/main.py` inline migrations** run on every startup. They are additive-only `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` statements (the table-rebuilding enum `MODIFY` and the always-failing `DROP INDEX` statements were removed 2026-08-15); prefer Alembic for new changes. The `bot_events.event_type` enum is owned by Alembic — never MODIFY it inline.
-- **Not all bot events are persisted.** `whale_snapshot` and `bounds_refreshed` are WebSocket-only (`_SKIP_DB_EVENTS` in `api/bot_manager.py`); everything else unknown still defaults to `error`. Don't add a DB query expecting those rows.
-- **Automated tests** are under `tests/` — **101 as of 2026-08-11**, and they run in under a second. Run `./venv/bin/python -m pytest tests/` before deploying changes.
+- **Not all bot events are persisted.** `whale_snapshot` and `bounds_refreshed` are WebSocket-only (`_SKIP_DB_EVENTS` in `api/bot_manager.py`); unknown labels still persist as `error`, now with the original label kept in `details.event_label`. Don't add a DB query expecting those rows.
+- **Bot launch config dict has a single source of truth.** `build_start_config(cfg)` in `api/bot_manager.py` builds the full config dict from a `BotConfig` row and is used by all three launch paths (`POST /bots/{id}/start`, `POST /admin/restart/{id}`, startup auto-restart). Never rebuild this dict at a call site — a dropped key once respawned paper bots LIVE after an API restart.
+- **`/bots/{id}/events` returns an envelope** `{total, rows, limit, offset}`, not a bare list.
+- **Automated tests** are under `tests/` — **110 as of 2026-08-15**, and they run in under a second. Run `./venv/bin/python -m pytest tests/` before deploying changes.
 - **`exec_size_usdt` is the NOTIONAL, not margin.** It is `size × fill_price`, so leverage is already inside it. Dollar P&L is `exec_size_usdt × price_return` and fees are `exec_size_usdt × 0.0009` — **never multiply either by leverage.** Doing so is the 2026-08-11 bug that overstated the dashboard by 3×–60×. (A *percentage* return on margin legitimately does multiply by leverage — that is a different quantity from a dollar figure. Don't conflate them.)
 - **`exec_leverage` ≠ `signal.leverage`.** HL caps leverage per asset (`maxLeverage` in `meta().universe`) and the executor silently uses `min(requested, max)`. Never assume they match; prefer `exec_leverage` for what actually executed.
 - **Hyperliquid price precision.** Perp prices accept **at most 5 significant figures**, and at most `6 - szDecimals` decimal places; whole numbers are always valid. A channel stop like BTC `65682.1` is rejected with `Invalid TP/SL price. asset=0` — where `asset=0` is merely HL's index for BTC, not a failed lookup. Use `_round_px()` in `api/signal_executor.py` for any manually-priced order. Entry orders need no rounding: `market_open()` derives its own price.

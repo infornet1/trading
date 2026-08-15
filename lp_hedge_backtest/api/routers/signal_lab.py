@@ -131,7 +131,11 @@ async def _fetch_hl_balance(addr: str) -> dict:
             }
         except Exception:
             return {"total": None, "perp": None, "spot": None, "spot_usable": False}
-    return await asyncio.to_thread(_sync)
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(_sync), timeout=10)
+    except asyncio.TimeoutError:
+        # Same error shape as a failed fetch — HL unreachable/slow
+        return {"total": None, "perp": None, "spot": None, "spot_usable": False}
 
 
 # ── User routes ────────────────────────────────────────────────────────────
@@ -417,13 +421,22 @@ def _calc_pnl(direction: str, leverage: int, fill_price: float,
 @router.get("/history")
 async def signal_history(
     limit:   int          = Query(50, ge=1, le=200),
+    offset:  int          = Query(0, ge=0),
     db:      AsyncSession = Depends(get_db),
     address: str          = Depends(get_current_address),
 ):
+    status_filter = SignalEvent.status.in_(["stopped", "tp_hit", "expired", "cancelled", "executed"])
+
+    # Total matching signals for client-side pagination
+    total = (await db.execute(
+        select(func.count()).select_from(SignalEvent).where(status_filter)
+    )).scalar_one()
+
     events_res = await db.execute(
         select(SignalEvent)
-        .where(SignalEvent.status.in_(["stopped", "tp_hit", "expired", "cancelled", "executed"]))
+        .where(status_filter)
         .order_by(desc(SignalEvent.received_at))
+        .offset(offset)
         .limit(limit)
     )
     events = events_res.scalars().all()
@@ -478,6 +491,7 @@ async def signal_history(
 
     return {
         "history": history,
+        "total": total,
         "stats": {
             "tp": tp_n, "sl": sl_n, "expired": exp_n,
             "win_rate": win_rate, "decided": decided,
@@ -942,7 +956,14 @@ async def get_hl_positions(
         except Exception:
             return []
 
-    results      = await asyncio.gather(*[asyncio.to_thread(_fetch_one, w) for w in wallets])
+    async def _guarded_fetch(wallet):
+        try:
+            return await asyncio.wait_for(asyncio.to_thread(_fetch_one, wallet), timeout=10)
+        except asyncio.TimeoutError:
+            # Same error shape as a failed fetch — HL unreachable/slow
+            return []
+
+    results      = await asyncio.gather(*[_guarded_fetch(w) for w in wallets])
     all_positions = [p for wallet_pos in results for p in wallet_pos]
     total_pnl     = round(sum(p["unrealized_pnl"] for p in all_positions), 4)
     return {"positions": all_positions, "total_pnl": total_pnl}

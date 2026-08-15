@@ -80,7 +80,7 @@
         <button class="lang-btn" id="lang-en" onclick="setLang('en')">EN</button>
       </div>
       <!-- Wallet connect -->
-      <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()">
+      <button id="wallet-btn" class="btn btn-primary btn-sm" onclick="connectWallet()" data-i18n="whale.connect">
         🟢&nbsp; Conectar Wallet
       </button>
       <span id="wallet-chip" class="wallet-chip hidden"></span>
@@ -96,7 +96,7 @@
   <div class="whale-hero">
     <div class="whale-hero-icon">🐋</div>
     <h1 class="whale-hero-title">Whale Tracker</h1>
-    <p class="whale-hero-sub">
+    <p class="whale-hero-sub" data-i18n="whale.hero.sub">
       Monitorea los top traders de Hyperliquid en tiempo real.
       Detecta aperturas, cierres y side flips de posiciones grandes.
     </p>
@@ -113,40 +113,45 @@
 
       <!-- Auth banner (shown when not signed in) -->
       <div id="auth-banner" class="alert alert-info hidden">
-        <span>🔒 Conecta tu wallet para gestionar bots de whale tracking.</span>
-        <button class="btn btn-sm" style="margin-left:12px" onclick="connectWallet()">Conectar</button>
+        <span data-i18n="whale.auth.banner">🔒 Conecta tu wallet para gestionar tus trackers. Los bots en ejecución siguen corriendo aunque tu sesión expire.</span>
+        <button class="btn btn-sm" style="margin-left:12px" onclick="connectWallet()" data-i18n="whale.auth.connect">Conectar</button>
       </div>
 
       <!-- Stats bar -->
       <div class="wt-stats-bar" id="wt-stats-bar">
         <div class="wt-stat">
           <div class="wt-stat-value" id="stat-signals-today">—</div>
-          <div class="wt-stat-label">Señales hoy</div>
+          <div class="wt-stat-label" data-i18n="whale.stats.signals_today">Señales hoy</div>
         </div>
         <div class="wt-stat">
           <div class="wt-stat-value" id="stat-active-trackers">—</div>
-          <div class="wt-stat-label">Trackers activos</div>
+          <div class="wt-stat-label" data-i18n="whale.stats.active">Trackers activos</div>
         </div>
         <div class="wt-stat">
           <div class="wt-stat-value" id="stat-whales-watched">—</div>
-          <div class="wt-stat-label">Whales monitoreados</div>
+          <div class="wt-stat-label" data-i18n="whale.stats.whales">Whales monitoreados</div>
         </div>
         <div class="wt-stat">
           <div class="wt-stat-value" id="stat-last-signal">—</div>
-          <div class="wt-stat-label">Última señal</div>
+          <div class="wt-stat-label" data-i18n="whale.stats.last">Última señal</div>
         </div>
       </div>
 
       <!-- Live signals feed -->
       <section class="wt-section">
         <div class="wt-section-header">
-          <div class="wt-section-title">📡 Señales en Vivo</div>
-          <div class="wt-section-meta" id="signals-updated">Actualizando…</div>
+          <div class="wt-section-title" data-i18n="whale.feed.title">📡 Señales en Vivo</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span id="ws-status" class="ws-status ws-status--off">
+              <span class="ws-dot"></span><span class="ws-status-text">Sin conexión</span>
+            </span>
+            <div class="wt-section-meta" id="signals-updated" data-i18n="whale.feed.updating">Actualizando…</div>
+          </div>
         </div>
         <div id="signals-feed" class="signals-feed">
           <div class="wt-empty">
             <div class="wt-empty-icon">🌊</div>
-            <p>Sin señales aún — el tracker está sondeando…</p>
+            <p data-i18n="whale.feed.empty">Sin señales aún — el tracker está sondeando…</p>
           </div>
         </div>
       </section>
@@ -154,8 +159,8 @@
       <!-- My trackers (requires auth) -->
       <section class="wt-section" id="my-trackers-section">
         <div class="wt-section-header">
-          <div class="wt-section-title">⚙️ Mis Trackers</div>
-          <span id="my-trackers-auth-hint" class="wt-auth-hint">Conecta wallet para gestionar</span>
+          <div class="wt-section-title" data-i18n="whale.trackers.title">⚙️ Mis Trackers</div>
+          <span id="my-trackers-auth-hint" class="wt-auth-hint" data-i18n="whale.trackers.hint">Conecta wallet para gestionar</span>
         </div>
         <div id="my-trackers-list"></div>
       </section>
@@ -163,20 +168,20 @@
       <!-- Launch new tracker -->
       <section class="wt-section" id="launch-section">
         <div class="wt-section-header">
-          <div class="wt-section-title">🚀 Nuevo Tracker</div>
+          <div class="wt-section-title" data-i18n="whale.launch.title">🚀 Nuevo Tracker</div>
         </div>
 
         <div id="launch-form-wrap" class="wt-launch-form">
           <!-- Overlay when not authed -->
           <div id="launch-overlay" class="wt-overlay">
-            <span>🔒 Conecta tu wallet para lanzar un tracker</span>
+            <span data-i18n="whale.launch.overlay">🔒 Conecta tu wallet para lanzar un tracker</span>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
 
             <div class="wt-field">
               <label class="wt-label">
-                Leaderboard Top N
+                <span data-i18n="whale.form.top_n">Leaderboard Top N</span>
                 <span class="wt-info" tabindex="0">❓
                   <span class="wt-popover">Número de top traders de HL (por PnL) a monitorear. <span style="color:#00d4ff">30–50 es un buen balance.</span></span>
                 </span>
@@ -186,7 +191,7 @@
 
             <div class="wt-field">
               <label class="wt-label">
-                Min Notional (USD)
+                <span data-i18n="whale.form.min_notional">Min Notional (USD)</span>
                 <span class="wt-info" tabindex="0">❓
                   <span class="wt-popover">Solo emite señales para posiciones superiores a este valor. <span style="color:#00d4ff">$50K–$100K filtra traders pequeños.</span></span>
                 </span>
@@ -195,37 +200,37 @@
             </div>
 
             <div class="wt-field">
-              <label class="wt-label">Poll Interval (seg)</label>
+              <label class="wt-label"><span data-i18n="whale.form.poll">Poll Interval (seg)</span></label>
               <input type="number" class="wt-input" id="whale-poll-interval" min="10" max="300" step="5" value="30" />
             </div>
 
             <div class="wt-field">
               <label class="wt-label">
-                Watch Assets
+                <span data-i18n="whale.form.watch">Watch Assets</span>
                 <span class="wt-info" tabindex="0">❓
                   <span class="wt-popover">Lista separada por comas, ej. <strong>BTC,ETH</strong>. Vacío = todos los activos.</span>
                 </span>
               </label>
-              <input type="text" class="wt-input" id="whale-watch-assets" placeholder="BTC,ETH (vacío = todos)" />
+              <input type="text" class="wt-input" id="whale-watch-assets" placeholder="BTC,ETH (vacío = todos)" data-i18n-placeholder="whale.form.watch_ph" />
             </div>
 
           </div>
 
           <div class="wt-field" style="margin-top:10px">
             <label class="wt-label">
-              Addresses Personalizadas (opcional)
+              <span data-i18n="whale.form.custom">Addresses Personalizadas (opcional)</span>
               <span class="wt-info" tabindex="0">❓
                 <span class="wt-popover">Addresses 0x separadas por comas, adicionales al leaderboard. Útil para wallets whale conocidas.</span>
               </span>
             </label>
-            <input type="text" class="wt-input" id="whale-custom-addresses" placeholder="0xABC..., 0xDEF... (opcional)" />
+            <input type="text" class="wt-input" id="whale-custom-addresses" placeholder="0xABC..., 0xDEF... (opcional)" data-i18n-placeholder="whale.form.custom_ph" />
           </div>
 
           <div style="display:flex;gap:16px;margin-top:12px;align-items:center;flex-wrap:wrap">
             <label class="wt-checkbox-label">
               <input type="checkbox" id="whale-use-ws" />
               <span>
-                Modo WebSocket
+                <span data-i18n="whale.form.ws">Modo WebSocket</span>
                 <span class="wt-info" tabindex="0">❓
                   <span class="wt-popover wt-popover--left"><strong>WebSocket</strong>: ~100–500ms latencia por fill. Ideal para copy-trading.<br><br><strong>Poll mode</strong>: snapshots cada N segundos. Más simple.</span>
                 </span>
@@ -233,11 +238,11 @@
             </label>
             <label class="wt-checkbox-label">
               <input type="checkbox" id="whale-paper-trade" checked />
-              <span style="color:#f59e0b">📋 Solo lectura / Paper mode</span>
+              <span style="color:#f59e0b" data-i18n="whale.form.paper">📋 Solo lectura / Paper mode</span>
             </label>
           </div>
 
-          <button class="btn wt-launch-btn" id="whale-launch-btn" onclick="launchWhaleBot()">
+          <button class="btn wt-launch-btn" id="whale-launch-btn" onclick="launchWhaleBot()" data-i18n="whale.launch.btn">
             🐋&nbsp; Launch Whale Tracker
           </button>
           <p id="whale-launch-error" class="wt-error-msg"></p>
@@ -283,10 +288,7 @@
         btn.classList.remove('open');
       }
     });
-    function setLang(l) {
-      document.getElementById('lang-es').classList.toggle('active', l === 'es');
-      document.getElementById('lang-en').classList.toggle('active', l === 'en');
-    }
+    // setLang() is defined in whale.js (page-local i18n, persisted to vf_lang).
   </script>
 
 </body>

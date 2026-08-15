@@ -19,7 +19,20 @@ _ADMIN_WALLETS = {
     if w.strip()
 }
 
-_bearer = HTTPBearer()
+# auto_error=False: a MISSING Authorization header must yield 401 (like an
+# expired/invalid token), not HTTPBearer's default 403 — the frontend only
+# handles 401 by redirecting to login.
+_bearer = HTTPBearer(auto_error=False)
+
+
+def _require_creds(creds: HTTPAuthorizationCredentials | None) -> HTTPAuthorizationCredentials:
+    if creds is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return creds
 
 
 def create_access_token(address: str) -> str:
@@ -47,13 +60,13 @@ def decode_token(token: str) -> dict:
 def get_current_address(
     creds: HTTPAuthorizationCredentials = Depends(_bearer),
 ) -> str:
-    return decode_token(creds.credentials)["sub"]
+    return decode_token(_require_creds(creds).credentials)["sub"]
 
 
 def get_current_admin(
     creds: HTTPAuthorizationCredentials = Depends(_bearer),
 ) -> str:
-    payload = decode_token(creds.credentials)
+    payload = decode_token(_require_creds(creds).credentials)
     if not payload.get("is_admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

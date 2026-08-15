@@ -181,8 +181,7 @@ async def _run_column_migrations():
 async def _auto_restart_bots():
     """On startup, re-launch any bot configs that were active before the last restart."""
     from api.models import BotConfig
-    from api.crypto import decrypt
-    from api.bot_manager import manager
+    from api.bot_manager import manager, build_start_config
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(BotConfig).where(BotConfig.active == True))
         bots = result.scalars().all()
@@ -194,39 +193,9 @@ async def _auto_restart_bots():
                 if needs_creds and (not bot.hl_api_key or not bot.hl_wallet_addr):
                     print(f"[Startup] Skipping bot {bot.id} — missing credentials (hl_api_key or hl_wallet_addr is NULL)", flush=True)
                     continue
-                config = {
-                    "nft_token_id":   bot.nft_token_id,
-                    "lower_bound":    str(bot.lower_bound),
-                    "upper_bound":    str(bot.upper_bound),
-                    "trigger_pct":    str(bot.trigger_pct),
-                    "hedge_ratio":    str(bot.hedge_ratio),
-                    "hl_api_key":     decrypt(bot.hl_api_key) if bot.hl_api_key else "",
-                    "hl_wallet_addr": bot.hl_wallet_addr or "",
-                    "user_address":   bot.user_address,
-                    "mode":           bot.mode,
-                    "pair":           bot.pair,
-                    "leverage":       str(bot.leverage   or 10),
-                    "sl_pct":         str(bot.sl_pct     or 0.1),
-                    "tp_pct":         str(bot.tp_pct)    if bot.tp_pct else "",
-                    "trailing_stop":  "1" if bot.trailing_stop else "0",
-                    "auto_rearm":     "1" if bot.auto_rearm    else "0",
-                    # FURY config (only used when mode='fury')
-                    "fury_symbol":       bot.fury_symbol       or "ETH",
-                    "fury_rsi_period":   str(bot.fury_rsi_period   or 9),
-                    "fury_rsi_long_th":  str(bot.fury_rsi_long_th  or 35),
-                    "fury_rsi_short_th": str(bot.fury_rsi_short_th or 65),
-                    "fury_leverage_max": str(bot.fury_leverage_max or 12),
-                    "fury_risk_pct":     str(bot.fury_risk_pct     or 2.0),
-                    # WHALE config (only used when mode='whale')
-                    "whale_top_n":              str(bot.whale_top_n          or 50),
-                    "whale_min_notional":       str(bot.whale_min_notional   or 50000),
-                    "whale_poll_interval":      str(bot.whale_poll_interval  or 30),
-                    "whale_custom_addresses":   bot.whale_custom_addresses   or "",
-                    "whale_watch_assets":       bot.whale_watch_assets       or "",
-                    "whale_use_websocket":      bot.whale_use_websocket      or False,
-                    "whale_oi_spike_threshold": str(bot.whale_oi_spike_threshold or 0.03),
-                    "engine_v2":               bool(bot.engine_v2),
-                }
+                # Shared builder (api/bot_manager.py) — must stay identical to
+                # the manual start path or restarted bots get a degraded config.
+                config = build_start_config(bot)
                 await manager.start(bot.id, config)
                 print(f"[Startup] Auto-restarted bot {bot.id} (NFT #{bot.nft_token_id})", flush=True)
             except Exception as e:

@@ -184,6 +184,11 @@ async def trade_journal(
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
             stmt = stmt.where(BotTrade.closed_at < to_dt)
+        # Total matching rows for client-side pagination
+        total = (await db.execute(
+            select(func.count()).select_from(stmt.subquery())
+        )).scalar_one()
+
         stmt = stmt.order_by(BotTrade.closed_at.desc()).limit(limit).offset(offset)
         result = await db.execute(stmt)
         trades = result.scalars().all()
@@ -209,7 +214,7 @@ async def trade_journal(
                 "opened_at": t.opened_at.isoformat() if t.opened_at else None,
                 "closed_at": t.closed_at.isoformat() if t.closed_at else None,
             })
-        return {"rows": rows, "limit": limit, "offset": offset}
+        return {"rows": rows, "limit": limit, "offset": offset, "total": total}
 
 
 @router.get("/breakdown")
@@ -300,6 +305,10 @@ async def export_csv(
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
             stmt = stmt.where(BotTrade.closed_at < to_dt)
+        # Real row count so the client can tell a capped CSV from a complete one
+        total = (await db.execute(
+            select(func.count()).select_from(stmt.subquery())
+        )).scalar_one()
         # Hard cap to bound memory on large journals
         stmt = stmt.order_by(BotTrade.closed_at.desc()).limit(10000)
         result = await db.execute(stmt)
@@ -325,8 +334,14 @@ async def export_csv(
 
         output.seek(0)
         filename = f"viznago_trades_{address[:8]}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+        headers = {
+            "Content-Disposition": f"attachment; filename={filename}",
+            "X-Total-Rows": str(total),
+        }
+        if total > len(trades):
+            headers["X-Truncated"] = "true"
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
+            headers=headers,
         )

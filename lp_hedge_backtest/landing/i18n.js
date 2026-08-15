@@ -234,6 +234,11 @@ const TRANSLATIONS = {
     'perf.noTrades':        'No hay operaciones cerradas en el período seleccionado.',
     'perf.noData':          'No hay datos para el período seleccionado.',
     'perf.includeEstimates': 'Incluir estimados',
+    'perf.updated':         'Actualizado',
+    'perf.loading':         'Cargando rendimiento…',
+    'perf.loadError':       'No se pudieron cargar los datos de rendimiento. Reintenta.',
+    'perf.exportError':     'Error al exportar el CSV. Reintenta.',
+    'perf.exportTruncated': 'Exportación truncada: se incluyeron 10.000 de {total} filas. Acota el rango de fechas para exportar todo.',
 
     // ── Dashboard: states ─────────────────────────────────────────
     'dash.loading.text':            'Obteniendo posiciones on-chain…',
@@ -321,6 +326,27 @@ const TRANSLATIONS = {
     'dash.admin.modal.desc':      'Esto detendrá TODOS los bots activos para TODOS los usuarios y los marcará inactivos. Esta acción no puede deshacerse automáticamente.',
     'dash.admin.modal.confirm':   '☢ Confirmar Parada Total',
     'dash.admin.modal.cancel':    'Cancelar',
+    // Stop-bot confirmation modal
+    'dash.stop.modal.title':      'Se cerrarán posiciones en Hyperliquid',
+    'dash.stop.modal.loading':    'Consultando posición en Hyperliquid…',
+    'dash.stop.modal.intro':      'Al desactivar esta trade, el sistema ejecutará automáticamente:',
+    'dash.stop.modal.bullet1':    'Cancelar triggers activos de',
+    'dash.stop.modal.bullet2':    'Cerrar posición abierta con orden a mercado',
+    'dash.stop.modal.warning':    'Esta acción es irreversible. El PnL se realizará al precio de mercado actual.',
+    'dash.stop.modal.noposition': 'No se encontró posición abierta en Hyperliquid para este bot.<br>Solo se detendrá el proceso del bot.',
+    'dash.stop.modal.confirm':    'Sí, desactivar y cerrar',
+    // Gas advisory modal
+    'dash.gas.title':             'Gas más elevado en',
+    'dash.gas.body1':             'VIZNIAGO LP Defensor y las transacciones de cobertura con Hyperliquid funcionan de manera óptima en <strong>Arbitrum One</strong>, donde los costos de gas son hasta <strong>10× menores</strong>.',
+    'dash.gas.body2a':            'Cambiar a',
+    'dash.gas.body2b':            'puede encarecer significativamente cada operación del bot.',
+    'dash.gas.stay':              '← Quedarme en Arbitrum',
+    'dash.gas.proceed':           'Continuar igual',
+    // WebSocket status + bot health
+    'dash.ws.live':               'LIVE',
+    'dash.ws.connecting':         'Conectando…',
+    'dash.ws.reconnecting':       'Reconectando…',
+    'dash.bot.lastOutput':        'última salida hace',
     // Whale Tracker
     'whale.leaderboard.label':    'Leaderboard',
     'whale.notional.label':       'Notional Mín.',
@@ -591,6 +617,11 @@ const TRANSLATIONS = {
     'perf.noTrades':        'No closed trades in the selected period.',
     'perf.noData':          'No data for the selected period.',
     'perf.includeEstimates': 'Include estimates',
+    'perf.updated':         'Updated',
+    'perf.loading':         'Loading performance…',
+    'perf.loadError':       'Could not load performance data. Please retry.',
+    'perf.exportError':     'CSV export failed. Please retry.',
+    'perf.exportTruncated': 'Export truncated: included 10,000 of {total} rows. Narrow the date range to export everything.',
 
     // ── Dashboard: states ─────────────────────────────────────────
     'dash.loading.text':            'Fetching on-chain positions…',
@@ -678,6 +709,27 @@ const TRANSLATIONS = {
     'dash.admin.modal.desc':      'This will terminate ALL active bots for ALL users and mark them inactive. This action cannot be automatically undone.',
     'dash.admin.modal.confirm':   '☢ Confirm Full Stop',
     'dash.admin.modal.cancel':    'Cancel',
+    // Stop-bot confirmation modal
+    'dash.stop.modal.title':      'Open Hyperliquid positions will be closed',
+    'dash.stop.modal.loading':    'Querying Hyperliquid position…',
+    'dash.stop.modal.intro':      'When you deactivate this trade, the system will automatically:',
+    'dash.stop.modal.bullet1':    'Cancel active triggers for',
+    'dash.stop.modal.bullet2':    'Close the open position with a market order',
+    'dash.stop.modal.warning':    'This action is irreversible. PnL will be realized at the current market price.',
+    'dash.stop.modal.noposition': 'No open Hyperliquid position was found for this bot.<br>Only the bot process will be stopped.',
+    'dash.stop.modal.confirm':    'Yes, deactivate and close',
+    // Gas advisory modal
+    'dash.gas.title':             'Higher gas on',
+    'dash.gas.body1':             'VIZNIAGO LP Defensor and Hyperliquid hedge transactions work best on <strong>Arbitrum One</strong>, where gas costs are up to <strong>10× lower</strong>.',
+    'dash.gas.body2a':            'Switching to',
+    'dash.gas.body2b':            'can significantly increase the cost of every bot operation.',
+    'dash.gas.stay':              '← Stay on Arbitrum',
+    'dash.gas.proceed':           'Continue anyway',
+    // WebSocket status + bot health
+    'dash.ws.live':               'LIVE',
+    'dash.ws.connecting':         'Connecting…',
+    'dash.ws.reconnecting':       'Reconnecting…',
+    'dash.bot.lastOutput':        'last output',
     // Whale Tracker
     'whale.leaderboard.label':    'Leaderboard',
     'whale.notional.label':       'Min. Notional',

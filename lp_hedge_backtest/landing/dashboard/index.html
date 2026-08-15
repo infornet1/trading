@@ -123,12 +123,12 @@
   <div id="stop-confirm-modal" class="nuclear-modal-overlay hidden">
     <div class="nuclear-modal stop-confirm-modal">
       <div class="nuclear-modal-icon">⚠️</div>
-      <h3 id="stop-confirm-title">Se cerrarán posiciones en Hyperliquid</h3>
+      <h3 id="stop-confirm-title" data-i18n="dash.stop.modal.title">Se cerrarán posiciones en Hyperliquid</h3>
 
       <!-- Loading state -->
       <div id="stop-confirm-loading" class="stop-confirm-loading">
         <div class="stop-confirm-spinner"></div>
-        <span>Consultando posición en Hyperliquid…</span>
+        <span data-i18n="dash.stop.modal.loading">Consultando posición en Hyperliquid…</span>
       </div>
 
       <!-- Position snapshot (populated by JS) -->
@@ -136,28 +136,30 @@
 
       <!-- Static warning bullets -->
       <div id="stop-confirm-body" class="stop-confirm-body hidden">
-        <p style="text-align:left;margin-bottom:10px;">Al desactivar esta trade, el sistema ejecutará automáticamente:</p>
+        <p style="text-align:left;margin-bottom:10px;" data-i18n="dash.stop.modal.intro">Al desactivar esta trade, el sistema ejecutará automáticamente:</p>
         <ul class="stop-confirm-list">
-          <li>Cancelar triggers activos de <strong id="stop-confirm-coin">ETH</strong></li>
-          <li>Cerrar posición abierta con orden a mercado</li>
+          <li><span data-i18n="dash.stop.modal.bullet1">Cancelar triggers activos de</span> <strong id="stop-confirm-coin">ETH</strong></li>
+          <li data-i18n="dash.stop.modal.bullet2">Cerrar posición abierta con orden a mercado</li>
         </ul>
-        <p class="stop-confirm-warning">Esta acción es irreversible. El PnL se realizará al precio de mercado actual.</p>
+        <p class="stop-confirm-warning" data-i18n="dash.stop.modal.warning">Esta acción es irreversible. El PnL se realizará al precio de mercado actual.</p>
       </div>
 
       <!-- No-position notice -->
       <div id="stop-confirm-no-position" class="hidden" style="margin-bottom:16px;">
-        <p style="color:var(--color-text-secondary);font-size:0.88rem;">
+        <p style="color:var(--color-text-secondary);font-size:0.88rem;"
+           data-i18n-html="dash.stop.modal.noposition">
           No se encontró posición abierta en Hyperliquid para este bot.<br>
           Solo se detendrá el proceso del bot.
         </p>
       </div>
 
       <div class="nuclear-modal-actions" style="margin-top:8px;">
-        <button id="stop-confirm-ok" class="btn-nuclear-confirm" onclick="confirmStopProtection()">
+        <button id="stop-confirm-ok" class="btn-nuclear-confirm" onclick="confirmStopProtection()"
+                data-i18n="dash.stop.modal.confirm">
           Sí, desactivar y cerrar
         </button>
         <button class="btn btn-sm" style="border-color:rgba(255,255,255,0.2)"
-                onclick="closeStopConfirmModal()">Cancelar</button>
+                onclick="closeStopConfirmModal()" data-i18n="dash.admin.modal.cancel">Cancelar</button>
       </div>
     </div>
   </div>
@@ -423,7 +425,7 @@
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
   <!-- Lightweight Charts™ for profitability dashboard (loaded early, used when enabled) -->
   <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
-  <script>window.PERFORMANCE_DASHBOARD_ENABLED = false;</script>
+  <!-- No client-side feature flag: profitability.js probes /performance/summary (404 = disabled) -->
   <script src="dashboard.js"></script>
   <script src="profitability.js"></script>
   <script src="../chat-widget.js"></script>
@@ -448,21 +450,21 @@
   <div id="gas-advisory-overlay" class="gas-overlay hidden" onclick="gasStayOnArb()">
     <div class="gas-modal" onclick="event.stopPropagation()">
       <div class="gas-modal-icon">⛽</div>
-      <h3 class="gas-modal-title">Gas más elevado en <span id="gas-chain-name">esta red</span></h3>
-      <p class="gas-modal-body">
+      <h3 class="gas-modal-title"><span data-i18n="dash.gas.title">Gas más elevado en</span> <span id="gas-chain-name">esta red</span></h3>
+      <p class="gas-modal-body" data-i18n-html="dash.gas.body1">
         VIZNIAGO LP Defensor y las transacciones de cobertura con Hyperliquid funcionan
         de manera óptima en <strong>Arbitrum One</strong>, donde los costos de gas son
         hasta <strong>10× menores</strong>.
       </p>
       <p class="gas-modal-body" style="margin-top:8px">
-        Cambiar a <span id="gas-chain-name2">esta red</span> puede encarecer
-        significativamente cada operación del bot.
+        <span data-i18n="dash.gas.body2a">Cambiar a</span> <span id="gas-chain-name2">esta red</span>
+        <span data-i18n="dash.gas.body2b">puede encarecer significativamente cada operación del bot.</span>
       </p>
       <div class="gas-modal-actions">
-        <button class="gas-btn gas-btn--primary" onclick="gasDismiss()">
+        <button class="gas-btn gas-btn--primary" onclick="gasDismiss()" data-i18n="dash.gas.stay">
           ← Quedarme en Arbitrum
         </button>
-        <button class="gas-btn gas-btn--ghost" id="gas-proceed-btn">
+        <button class="gas-btn gas-btn--ghost" id="gas-proceed-btn" data-i18n="dash.gas.proceed">
           Continuar igual
         </button>
       </div>

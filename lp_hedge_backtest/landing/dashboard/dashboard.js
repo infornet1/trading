@@ -131,6 +131,7 @@ const saas = {
   botsLoaded:     false,   // true after first successful GET /bots response
   sockets:        {},      // config_id (number) → WebSocket
   statuses:       {},      // config_id → last event payload
+  botStatus:      {},      // config_id → full /bots/{id}/status payload (last_seen, seconds_since_output, last_error — when backend provides them)
   logs:           {},      // config_id → array of log line strings (max 50)
   tgLinked:       null,    // null=unknown, false=not linked, {hint:"...1234"}=linked
 };
@@ -273,6 +274,7 @@ window.disconnectWallet = function ({ showBanner = false } = {}) {
   saas.bots       = {};
   saas.botsLoaded = false;
   saas.statuses   = {};
+  saas.botStatus  = {};
   saas._wsRetry   = {};
   saas.jwt        = null;
   localStorage.removeItem('vf_jwt');
@@ -294,6 +296,10 @@ window.setTab = function (tab) {
   });
   renderPositions();
   togglePerformanceSection(tab === 'performance');
+  // Refresh perf data every time the tab is opened (it has no auto-refresh)
+  if (tab === 'performance' && window.refreshPerformanceTab) {
+    window.refreshPerformanceTab();
+  }
 };
 
 // ── Watch Address (read-only) ─────────────────────────────────────────────
@@ -1292,10 +1298,49 @@ function renderPriceTicker() {
   upEl.textContent = `Updated ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
 }
 
+// ── Protection drawer form preservation ─────────────────────────────────────
+// Auto-refresh rebuilds position cards, which would wipe unsaved input in an
+// open protection drawer (including the HL private key field). Snapshot the
+// values of every input/select inside open drawers before the rebuild and
+// restore them into the redrawn drawer afterwards.
+
+function snapshotDrawerInputs() {
+  const snap = {};
+  for (const tokenId of _drawerOpen) {
+    const body = document.getElementById('prot-body-' + tokenId);
+    if (!body) continue;
+    body.querySelectorAll('input, select').forEach(el => {
+      if (!el.id) return;
+      snap[el.id] = (el.type === 'checkbox' || el.type === 'radio')
+        ? { checked: el.checked }
+        : { value: el.value };
+    });
+  }
+  return snap;
+}
+
+function restoreDrawerInputs(snap) {
+  const ids = Object.keys(snap);
+  if (!ids.length) return;
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (snap[id].checked !== undefined) el.checked = snap[id].checked;
+    else el.value = snap[id].value;
+  }
+  // Re-sync slider labels, SL warning and margin box with restored values
+  for (const tokenId of _drawerOpen) {
+    if (document.getElementById('prot-form-' + tokenId)) {
+      window.onSLChange(tokenId);
+    }
+  }
+}
+
 function renderPositions() {
   if (state.activeTab === 'explore') return;
   if (state.activeTab === 'performance') return;
   const grid = document.getElementById('positions-grid');
+  const drawerSnap = snapshotDrawerInputs();
   grid.innerHTML = '';
 
   // Always update counts first (affects both tabs and ws-count)
@@ -1319,6 +1364,7 @@ function renderPositions() {
   const sorted = [...filtered].sort((a, b) => (order[a.rangeStatus] ?? 4) - (order[b.rangeStatus] ?? 4));
 
   sorted.forEach(pos => grid.appendChild(buildPositionCard(pos)));
+  restoreDrawerInputs(drawerSnap);
   // Load event history for each position (no-op if no bot configured or not authed)
   sorted.forEach(pos => loadPositionEvents(pos.tokenId));
   // Load fee APR + projections for each position (M2-1/M2-2)
@@ -1433,14 +1479,19 @@ async function loadPositionAPR(pos) {
 
 // ── Position Event History ────────────────────────────────────────────────
 
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 async function loadPositionEvents(tokenId) {
   const bot = saas.bots[String(tokenId)];
   const el  = document.getElementById(`pos-events-${tokenId}`);
   if (!el || !bot || !saas.jwt) return;
 
   try {
-    const events = await apiCall('GET', `/bots/${bot.id}/events?limit=50`);
-    if (!Array.isArray(events) || !events.length) {
+    const res = await apiCall('GET', `/bots/${bot.id}/events?limit=50`);
+    const events = Array.isArray(res) ? res : (res.rows || []);
+    if (!events.length) {
       el.innerHTML = `
         <div class="pos-events-header"><span>Eventos del Bot</span></div>
         <div class="pos-events-empty">Sin eventos registrados aún</div>`;
@@ -1474,6 +1525,12 @@ async function loadPositionEvents(tokenId) {
       // M2-43: IL attribution line for close events
       const CLOSE_TYPES = new Set(['sl_hit', 'trailing_stop', 'tp_hit']);
       const det = ev.details || {};
+      // Error events: render the human-readable detail persisted by the
+      // backend (details.msg, or details.event_label for unmapped labels)
+      // instead of a bare "⚠️ Error".
+      const errRow = ev.event_type === 'error' && (det.msg || det.event_label)
+        ? `<div class="evt-error-msg">${escapeHtml(det.msg || det.event_label)}</div>`
+        : '';
       const ilRow = CLOSE_TYPES.has(ev.event_type) && det.lp_chg_pct != null ? (() => {
         const lp  = Number(det.lp_chg_pct);
         const hdg = Number(det.hedge_offset_pct);
@@ -1493,6 +1550,7 @@ async function loadPositionEvents(tokenId) {
         ${price}${pnl}
         <span class="evt-time">${time}</span>
         ${ilRow}
+        ${errRow}
       </div>`;
     };
 
@@ -1821,6 +1879,17 @@ function init() {
     if (wrapper && !wrapper.contains(e.target)) closeWalletDropdown();
   });
 
+  // Escape closes any open modal — mirrors overlay-click behavior
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const stopModal = document.getElementById('stop-confirm-modal');
+    if (stopModal && !stopModal.classList.contains('hidden')) { closeStopConfirmModal(); return; }
+    const nuclearModal = document.getElementById('nuclear-modal');
+    if (nuclearModal && !nuclearModal.classList.contains('hidden')) { closeNuclearModal(); return; }
+    const gasOverlay = document.getElementById('gas-advisory-overlay');
+    if (gasOverlay && !gasOverlay.classList.contains('hidden')) { gasStayOnArb(); return; }
+  });
+
   // Enter key on watch address input
   const watchInput = document.getElementById('watch-addr-input');
   if (watchInput) {
@@ -2002,6 +2071,9 @@ async function saasLoadBots() {
         // Fetch last known event so panel shows real data immediately after refresh
         apiCall('GET', `/bots/${bot.id}/status`).then(s => {
           if (s?.last_event) saas.statuses[bot.id] = s.last_event;
+          // Keep the full payload — newer backends include liveness fields
+          // (last_seen, seconds_since_output, last_error) shown in the panel.
+          if (s) saas.botStatus[bot.id] = s;
           renderLiveBots();
         }).catch(() => {});
         // 1. Pre-populate from localStorage cache (raw lines, 72h TTL)
@@ -2011,8 +2083,9 @@ async function saasLoadBots() {
           renderLiveBots();
         }
         // 2. Append structured DB events (last 72h) on top of cache
-        apiCall('GET', `/bots/${bot.id}/events?limit=200&hours=72`).then(events => {
-          if (!Array.isArray(events) || !events.length) return;
+        apiCall('GET', `/bots/${bot.id}/events?limit=200&hours=72`).then(res => {
+          const events = Array.isArray(res) ? res : (res.rows || []);
+          if (!events.length) return;
           if (!saas.logs[bot.id]) saas.logs[bot.id] = [];
           const now = Date.now();
           // Events come newest-first — reverse to show oldest at top
@@ -2024,7 +2097,11 @@ async function saasLoadBots() {
               : d.toLocaleTimeString();
             const pnl = ev.pnl != null ? ` | P&L: ${ev.pnl >= 0 ? '+' : ''}$${Number(ev.pnl).toFixed(2)}` : '';
             const px  = ev.price_at_event ? ` | $${Number(ev.price_at_event).toLocaleString('en-US',{maximumFractionDigits:2})}` : '';
-            saas.logs[bot.id].push(`[${ts}] ${ev.event_type.toUpperCase()}${px}${pnl}`);
+            // Surface human-readable error detail instead of a bare "ERROR"
+            const eDet = ev.details || {};
+            const errDetail = ev.event_type === 'error' && (eDet.msg || eDet.event_label)
+              ? ` — ${eDet.msg || eDet.event_label}` : '';
+            saas.logs[bot.id].push(`[${ts}] ${ev.event_type.toUpperCase()}${px}${pnl}${errDetail}`);
           });
           renderLiveBots();
         }).catch(() => {});
@@ -2068,6 +2145,43 @@ async function saasLoadBots() {
 
 // ── Live Bots Panel ───────────────────────────────────────────────────────
 
+// WS connection status pill for bot panel headers. Rendered from the actual
+// socket state so re-renders don't reset it; updated live by connectBotWS.
+function wsStatusHtml(bot) {
+  const t    = window.t || (k => k);
+  const ws   = saas.sockets[bot.id];
+  const open = ws && ws.readyState === WebSocket.OPEN;
+  const cls  = open ? 'ws-status--live' : (ws ? 'ws-status--connecting' : 'ws-status--reconnecting');
+  const key  = open ? 'dash.ws.live' : (ws ? 'dash.ws.connecting' : 'dash.ws.reconnecting');
+  return `<span class="ws-status ${cls}" id="ws-status-${bot.id}">${t(key)}</span>`;
+}
+
+function updateWsIndicator(configId, status) {
+  const el = document.getElementById(`ws-status-${configId}`);
+  if (!el) return;
+  const t = window.t || (k => k);
+  el.className = `ws-status ws-status--${status}`;
+  el.textContent = t(`dash.ws.${status}`);
+}
+
+// Cheap liveness line from /bots/{id}/status (null-safe — fields only exist
+// on newer backends). Shows seconds_since_output and/or last_error.
+function botHealthHtml(bot) {
+  const st = saas.botStatus[bot.id];
+  if (!st) return '';
+  const t = window.t || (k => k);
+  const parts = [];
+  if (st.seconds_since_output != null && !isNaN(Number(st.seconds_since_output))) {
+    const s = Number(st.seconds_since_output);
+    const age = s < 120 ? `${Math.round(s)}s` : `${Math.round(s / 60)}min`;
+    parts.push(`⏱ ${t('dash.bot.lastOutput')} ${age}`);
+  }
+  if (st.last_error) {
+    parts.push(`⚠ ${escapeHtml(String(st.last_error)).slice(0, 140)}`);
+  }
+  return parts.length ? `<div class="bot-health-line">${parts.join(' · ')}</div>` : '';
+}
+
 function renderLiveBots() {
   const section = document.getElementById('live-bots-section');
   if (!section) return;
@@ -2110,9 +2224,10 @@ function renderLiveBots() {
           <div class="hedge-panel-header">
             <div class="section-label">VIZNIAGO FURY</div>
             <h3 class="hedge-panel-title">
-              RSI Trader · ${symbol} ${statusTag}
+              RSI Trader · ${symbol} ${statusTag} ${wsStatusHtml(bot)}
             </h3>
           </div>
+          ${botHealthHtml(bot)}
           <div class="hedge-info-grid">
             <div class="hedge-info-card">
               <div class="hi-label">Symbol</div>
@@ -2169,16 +2284,22 @@ function renderLiveBots() {
         </div>`;
     }
 
+    // Mirror the FURY branch: paper hedge bots must not be tagged LIVE
+    const isPaperHedge = bot.paper_trade === true;
+    const hedgeStatusTag = isPaperHedge
+      ? `<span class="status-live-tag" style="background:#f59e0b;color:#000">PAPER</span>`
+      : `<span class="status-dot dot-green"></span><span class="status-live-tag">LIVE</span>`;
+
     return `
       <div class="hedge-panel" style="margin-top:16px">
         <div class="hedge-panel-header">
           <div class="section-label">${t('dash.hedge.label')}</div>
           <h3 class="hedge-panel-title">
             ${bot.mode === 'aragan' ? 'Defensor Bajista' : 'Defensor Alcista'} v1.3
-            <span class="status-dot dot-green"></span>
-            <span class="status-live-tag">LIVE</span>
+            ${hedgeStatusTag} ${wsStatusHtml(bot)}
           </h3>
         </div>
+        ${botHealthHtml(bot)}
         <div class="hedge-info-grid">
           <div class="hedge-info-card">
             <div class="hi-label">${t('dash.hedge.nft.label')}</div>
@@ -2271,10 +2392,12 @@ function connectBotWS(configId) {
   const url   = `${proto}://${location.host}/trading/lp-hedge/api/ws/${configId}?token=${saas.jwt}`;
   const ws    = new WebSocket(url);
   saas.sockets[configId] = ws;
+  updateWsIndicator(configId, 'connecting');
 
   ws.onopen = () => {
     // Reset backoff counter on successful connection
     saas._wsRetry[configId] = 0;
+    updateWsIndicator(configId, 'live');
   };
 
   ws.onmessage = (e) => {
@@ -2310,6 +2433,7 @@ function connectBotWS(configId) {
 
     const delayS = (delay / 1000).toFixed(0);
     appendLogLine(configId, `⟳ Connection lost — reconnecting in ${delayS}s…`);
+    updateWsIndicator(configId, 'reconnecting');
 
     setTimeout(() => {
       const stillActive = Object.values(saas.bots).find(b => b.id === configId)?.active;
@@ -3082,8 +3206,9 @@ window.activateProtection = async function (tokenId) {
     // POST /start returns. Re-fetch events once at T+3 s so the log panel
     // shows the startup line instead of being empty for ~2 min until WS fires.
     setTimeout(() => {
-      apiCall('GET', `/bots/${configId}/events?limit=10`).then(events => {
-        if (!Array.isArray(events) || !events.length) return;
+      apiCall('GET', `/bots/${configId}/events?limit=10`).then(res => {
+        const events = Array.isArray(res) ? res : (res.rows || []);
+        if (!events.length) return;
         if (!saas.logs[configId]) saas.logs[configId] = [];
         const now = Date.now();
         [...events].reverse().forEach(ev => {
@@ -3091,7 +3216,10 @@ window.activateProtection = async function (tokenId) {
           const ts = d.toLocaleTimeString();
           const pnl = ev.pnl != null ? ` | P&L: ${ev.pnl >= 0 ? '+' : ''}$${Number(ev.pnl).toFixed(2)}` : '';
           const px  = ev.price_at_event ? ` | $${Number(ev.price_at_event).toLocaleString('en-US',{maximumFractionDigits:2})}` : '';
-          const line = `[${ts}] ${ev.event_type.toUpperCase()}${px}${pnl}`;
+          const eDet2 = ev.details || {};
+          const errDetail = ev.event_type === 'error' && (eDet2.msg || eDet2.event_label)
+            ? ` — ${eDet2.msg || eDet2.event_label}` : '';
+          const line = `[${ts}] ${ev.event_type.toUpperCase()}${px}${pnl}${errDetail}`;
           if (!saas.logs[configId].includes(line)) saas.logs[configId].push(line);
         });
         renderLiveBots();
@@ -3526,6 +3654,7 @@ window.stopProtection = async function (configId, tokenId) {
   bodyEl.classList.add('hidden');
   noPosEl.classList.add('hidden');
   okBtn.disabled = false;
+  okBtn.textContent = (window.t || (k => k))('dash.stop.modal.confirm');
   modal.classList.remove('hidden');
 
   // Query live HL position
@@ -3604,7 +3733,7 @@ window.confirmStopProtection = async function () {
   } catch (err) {
     showError('Stop failed: ' + (err.message || err));
     okBtn.disabled = false;
-    okBtn.textContent = 'Sí, desactivar y cerrar';
+    okBtn.textContent = t('dash.stop.modal.confirm');
     if (btn) { btn.disabled = false; btn.textContent = t('prot.btn.stop'); }
   }
 };

@@ -245,6 +245,46 @@
 }
 .sig-addr:hover { color: #00d4ff; border-color: rgba(0,212,255,0.4); }
 
+/* Detail message under a feed row (error events: details.msg) */
+.sig-msg {
+  grid-column: 2 / -1;
+  color: #fca5a5;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* ── WS connection status indicator ──────────────────────── */
+.ws-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.ws-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6b7280;
+  flex-shrink: 0;
+}
+
+.ws-status--live { color: #34d399; }
+.ws-status--live .ws-dot {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52,211,153,0.6);
+  animation: pulse-green 2s infinite;
+}
+
+.ws-status--reconnect { color: #f59e0b; }
+.ws-status--reconnect .ws-dot {
+  background: #f59e0b;
+  animation: pulse-green 1s infinite;
+}
+
 /* ── Tracker cards ───────────────────────────────────────── */
 .tracker-card {
   display: flex;
@@ -440,6 +480,7 @@
   transition: background 0.15s, border-color 0.15s;
 }
 .btn:hover { background: rgba(255,255,255,0.05); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-primary {
   background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(26,143,255,0.15));

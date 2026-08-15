@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+from collections import deque
 from datetime import datetime, timezone
 from subprocess import PIPE, STDOUT
 from typing import Optional
@@ -71,6 +72,65 @@ _EVENT_MAP = {
 # - bounds_refreshed: emitted by live_hedge_bot_v2; not a valid
 #   bot_events.event_type enum value (it would default to 'error').
 _SKIP_DB_EVENTS = {"whale_snapshot", "bounds_refreshed"}
+
+
+def build_start_config(cfg: BotConfig) -> dict:
+    """Build the complete config dict passed to BotManager.start().
+
+    Single source of truth shared by every bot-launch path —
+    POST /bots/{id}/start (api/routers/bots.py), POST /admin/restart/{id}
+    (api/routers/admin.py) and the startup auto-restart
+    (api/main.py::_auto_restart_bots). A bot respawned after an API restart
+    must receive exactly the same config as one started by hand (a missing
+    `paper_trade` key once respawned paper bots LIVE). Do NOT fork this
+    logic at a call site — extend it here.
+    """
+    from api.crypto import decrypt
+    return {
+        "nft_token_id":   cfg.nft_token_id,
+        "lower_bound":    str(cfg.lower_bound),
+        "upper_bound":    str(cfg.upper_bound),
+        "trigger_pct":    str(cfg.trigger_pct),
+        "hedge_ratio":    str(cfg.hedge_ratio),
+        "hl_api_key":     decrypt(cfg.hl_api_key) if cfg.hl_api_key else "",
+        "hl_wallet_addr": cfg.hl_wallet_addr or "",
+        "user_address":   cfg.user_address,
+        "mode":           cfg.mode,
+        "pair":           cfg.pair,
+        "leverage":       str(cfg.leverage   or 10),
+        "sl_pct":         str(cfg.sl_pct     or 0.1),
+        "tp_pct":         str(cfg.tp_pct)    if cfg.tp_pct else "",
+        "trailing_stop":  "1" if cfg.trailing_stop else "0",
+        "auto_rearm":     "1" if cfg.auto_rearm    else "0",
+        # FURY config (only used when mode='fury')
+        "fury_symbol":       cfg.fury_symbol       or "ETH",
+        "fury_rsi_period":   str(cfg.fury_rsi_period   or 9),
+        "fury_rsi_long_th":  str(cfg.fury_rsi_long_th  or 35),
+        "fury_rsi_short_th": str(cfg.fury_rsi_short_th or 65),
+        "fury_leverage_max": str(cfg.fury_leverage_max or 12),
+        "fury_risk_pct":     str(cfg.fury_risk_pct     or 2.0),
+        # WHALE config (only used when mode='whale')
+        "whale_top_n":              str(cfg.whale_top_n          or 50),
+        "whale_min_notional":       str(cfg.whale_min_notional   or 50000),
+        "whale_poll_interval":      str(cfg.whale_poll_interval  or 30),
+        "whale_custom_addresses":   cfg.whale_custom_addresses   or "",
+        "whale_watch_assets":       cfg.whale_watch_assets       or "",
+        "whale_use_websocket":      bool(cfg.whale_use_websocket),
+        "whale_oi_spike_threshold": str(cfg.whale_oi_spike_threshold or 0.03),
+        # POLYMARKET config (only used when mode='polymarket')
+        "polymarket_token_id":    cfg.polymarket_token_id    or "",
+        "polymarket_size_usd":    str(cfg.polymarket_size_usd or 0),
+        "polymarket_entry_price": str(cfg.polymarket_entry_price) if cfg.polymarket_entry_price else "",
+        "polymarket_tp_price":    str(cfg.polymarket_tp_price or 0),
+        "polymarket_sl_price":    str(cfg.polymarket_sl_price or 0),
+        "paper_trade":         bool(cfg.paper_trade),
+        "engine_v2":           bool(cfg.engine_v2),
+        # M2-47: from-above distance gate (user-tunable, default 5%)
+        "from_above_dist_pct": str(cfg.from_above_dist_pct or 5.0),
+        # M2-44: funding rate gate (Phase 2, default off)
+        "use_funding_gate":    "1" if cfg.use_funding_gate else "0",
+        "funding_gate_pct":    str(cfg.funding_gate_pct or 0.05),
+    }
 
 
 class BotManager:
@@ -208,7 +268,8 @@ class BotManager:
         for config_id, proc in list(self._procs.items()):
             try:
                 proc.terminate()
-                proc.wait(timeout=3)
+                # proc.wait() is blocking — keep it off the event loop.
+                await asyncio.to_thread(proc.wait, timeout=3)
             except Exception:
                 try: proc.kill()
                 except Exception: pass
@@ -224,9 +285,11 @@ class BotManager:
         if proc:
             proc.terminate()
             try:
-                proc.wait(timeout=5)
+                # proc.wait() is blocking — keep it off the event loop.
+                await asyncio.to_thread(proc.wait, timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
+                await asyncio.to_thread(proc.wait)
             print(f"[BotManager] Stopped bot for config {config_id}", flush=True)
         if task and not task.done():
             task.cancel()
@@ -258,6 +321,9 @@ class BotManager:
         Parse [EVENT] JSON lines → DB + WebSocket.
         """
         loop = asyncio.get_event_loop()
+        # Ring buffer of recent stdout lines for crash forensics — the
+        # traceback otherwise only exists as transient WS log lines.
+        recent_lines: deque = deque(maxlen=20)
         try:
             while True:
                 line = await loop.run_in_executor(None, proc.stdout.readline)
@@ -269,6 +335,7 @@ class BotManager:
 
                 print(f"[Bot {config_id}] {line}", flush=True)
                 self._last_seen[config_id] = datetime.now(timezone.utc)
+                recent_lines.append(line)
 
                 if line.startswith("[EVENT] "):
                     try:
@@ -296,8 +363,19 @@ class BotManager:
                 proc.poll()
                 killed_by_signal = proc.returncode is None or proc.returncode < 0
                 if not self._shutting_down and not killed_by_signal:
+                    # Crash — persist the last stdout lines so the cause is
+                    # recoverable from bot_events, not just the live log.
+                    crash_details = {
+                        "msg":        f"process exited rc={proc.returncode}",
+                        "last_lines": list(recent_lines),
+                    }
+                    await self._write_event(config_id, "error", None, None, crash_details)
                     await self._mark_inactive(config_id)
-                    await self._broadcast(config_id, {"event": "stopped", "config_id": config_id})
+                    await self._broadcast(config_id, {
+                        "event":     "stopped",
+                        "config_id": config_id,
+                        "details":   crash_details,
+                    })
                     print(f"[BotManager] Bot {config_id} crashed (rc={proc.returncode}), marked inactive", flush=True)
                 else:
                     print(f"[BotManager] Bot {config_id} terminated (rc={proc.returncode}), active=True preserved", flush=True)
@@ -308,6 +386,11 @@ class BotManager:
         price       = record.get("price")
         pnl         = record.get("pnl")
         details     = record.get("details")
+
+        # Unknown labels persist as 'error' — keep the original label so the
+        # true event identity survives in bot_events.details.
+        if event_label not in _EVENT_MAP:
+            details = {**(details or {}), "event_label": event_label}
 
         # Noisy / non-enum events: WebSocket broadcast only, no bot_events row.
         if event_label not in _SKIP_DB_EVENTS:

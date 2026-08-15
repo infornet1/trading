@@ -43,3 +43,20 @@ def test_non_admin_does_not_get_claim():
     token = auth.create_access_token("0x" + "b" * 40)
     payload = auth.decode_token(token)
     assert "is_admin" not in payload
+
+
+def test_missing_credentials_raise_401_not_403():
+    """HTTPBearer(auto_error=False): a missing Authorization header must
+    surface as 401 (the frontend only handles 401), never 403."""
+    from fastapi import HTTPException
+
+    from api.auth import get_current_admin
+
+    with pytest.raises(HTTPException) as exc:
+        get_current_address(None)
+    assert exc.value.status_code == 401
+    assert "Missing" in exc.value.detail
+
+    with pytest.raises(HTTPException) as exc:
+        get_current_admin(None)
+    assert exc.value.status_code == 401
