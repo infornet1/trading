@@ -723,6 +723,7 @@ async def start_bot(
         "hedge_ratio":    str(cfg.hedge_ratio),
         "hl_api_key":     decrypt(cfg.hl_api_key) if cfg.hl_api_key else "",
         "hl_wallet_addr": cfg.hl_wallet_addr or "",
+        "user_address":   cfg.user_address,
         "mode":           cfg.mode,
         "pair":           cfg.pair,
         "leverage":       str(cfg.leverage   or 10),

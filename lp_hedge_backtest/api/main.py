@@ -55,17 +55,9 @@ async def _run_column_migrations():
         # M2-44: funding rate gate — Phase 2 (gate off by default)
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS use_funding_gate TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS funding_gate_pct DECIMAL(5,3) NOT NULL DEFAULT 0.050",
-        # Extend bot_events enum with LP safety + V2 recovery event types
-        (
-            "ALTER TABLE bot_events MODIFY COLUMN event_type ENUM("
-            "'started','hedge_opened','breakeven','tp_hit','sl_hit',"
-            "'trailing_stop','stopped','error','reentry_guard_cleared',"
-            "'lp_removed','lp_burned','orphan_recovered','circuit_breaker',"
-            "'fury_entry','fury_sl','fury_tp','fury_circuit_breaker',"
-            "'whale_new_position','whale_closed','whale_size_increase',"
-            "'whale_size_decrease','whale_flip','whale_snapshot','whale_event'"
-            ") NOT NULL"
-        ),
+        # NOTE: bot_events.event_type enum is owned by Alembic (b2c4d6e8f0a1).
+        # The old unconditional MODIFY COLUMN rebuilt the whole table on every
+        # restart and omitted the poly_* event types — removed 2026-08-15.
         # Telegram alerts — create table if not exists
         (
             "CREATE TABLE IF NOT EXISTS telegram_links ("
@@ -76,11 +68,9 @@ async def _run_column_migrations():
             "  UNIQUE KEY uq_chat_wallet (telegram_chat_id, user_address)"
             ")"
         ),
-        # Multi-wallet migration: drop old single-column unique indexes if they exist
-        "ALTER TABLE telegram_links DROP INDEX user_address",
-        "ALTER TABLE telegram_links DROP INDEX telegram_chat_id",
-        # Add composite unique if not already present
-        "ALTER TABLE telegram_links ADD UNIQUE KEY uq_chat_wallet (telegram_chat_id, user_address)",
+        # Multi-wallet unique key uq_chat_wallet is already created with the
+        # table above; the old DROP INDEX statements failed on every startup —
+        # removed 2026-08-15.
         # Signal Lab tables
         (
             "CREATE TABLE IF NOT EXISTS signal_sources ("
@@ -212,6 +202,7 @@ async def _auto_restart_bots():
                     "hedge_ratio":    str(bot.hedge_ratio),
                     "hl_api_key":     decrypt(bot.hl_api_key) if bot.hl_api_key else "",
                     "hl_wallet_addr": bot.hl_wallet_addr or "",
+                    "user_address":   bot.user_address,
                     "mode":           bot.mode,
                     "pair":           bot.pair,
                     "leverage":       str(bot.leverage   or 10),

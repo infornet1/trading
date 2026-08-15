@@ -20,13 +20,13 @@ import asyncio
 import json
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import desc, select, update
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import get_current_address, get_current_admin
@@ -35,7 +35,6 @@ from api.database import get_db
 from api.models import BotConfig, SignalEvent, SignalExecution, SignalSource, SignalUserDefault, SignalWallet
 from api.signal_executor import place_hl_order
 
-SIGNAL_EXPIRY_HOURS = 7
 _HL_ASSETS_CACHE: list | None = None
 _HL_ASSETS_TS:    float       = 0.0
 _HL_ASSETS_TTL:   int         = 3600  # refresh every hour
@@ -78,17 +77,6 @@ class PatchWalletRequest(BaseModel):
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
-
-async def _expire_stale_signals(db: AsyncSession) -> int:
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=SIGNAL_EXPIRY_HOURS)
-    result = await db.execute(
-        update(SignalEvent)
-        .where(SignalEvent.status == "pending", SignalEvent.received_at < cutoff)
-        .values(status="expired")
-    )
-    await db.commit()
-    return result.rowcount
-
 
 def _signal_to_dict(ev: SignalEvent) -> dict:
     age_seconds = int((datetime.now(timezone.utc).replace(tzinfo=None) - ev.received_at).total_seconds())
@@ -155,7 +143,8 @@ async def list_signals(
     db:      AsyncSession  = Depends(get_db),
     address: str           = Depends(get_current_address),
 ):
-    await _expire_stale_signals(db)
+    # Expiry is owned by the background sweeper (api/signal_expiry.py) — no
+    # UPDATE+COMMIT on this read endpoint.
     q = select(SignalEvent).order_by(desc(SignalEvent.received_at)).limit(limit)
     if status:
         q = q.where(SignalEvent.status == status)
@@ -439,17 +428,37 @@ async def signal_history(
     )
     events = events_res.scalars().all()
 
+    # Most recent filled execution per signal — one window query instead of
+    # one query per event.
+    exec_map = {}
+    if events:
+        rn = func.row_number().over(
+            partition_by=SignalExecution.signal_id,
+            order_by=desc(SignalExecution.executed_at),
+        ).label("rn")
+        exec_sub = (
+            select(
+                SignalExecution.signal_id,
+                SignalExecution.fill_price,
+                SignalExecution.close_price,
+                rn,
+            )
+            .where(
+                SignalExecution.signal_id.in_([ev.id for ev in events]),
+                SignalExecution.outcome == "filled",
+            )
+            .subquery()
+        )
+        exec_rows = (await db.execute(
+            select(exec_sub).where(exec_sub.c.rn == 1)
+        )).all()
+        exec_map = {r.signal_id: r for r in exec_rows}
+
     history = []
     for ev in events:
         d = _signal_to_dict(ev)
         # Most recent filled execution for this signal
-        exc_res = await db.execute(
-            select(SignalExecution)
-            .where(SignalExecution.signal_id == ev.id, SignalExecution.outcome == "filled")
-            .order_by(desc(SignalExecution.executed_at))
-            .limit(1)
-        )
-        exc = exc_res.scalar_one_or_none()
+        exc = exec_map.get(ev.id)
         fill  = float(exc.fill_price)  if exc and exc.fill_price  else None
         close = float(exc.close_price) if exc and exc.close_price else None
         d["fill_price"]  = fill

@@ -5,7 +5,7 @@ SQLAlchemy ORM models — mirrors the MariaDB schema in SAAS_PLAN.md.
 from datetime import datetime, timezone
 from sqlalchemy import (
     BigInteger, Boolean, Column, DateTime, Float, Numeric,
-    Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint,
+    Enum, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from api.database import Base
@@ -95,6 +95,9 @@ class BotConfig(Base):
 
 class BotEvent(Base):
     __tablename__ = "bot_events"
+    __table_args__ = (
+        Index("ix_bot_events_config_ts", "config_id", "ts"),
+    )
 
     id            = Column(BigInteger, primary_key=True, autoincrement=True)
     config_id     = Column(Integer, ForeignKey("bot_configs.id", ondelete="CASCADE"), nullable=False)
@@ -177,6 +180,9 @@ class SignalSource(Base):
 class SignalEvent(Base):
     """Every parsed trading signal from a Telegram signal source."""
     __tablename__ = "signal_events"
+    __table_args__ = (
+        Index("ix_signal_events_status_received", "status", "received_at"),
+    )
 
     id          = Column(Integer,      primary_key=True, autoincrement=True)
     source_id   = Column(Integer,      ForeignKey("signal_sources.id"), nullable=False)
@@ -203,6 +209,10 @@ class SignalEvent(Base):
 class SignalExecution(Base):
     """Records when a user executes a signal."""
     __tablename__ = "signal_executions"
+    __table_args__ = (
+        Index("ix_signal_executions_user_address", "user_address"),
+        Index("ix_signal_executions_outcome_close", "outcome", "close_price"),
+    )
 
     id             = Column(Integer,     primary_key=True, autoincrement=True)
     signal_id      = Column(Integer,     ForeignKey("signal_events.id"), nullable=False)
@@ -231,6 +241,9 @@ class SignalExecution(Base):
 class BotTrade(Base):
     """Normalized closed round-trips for the profitability dashboard."""
     __tablename__ = "bot_trades"
+    __table_args__ = (
+        Index("ix_bot_trades_user_closed", "user_address", "closed_at"),
+    )
 
     id              = Column(Integer, primary_key=True, autoincrement=True)
     config_id       = Column(Integer, ForeignKey("bot_configs.id", ondelete="CASCADE"), index=True)

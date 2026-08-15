@@ -148,6 +148,7 @@ node --check landing/dashboard/dashboard.js
 | `api/routers/admin.py` | Admin endpoints including `/admin/performance`. |
 | `api/performance_worker.py` | Wallet snapshot background task. |
 | `api/signal_reconciler.py` | Reconciles Signal Lab closes with HL fills. |
+| `api/signal_expiry.py` | Sole owner of signal expiry (7 h cutoff, every 15 min). |
 | `api/signal_executor.py` | Places HL entry + native SL/TP for Signal Lab. Holds `_round_px()` and the sizing/leverage-cap logic. |
 | `scripts/backfill_bot_trades.py` | One-off backfill from `bot_events` to `bot_trades`. |
 | `scripts/backfill_signal_close_pnl.py` | One-off: fills dashboard P&L columns on listener-closed executions. |
@@ -288,11 +289,60 @@ and the signal was skipped. Latent for months because every earlier BTC stop was
 `root:webdev` by the 2026-07-16 hardening that moved the API to the `viznago` user, so the hourly
 overwrite failed with `[Errno 13]` from 2026-07-16 to 2026-08-11. Fixed with `chown viznago:webdev`.
 
+### Performance pass (2026-08-15)
+
+Repo-wide performance audit + fixes. Baseline tag: `pre-perf-pass`. No live-trading logic or the
+`[EVENT]` wire format changed.
+
+**1. Startup safety (`api/main.py`).** Removed three stale inline migrations: an unconditional
+`ALTER TABLE bot_events MODIFY COLUMN event_type ENUM(...)` that rebuilt the whole table on every
+restart **and omitted `poly_entry`/`poly_tp`/`poly_sl`** (it would have silently stripped polymarket
+event types if it ever succeeded — that enum is owned solely by Alembic `b2c4d6e8f0a1` now), plus two
+`DROP INDEX` statements and a duplicate `ADD UNIQUE KEY` that failed and logged on every startup.
+
+**2. Indexes (Alembic `c3a7f19d2e54`, mirrored in `api/models.py`).** `signal_executions` previously
+had **zero** non-PK indexes. Added: `signal_executions(user_address)` and `(outcome, close_price)`,
+`bot_trades(user_address, closed_at)`, `bot_events(config_id, ts)`,
+`signal_events(status, received_at)`. Verified with EXPLAIN.
+
+**3. SQL-side aggregations.** `/performance/summary`, `/performance/breakdown`, `/admin/performance`
+no longer hydrate entire tables to aggregate in Python — they use `SUM`/`COUNT`/`CASE` and `GROUP BY`
+(response shapes unchanged). `/admin/overview` went from 4 queries per bot config (including loading
+**all** historical `hedge_opened` JSON into Python) to 4 constant queries
+(`ROW_NUMBER() OVER (PARTITION BY config_id …)` + `SUM(JSON_EXTRACT(details,'$.notional'))`).
+`/signal-lab/history` went from up to 201 queries to one window-function query. `/performance/export`
+is now capped at 10 000 rows.
+
+**4. Signal expiry ownership.** `GET /signal-lab/signals` no longer runs an UPDATE+COMMIT on a read
+endpoint; expiry is owned solely by the `api/signal_expiry.py` sweeper, whose cutoff was aligned
+4h → 7h to match what the endpoint used to apply.
+
+**5. Worker external-API waste.** `api/performance_worker.py` reuses one shared `Info` client
+(previously ~2 extra HL meta REST calls per wallet per 15-min cycle) and fetches balances with
+`asyncio.gather`. `api/signal_reconciler.py` groups open executions by wallet — one `user_state` +
+one `user_fills_by_time` per wallet per scan (concurrently), instead of per-execution full
+`user_fills` (~2000-row) fetches. ⚠️ `userFillsByTime` returns fills **oldest-first** while
+`userFills` returns newest-first; the reconciler reverses to preserve its last-match-wins scan.
+
+**6. SMTP off the event loop.** Admin alert emails in `api/lp_reconciler.py` and
+`api/bot_manager.py` (`_notify_admin_lp_gone`) now send via `asyncio.to_thread` with
+`smtplib.SMTP(..., timeout=15)`; a slow SMTP server can no longer stall the API event loop.
+
+**7. Bot-event write amplification (`api/bot_manager.py`).** `BotConfig` metadata
+(user_address/pair/mode) is cached at bot start instead of re-SELECTed per `[EVENT]` line (DB
+fallback retained). `whale_snapshot` and V2's `bounds_refreshed` events are now WebSocket-only —
+no `bot_events` rows (`_SKIP_DB_EVENTS`); `bounds_refreshed` was previously misfiled as `error`.
+
+**8. Frontend leak (`landing/dashboard/profitability.js`).** The equity chart is a lazy singleton
+reused via `series.setData(...)` with a single `resize` listener; previously every refresh leaked a
+LightweightCharts instance + window listener.
+
 ---
 
 ## 8. Common pitfalls
 
-- **`api/main.py` inline migrations** run on every startup. They are idempotent but noisy; prefer Alembic for new changes.
+- **`api/main.py` inline migrations** run on every startup. They are additive-only `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` statements (the table-rebuilding enum `MODIFY` and the always-failing `DROP INDEX` statements were removed 2026-08-15); prefer Alembic for new changes. The `bot_events.event_type` enum is owned by Alembic — never MODIFY it inline.
+- **Not all bot events are persisted.** `whale_snapshot` and `bounds_refreshed` are WebSocket-only (`_SKIP_DB_EVENTS` in `api/bot_manager.py`); everything else unknown still defaults to `error`. Don't add a DB query expecting those rows.
 - **Automated tests** are under `tests/` — **101 as of 2026-08-11**, and they run in under a second. Run `./venv/bin/python -m pytest tests/` before deploying changes.
 - **`exec_size_usdt` is the NOTIONAL, not margin.** It is `size × fill_price`, so leverage is already inside it. Dollar P&L is `exec_size_usdt × price_return` and fees are `exec_size_usdt × 0.0009` — **never multiply either by leverage.** Doing so is the 2026-08-11 bug that overstated the dashboard by 3×–60×. (A *percentage* return on margin legitimately does multiply by leverage — that is a different quantity from a dollar figure. Don't conflate them.)
 - **`exec_leverage` ≠ `signal.leverage`.** HL caps leverage per asset (`maxLeverage` in `meta().universe`) and the executor silently uses `min(requested, max)`. Never assume they match; prefer `exec_leverage` for what actually executed.

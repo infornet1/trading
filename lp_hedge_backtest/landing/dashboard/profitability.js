@@ -98,36 +98,48 @@
     return Number(val) >= 0 ? 'perf-pos' : 'perf-neg';
   }
 
+  // Equity chart is created once and reused across refreshes — recreating it
+  // per render leaked chart instances and window resize listeners.
+  let equityChart = null;
+  let equitySeries = null;
+  let equityChartContainer = null;
+
+  window.addEventListener('resize', () => {
+    if (equityChart && equityChartContainer) {
+      equityChart.applyOptions({ width: equityChartContainer.clientWidth });
+    }
+  });
+
   function renderEquityChart() {
     const container = document.getElementById('perf-equity-chart');
     if (!container || !window.LightweightCharts) return;
-    container.innerHTML = '';
 
-    const chart = LightweightCharts.createChart(container, {
-      width: container.clientWidth,
-      height: 300,
-      layout: { background: { color: 'transparent' }, textColor: '#cbd5e1' },
-      grid: { vertLines: { color: 'rgba(255,255,255,0.05)' }, horzLines: { color: 'rgba(255,255,255,0.05)' } },
-      rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
-      timeScale: { borderColor: 'rgba(255,255,255,0.1)' },
-    });
+    // (Re)create only on first render or if the section DOM was rebuilt.
+    if (!equityChart || equityChartContainer !== container) {
+      if (equityChart) equityChart.remove();
+      equityChartContainer = container;
+      equityChart = LightweightCharts.createChart(container, {
+        width: container.clientWidth,
+        height: 300,
+        layout: { background: { color: 'transparent' }, textColor: '#cbd5e1' },
+        grid: { vertLines: { color: 'rgba(255,255,255,0.05)' }, horzLines: { color: 'rgba(255,255,255,0.05)' } },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+        timeScale: { borderColor: 'rgba(255,255,255,0.1)' },
+      });
 
-    const series = chart.addAreaSeries({
-      lineColor: '#00d4ff',
-      topColor: 'rgba(0, 212, 255, 0.3)',
-      bottomColor: 'rgba(0, 212, 255, 0.01)',
-    });
+      equitySeries = equityChart.addAreaSeries({
+        lineColor: '#00d4ff',
+        topColor: 'rgba(0, 212, 255, 0.3)',
+        bottomColor: 'rgba(0, 212, 255, 0.01)',
+      });
+    }
 
     const data = perfState.equity
       .filter(p => p.ts)
       .map(p => ({ time: p.ts.split('T')[0], value: Number(p.equity || 0) }));
 
-    series.setData(data);
-    chart.timeScale().fitContent();
-
-    window.addEventListener('resize', () => {
-      chart.applyOptions({ width: container.clientWidth });
-    });
+    equitySeries.setData(data);
+    equityChart.timeScale().fitContent();
   }
 
   function renderTradeJournal() {

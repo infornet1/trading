@@ -7,9 +7,10 @@ import json
 import os
 import subprocess
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select, update
+from sqlalchemy import Numeric, case, func, select, update
 from sqlalchemy.orm import selectinload
 
 from api.auth import get_current_admin
@@ -204,6 +205,7 @@ async def start_whale_bots(admin: str = Depends(get_current_admin)):
                 "hedge_ratio":              str(bot.hedge_ratio or 0),
                 "hl_api_key":               "",
                 "hl_wallet_addr":           "",
+                "user_address":             bot.user_address,
                 "mode":                     "whale",
                 "pair":                     bot.pair or "ETH",
                 "leverage":                 str(bot.leverage or 10),
@@ -267,6 +269,7 @@ async def restart_bot(config_id: int, admin: str = Depends(get_current_admin)):
             "hedge_ratio":               str(cfg.hedge_ratio),
             "hl_api_key":                decrypt(cfg.hl_api_key) if cfg.hl_api_key else "",
             "hl_wallet_addr":            cfg.hl_wallet_addr or "",
+            "user_address":              cfg.user_address,
             "mode":                      cfg.mode,
             "pair":                      cfg.pair,
             "leverage":                  str(cfg.leverage   or 10),
@@ -776,53 +779,93 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
         )
         configs = cfg_result.scalars().all()
 
+        config_ids = [c.id for c in configs]
+
+        # Constant-query-count prefetch: latest event, last 5 events, last
+        # 'started' event, and hedge_opened notional volume — per config.
+        last_evt_map: dict = {}
+        recent_map: dict = {cid: [] for cid in config_ids}
+        started_map: dict = {}
+        volume_map: dict = {}
+
+        if config_ids:
+            rn = func.row_number().over(
+                partition_by=BotEvent.config_id, order_by=BotEvent.id.desc()
+            ).label("rn")
+            evt_sub = (
+                select(
+                    BotEvent.id, BotEvent.config_id, BotEvent.event_type,
+                    BotEvent.price_at_event, BotEvent.pnl, BotEvent.ts,
+                    BotEvent.details, rn,
+                )
+                .where(BotEvent.config_id.in_(config_ids))
+                .subquery()
+            )
+            # Last event per config
+            last_rows = (await db.execute(
+                select(evt_sub).where(evt_sub.c.rn == 1)
+            )).all()
+            for r in last_rows:
+                last_evt_map[r.config_id] = r
+
+            # Recent events (last 5 with full details) per config
+            recent_rows = (await db.execute(
+                select(evt_sub)
+                .where(evt_sub.c.rn <= 5)
+                .order_by(evt_sub.c.config_id, evt_sub.c.id.desc())
+            )).all()
+            for r in recent_rows:
+                recent_map[r.config_id].append(r)
+
+            # x_max_eth from last started event (used for pool value estimate)
+            started_rn = func.row_number().over(
+                partition_by=BotEvent.config_id, order_by=BotEvent.id.desc()
+            ).label("rn")
+            started_sub = (
+                select(BotEvent.config_id, BotEvent.details, started_rn)
+                .where(
+                    BotEvent.config_id.in_(config_ids),
+                    BotEvent.event_type == "started",
+                )
+                .subquery()
+            )
+            started_rows = (await db.execute(
+                select(started_sub).where(started_sub.c.rn == 1)
+            )).all()
+            for r in started_rows:
+                started_map[r.config_id] = r
+
+            # Volume: sum notionals from hedge_opened event details (JSON)
+            vol_rows = (await db.execute(
+                select(
+                    BotEvent.config_id,
+                    func.coalesce(func.sum(func.cast(
+                        func.json_unquote(func.json_extract(BotEvent.details, "$.notional")),
+                        Numeric(20, 4),
+                    )), 0).label("volume"),
+                )
+                .where(
+                    BotEvent.config_id.in_(config_ids),
+                    BotEvent.event_type == "hedge_opened",
+                )
+                .group_by(BotEvent.config_id)
+            )).all()
+            for r in vol_rows:
+                volume_map[r.config_id] = float(r.volume)
+
         pools = []
         total_volume = 0.0
         active_shorts = 0
         whale_bots = 0
 
         for cfg in configs:
-            # Last event
-            evt_result = await db.execute(
-                select(BotEvent)
-                .where(BotEvent.config_id == cfg.id)
-                .order_by(BotEvent.id.desc())
-                .limit(1)
-            )
-            last_evt = evt_result.scalar_one_or_none()
+            last_evt = last_evt_map.get(cfg.id)
+            recent_evts = recent_map.get(cfg.id, [])
 
-            # Recent events (last 5 with full details)
-            recent_result = await db.execute(
-                select(BotEvent)
-                .where(BotEvent.config_id == cfg.id)
-                .order_by(BotEvent.id.desc())
-                .limit(5)
-            )
-            recent_evts = recent_result.scalars().all()
-
-            # x_max_eth from last started event (used for pool value estimate)
-            started_result = await db.execute(
-                select(BotEvent)
-                .where(BotEvent.config_id == cfg.id)
-                .where(BotEvent.event_type == "started")
-                .order_by(BotEvent.id.desc())
-                .limit(1)
-            )
-            started_evt = started_result.scalar_one_or_none()
+            started_evt = started_map.get(cfg.id)
             x_max_eth = float(started_evt.details.get("x_max_eth", 0)) if started_evt and started_evt.details else None
 
-            # Volume: sum notionals from hedge_opened events
-            vol_result = await db.execute(
-                select(BotEvent)
-                .where(BotEvent.config_id == cfg.id)
-                .where(BotEvent.event_type == "hedge_opened")
-            )
-            hedge_events = vol_result.scalars().all()
-            config_volume = sum(
-                float(e.details.get("notional", 0))
-                for e in hedge_events
-                if e.details
-            )
+            config_volume = volume_map.get(cfg.id, 0)
             total_volume += config_volume
 
             running = cfg.id in manager._procs
@@ -1105,36 +1148,41 @@ async def admin_performance(
     """Platform-wide profitability aggregates for admin dashboards / investor updates."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
     async with AsyncSessionLocal() as db:
-        stmt = (
-            select(BotTrade)
-            .where(BotTrade.closed_at >= since)
-        )
+        # The closed_at >= since filter already excludes NULL closed_at,
+        # so every matching row is a closed trade.
+        win_cond = func.coalesce(BotTrade.realized_pnl_usd, 0) > 0
+        loss_cond = func.coalesce(BotTrade.realized_pnl_usd, 0) < 0
+        stmt = select(
+            func.count().label("closed"),
+            func.coalesce(func.sum(case((win_cond, 1), else_=0)), 0).label("wins"),
+            func.coalesce(func.sum(case((loss_cond, 1), else_=0)), 0).label("losses"),
+            func.coalesce(func.sum(BotTrade.realized_pnl_usd), 0).label("pnl"),
+            func.coalesce(func.sum(BotTrade.fees_usd), 0).label("fees"),
+            func.coalesce(func.sum(BotTrade.funding_usd), 0).label("funding"),
+        ).where(BotTrade.closed_at >= since)
         if not include_estimates:
             stmt = stmt.where(BotTrade.is_estimate.is_(False))
-        trades_result = await db.execute(stmt)
-        trades = trades_result.scalars().all()
+        row = (await db.execute(stmt)).one()
 
-        signal_result = await db.execute(
-            select(SignalExecution).where(SignalExecution.closed_at >= since)
-        )
-        signal_execs = signal_result.scalars().all()
+        srow = (await db.execute(
+            select(
+                func.coalesce(func.sum(SignalExecution.realized_pnl_usd), 0).label("pnl"),
+                func.coalesce(func.sum(SignalExecution.fees_usd), 0).label("fees"),
+            ).where(SignalExecution.closed_at >= since)
+        )).one()
 
-        bot_pnl = sum((t.realized_pnl_usd or 0 for t in trades), 0)
-        bot_fees = sum((t.fees_usd or 0 for t in trades), 0)
-        bot_funding = sum((t.funding_usd or 0 for t in trades), 0)
-        signal_pnl = sum((e.realized_pnl_usd or 0 for e in signal_execs), 0)
-        signal_fees = sum((e.fees_usd or 0 for e in signal_execs), 0)
-
-        closed = [t for t in trades if t.closed_at is not None]
-        wins = sum(1 for t in closed if (t.realized_pnl_usd or 0) > 0)
-        losses = sum(1 for t in closed if (t.realized_pnl_usd or 0) < 0)
+        bot_pnl = Decimal(str(row.pnl))
+        bot_fees = Decimal(str(row.fees))
+        bot_funding = Decimal(str(row.funding))
+        signal_pnl = Decimal(str(srow.pnl))
+        signal_fees = Decimal(str(srow.fees))
 
         return {
             "days": days,
             "since": since.isoformat(),
-            "total_bot_trades": len(closed),
-            "bot_winning_trades": wins,
-            "bot_losing_trades": losses,
+            "total_bot_trades": int(row.closed),
+            "bot_winning_trades": int(row.wins),
+            "bot_losing_trades": int(row.losses),
             "bot_realized_pnl_usd": float(bot_pnl),
             "bot_fees_usd": float(bot_fees),
             "bot_funding_usd": float(bot_funding),

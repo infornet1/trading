@@ -64,6 +64,14 @@ _EVENT_MAP = {
     "poly_sl":              "poly_sl",
 }
 
+# High-frequency / non-enum event labels that are broadcast over WebSocket
+# but never persisted to bot_events:
+# - whale_snapshot: whale leaderboard poll (~every 5-10 min per whale bot);
+#   in neither OPEN_EVENTS nor CLOSE_EVENTS, so no trade logic reads it.
+# - bounds_refreshed: emitted by live_hedge_bot_v2; not a valid
+#   bot_events.event_type enum value (it would default to 'error').
+_SKIP_DB_EVENTS = {"whale_snapshot", "bounds_refreshed"}
+
 
 class BotManager:
     def __init__(self):
@@ -71,6 +79,9 @@ class BotManager:
         self._tasks:  dict[int, asyncio.Task]              = {}   # config_id → tail task
         self._subscribers: dict[int, list[asyncio.Queue]] = {}   # config_id → WS queues
         self._last_seen:   dict[int, datetime]             = {}   # config_id → last stdout ts
+        # config_id → (user_address, pair, mode), cached at start() so the
+        # per-event bot_trades path doesn't re-SELECT BotConfig every line
+        self._cfg_meta:    dict[int, tuple]                = {}
         self._shutting_down: bool = False
 
     # ── Lifecycle ─────────────────────────────────────────────────────────
@@ -78,6 +89,17 @@ class BotManager:
     async def start(self, config_id: int, config: dict):
         if config_id in self._procs:
             return  # already running
+
+        # Cache config metadata for the per-event bot_trades path (avoids a
+        # BotConfig SELECT on every [EVENT] line). Requires the caller to
+        # include user_address/pair/mode in the config dict; the event path
+        # falls back to a DB query when absent.
+        if config.get("user_address"):
+            self._cfg_meta[config_id] = (
+                config["user_address"],
+                config.get("pair"),
+                config.get("mode", "aragan"),
+            )
 
         # Build a clean environment — never inherit pool-specific vars from the
         # parent process or any .env file. Only pass what the bot explicitly needs.
@@ -192,11 +214,13 @@ class BotManager:
                 except Exception: pass
         self._procs.clear()
         self._tasks.clear()
+        self._cfg_meta.clear()
         print("[BotManager] Graceful shutdown complete", flush=True)
 
     async def stop(self, config_id: int):
         proc = self._procs.pop(config_id, None)
         task = self._tasks.pop(config_id, None)
+        self._cfg_meta.pop(config_id, None)
         if proc:
             proc.terminate()
             try:
@@ -267,6 +291,7 @@ class BotManager:
                 self._procs.pop(config_id, None)
                 self._tasks.pop(config_id, None)
                 self._last_seen.pop(config_id, None)
+                self._cfg_meta.pop(config_id, None)
                 # Poll to get actual returncode (-15=SIGTERM, -9=SIGKILL, None=undetermined)
                 proc.poll()
                 killed_by_signal = proc.returncode is None or proc.returncode < 0
@@ -284,7 +309,9 @@ class BotManager:
         pnl         = record.get("pnl")
         details     = record.get("details")
 
-        await self._write_event(config_id, event_type, price, pnl, details)
+        # Noisy / non-enum events: WebSocket broadcast only, no bot_events row.
+        if event_label not in _SKIP_DB_EVENTS:
+            await self._write_event(config_id, event_type, price, pnl, details)
         await self._update_bot_trade(config_id, event_type, price, pnl, details)
         await self._broadcast(config_id, {
             "event":   event_type,
@@ -333,17 +360,23 @@ class BotManager:
                         "fury_sl", "fury_tp", "whale_closed",
                         "poly_tp", "poly_sl"}
 
-        async with AsyncSessionLocal() as db:
-            # Resolve config metadata once per event.
-            cfg_result = await db.execute(
-                select(BotConfig.user_address, BotConfig.pair, BotConfig.mode)
-                .where(BotConfig.id == config_id)
-            )
-            cfg = cfg_result.one_or_none()
-            if cfg is None:
-                return
-            user_address, pair, mode = cfg
+        # Resolve config metadata from the start-time cache; fall back to a
+        # DB query (e.g. bots started before the cache existed).
+        meta = self._cfg_meta.get(config_id)
+        if meta is None:
+            async with AsyncSessionLocal() as db:
+                cfg_result = await db.execute(
+                    select(BotConfig.user_address, BotConfig.pair, BotConfig.mode)
+                    .where(BotConfig.id == config_id)
+                )
+                cfg = cfg_result.one_or_none()
+                if cfg is None:
+                    return
+                meta = (cfg.user_address, cfg.pair, cfg.mode)
+            self._cfg_meta[config_id] = meta
+        user_address, pair, mode = meta
 
+        async with AsyncSessionLocal() as db:
             if event_type in OPEN_EVENTS:
                 # Compute side and size from event details.
                 side = details.get("side")
@@ -475,6 +508,10 @@ class BotManager:
 
     async def _notify_admin_lp_gone(self, config_id: int, event_type: str, details: Optional[dict]):
         """Send admin email when a bot is auto-deactivated due to LP removal."""
+        # Blocking smtplib work — keep it off the event loop.
+        await asyncio.to_thread(self._send_admin_lp_gone_email, config_id, event_type, details)
+
+    def _send_admin_lp_gone_email(self, config_id: int, event_type: str, details: Optional[dict]):
         import smtplib
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
@@ -497,7 +534,7 @@ class BotManager:
                 f"Config set to active=False. User must re-add liquidity and re-arm from the dashboard."
             )
             msg.attach(MIMEText(body, "plain"))
-            s = smtplib.SMTP(cfg["smtp_server"], cfg["smtp_port"])
+            s = smtplib.SMTP(cfg["smtp_server"], cfg["smtp_port"], timeout=15)
             s.starttls()
             s.login(cfg["smtp_username"], cfg["smtp_password"])
             s.send_message(msg)

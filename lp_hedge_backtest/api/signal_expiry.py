@@ -1,5 +1,5 @@
 """
-Background task: marks pending signals older than 4 hours as expired.
+Background task: marks pending signals older than 7 hours as expired.
 Runs every 15 minutes alongside the LP reconciler.
 """
 
@@ -11,7 +11,7 @@ from sqlalchemy import update
 from api.database import AsyncSessionLocal
 from api.models import SignalEvent
 
-EXPIRY_HOURS   = 4
+EXPIRY_HOURS   = 7  # aligned with the cutoff the /signal-lab/signals endpoint used before it was removed
 SWEEP_INTERVAL = 900  # 15 minutes
 
 

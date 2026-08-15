@@ -37,8 +37,33 @@ def _get_info():
     return _INFO_CLIENT
 
 
-def _hl_check_closed(
-    wallet_addr:  str,
+def _hl_fetch_wallet(wallet_addr: str, start_ts_ms: int) -> dict:
+    """
+    Synchronous per-wallet prefetch — run via asyncio.to_thread.
+
+    Fetches user_state once and fills once per wallet per scan, instead of
+    once per open execution. Returns dict with keys:
+      state  dict | None
+      fills  list | None   (newest-first, same order user_fills() returns)
+      error  str | None
+    """
+    try:
+        info = _get_info()
+        state = info.user_state(wallet_addr)
+        # user_fills_by_time(startTime) covers fills since the oldest open
+        # execution on this wallet. NOTE: this endpoint returns fills
+        # OLDEST-first while user_fills() returns NEWEST-first — reverse so
+        # _match_close() sees exactly the order it was written against.
+        fills = info.user_fills_by_time(wallet_addr, start_ts_ms)
+        fills = list(reversed(fills or []))
+        return {"state": state, "fills": fills, "error": None}
+    except Exception as exc:
+        return {"state": None, "fills": None, "error": str(exc)}
+
+
+def _match_close(
+    state:        dict,
+    fills:        list,
     symbol:       str,
     is_short:     bool,
     entry_oid:    str | None,
@@ -48,7 +73,7 @@ def _hl_check_closed(
     tp2_oid:      str | None,
 ) -> dict:
     """
-    Synchronous HL query — run via asyncio.to_thread.
+    Pure reconciliation of one execution against prefetched wallet data.
 
     Returns dict with keys:
       still_open  bool
@@ -57,10 +82,7 @@ def _hl_check_closed(
       error       str | None
     """
     try:
-        info = _get_info()  # L5: shared client
-
         # ── 1. Is position still open? ────────────────────────────────────────
-        state = info.user_state(wallet_addr)
         for ap in state.get("assetPositions", []):
             pos = ap["position"]
             if pos["coin"] == symbol and abs(float(pos.get("szi", 0))) > 0:
@@ -69,8 +91,6 @@ def _hl_check_closed(
         # ── 2. Position closed — find close fills ─────────────────────────────
         # calendar.timegm always treats struct_time as UTC (safe for naive datetimes)
         entry_ts_ms = calendar.timegm(executed_at.timetuple()) * 1000
-
-        fills = info.user_fills(wallet_addr)
 
         # Fills for this coin since entry, excluding the entry fill itself
         close_side = "B" if is_short else "A"  # buying back SHORT, or selling LONG
@@ -143,13 +163,48 @@ async def _reconcile_once() -> None:
 
     print(f"[Reconciler] Scanning {len(rows)} open execution(s)…", flush=True)
 
+    # Group executions by wallet so each wallet's user_state and fills are
+    # fetched once per scan (concurrently across wallets) instead of once
+    # per execution.
+    by_wallet: dict[str, list] = {}
+    for row in rows:
+        by_wallet.setdefault(row[2].hl_wallet_addr, []).append(row)
+
+    def _wallet_start_ms(wallet_rows) -> int:
+        # Oldest executed_at among the wallet's open executions; a 1s buffer
+        # guards against startTime boundary exclusivity. Executions with no
+        # executed_at still error out individually in _match_close, exactly
+        # as before.
+        starts = [r[0].executed_at for r in wallet_rows if r[0].executed_at is not None]
+        if not starts:
+            return 0
+        return calendar.timegm(min(starts).timetuple()) * 1000 - 1000
+
+    prefetched = await asyncio.gather(
+        *(
+            asyncio.to_thread(_hl_fetch_wallet, addr, _wallet_start_ms(wallet_rows))
+            for addr, wallet_rows in by_wallet.items()
+        ),
+        return_exceptions=True,
+    )
+    wallet_data = dict(zip(by_wallet.keys(), prefetched))
+
     for execution, signal, wallet in rows:
         symbol   = (signal.pair or "").split("/")[0].upper()
         is_short = (signal.direction or "short").lower() == "short"
 
-        result = await asyncio.to_thread(
-            _hl_check_closed,
-            wallet.hl_wallet_addr,
+        data = wallet_data[wallet.hl_wallet_addr]
+        if isinstance(data, Exception):
+            data = {"error": str(data)}
+
+        if data.get("error"):
+            # Treat errors as "still open" — never false-close a position
+            print(f"[Reconciler] HL error for exec#{execution.id} ({symbol}): {data['error']}", flush=True)
+            continue
+
+        result = _match_close(
+            data["state"],
+            data["fills"],
             symbol,
             is_short,
             execution.hl_order_id,

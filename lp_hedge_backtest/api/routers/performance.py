@@ -12,7 +12,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import get_current_address
@@ -59,42 +59,50 @@ async def performance_summary(
         to_dt = to_dt + timedelta(days=1)
 
     async with AsyncSessionLocal() as db:
-        stmt = (
-            select(BotTrade)
-            .where(BotTrade.user_address == address)
-        )
+        # Win/loss conditions: closed trades (closed_at IS NOT NULL) with pnl > 0 / < 0
+        win_cond = BotTrade.closed_at.isnot(None) & (func.coalesce(BotTrade.realized_pnl_usd, 0) > 0)
+        loss_cond = BotTrade.closed_at.isnot(None) & (func.coalesce(BotTrade.realized_pnl_usd, 0) < 0)
+        stmt = select(
+            func.coalesce(func.sum(BotTrade.realized_pnl_usd), 0).label("realized"),
+            func.coalesce(func.sum(BotTrade.fees_usd), 0).label("fees"),
+            func.coalesce(func.sum(BotTrade.funding_usd), 0).label("funding"),
+            func.coalesce(func.sum(case((win_cond, 1), else_=0)), 0).label("wins"),
+            func.coalesce(func.sum(case((loss_cond, 1), else_=0)), 0).label("losses"),
+            func.coalesce(func.sum(case((win_cond, BotTrade.realized_pnl_usd), else_=0)), 0).label("gross_profit"),
+            func.coalesce(func.sum(case((loss_cond, BotTrade.realized_pnl_usd), else_=0)), 0).label("gross_loss"),
+        ).where(BotTrade.user_address == address)
         if not include_estimates:
             stmt = stmt.where(BotTrade.is_estimate.is_(False))
         if from_dt:
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
             stmt = stmt.where(BotTrade.closed_at < to_dt)
-        result = await db.execute(stmt)
-        trades = result.scalars().all()
+        row = (await db.execute(stmt)).one()
 
-        signal_stmt = select(SignalExecution).where(SignalExecution.user_address == address)
+        signal_stmt = select(
+            func.coalesce(func.sum(SignalExecution.realized_pnl_usd), 0).label("pnl"),
+            func.coalesce(func.sum(SignalExecution.fees_usd), 0).label("fees"),
+        ).where(SignalExecution.user_address == address)
         if from_dt:
             signal_stmt = signal_stmt.where(SignalExecution.closed_at >= from_dt)
         if to_dt:
             signal_stmt = signal_stmt.where(SignalExecution.closed_at < to_dt)
-        signal_result = await db.execute(signal_stmt)
-        signal_execs = signal_result.scalars().all()
+        srow = (await db.execute(signal_stmt)).one()
 
-        realized = sum((t.realized_pnl_usd or Decimal("0") for t in trades), Decimal("0"))
-        fees = sum((t.fees_usd or Decimal("0") for t in trades), Decimal("0"))
-        funding = sum((t.funding_usd or Decimal("0") for t in trades), Decimal("0"))
-        signal_pnl = sum((e.realized_pnl_usd or Decimal("0") for e in signal_execs), Decimal("0"))
-        signal_fees = sum((e.fees_usd or Decimal("0") for e in signal_execs), Decimal("0"))
+        realized = Decimal(str(row.realized))
+        fees = Decimal(str(row.fees))
+        funding = Decimal(str(row.funding))
+        signal_pnl = Decimal(str(srow.pnl))
+        signal_fees = Decimal(str(srow.fees))
 
         net = realized - fees - funding + signal_pnl - signal_fees
-        closed_trades = [t for t in trades if t.closed_at is not None]
-        wins = sum(1 for t in closed_trades if (t.realized_pnl_usd or Decimal("0")) > 0)
-        losses = sum(1 for t in closed_trades if (t.realized_pnl_usd or Decimal("0")) < 0)
+        wins = int(row.wins)
+        losses = int(row.losses)
         total = wins + losses
 
         win_rate = (wins / total * 100) if total else 0.0
-        gross_profit = sum((t.realized_pnl_usd or Decimal("0")) for t in closed_trades if (t.realized_pnl_usd or Decimal("0")) > 0)
-        gross_loss = abs(sum((t.realized_pnl_usd or Decimal("0")) for t in closed_trades if (t.realized_pnl_usd or Decimal("0")) < 0))
+        gross_profit = Decimal(str(row.gross_profit))
+        gross_loss = abs(Decimal(str(row.gross_loss)))
         profit_factor = (gross_profit / gross_loss) if gross_loss else None
 
         return {
@@ -219,8 +227,26 @@ async def breakdown(
         to_dt = to_dt + timedelta(days=1)
 
     async with AsyncSessionLocal() as db:
+        if by == "pair":
+            key_col = func.coalesce(BotTrade.pair, "unknown")
+        elif by == "mode":
+            key_col = func.coalesce(BotTrade.mode, "unknown")
+        else:  # month — DATE_FORMAT produces the same "%Y-%m" buckets as strftime
+            key_col = func.coalesce(func.date_format(BotTrade.closed_at, "%Y-%m"), "unknown")
+
+        win_cond = func.coalesce(BotTrade.realized_pnl_usd, 0) > 0
+        loss_cond = func.coalesce(BotTrade.realized_pnl_usd, 0) < 0
         stmt = (
-            select(BotTrade)
+            select(
+                key_col.label("key"),
+                func.count().label("trades"),
+                func.coalesce(func.sum(BotTrade.realized_pnl_usd), 0).label("realized_pnl_usd"),
+                func.coalesce(func.sum(BotTrade.fees_usd), 0).label("fees_usd"),
+                func.coalesce(func.sum(BotTrade.funding_usd), 0).label("funding_usd"),
+                func.coalesce(func.sum(BotTrade.net_pnl_usd), 0).label("net_pnl_usd"),
+                func.coalesce(func.sum(case((win_cond, 1), else_=0)), 0).label("wins"),
+                func.coalesce(func.sum(case((loss_cond, 1), else_=0)), 0).label("losses"),
+            )
             .where(BotTrade.user_address == address)
         )
         if not include_estimates:
@@ -229,49 +255,23 @@ async def breakdown(
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
             stmt = stmt.where(BotTrade.closed_at < to_dt)
-        result = await db.execute(stmt)
-        trades = result.scalars().all()
-
-        groups = {}
-        for t in trades:
-            if by == "pair":
-                key = t.pair or "unknown"
-            elif by == "mode":
-                key = t.mode or "unknown"
-            else:  # month
-                key = t.closed_at.strftime("%Y-%m") if t.closed_at else "unknown"
-
-            if key not in groups:
-                groups[key] = {"trades": 0, "realized_pnl_usd": Decimal("0"),
-                               "fees_usd": Decimal("0"), "funding_usd": Decimal("0"),
-                               "net_pnl_usd": Decimal("0"), "wins": 0, "losses": 0}
-
-            g = groups[key]
-            g["trades"] += 1
-            g["realized_pnl_usd"] += t.realized_pnl_usd or Decimal("0")
-            g["fees_usd"] += t.fees_usd or Decimal("0")
-            g["funding_usd"] += t.funding_usd or Decimal("0")
-            g["net_pnl_usd"] += t.net_pnl_usd or Decimal("0")
-            pnl = t.realized_pnl_usd or Decimal("0")
-            if pnl > 0:
-                g["wins"] += 1
-            elif pnl < 0:
-                g["losses"] += 1
+        stmt = stmt.group_by(key_col)
+        rows = (await db.execute(stmt)).all()
 
         return {
             "by": by,
             "rows": [
                 {
-                    "key": key,
-                    "trades": g["trades"],
-                    "realized_pnl_usd": _to_float(g["realized_pnl_usd"]),
-                    "fees_usd": _to_float(g["fees_usd"]),
-                    "funding_usd": _to_float(g["funding_usd"]),
-                    "net_pnl_usd": _to_float(g["net_pnl_usd"]),
-                    "wins": g["wins"],
-                    "losses": g["losses"],
+                    "key": r.key,
+                    "trades": int(r.trades),
+                    "realized_pnl_usd": _to_float(r.realized_pnl_usd),
+                    "fees_usd": _to_float(r.fees_usd),
+                    "funding_usd": _to_float(r.funding_usd),
+                    "net_pnl_usd": _to_float(r.net_pnl_usd),
+                    "wins": int(r.wins),
+                    "losses": int(r.losses),
                 }
-                for key, g in sorted(groups.items())
+                for r in sorted(rows, key=lambda r: r.key)
             ],
         }
 
@@ -300,7 +300,8 @@ async def export_csv(
             stmt = stmt.where(BotTrade.closed_at >= from_dt)
         if to_dt:
             stmt = stmt.where(BotTrade.closed_at < to_dt)
-        stmt = stmt.order_by(BotTrade.closed_at.desc())
+        # Hard cap to bound memory on large journals
+        stmt = stmt.order_by(BotTrade.closed_at.desc()).limit(10000)
         result = await db.execute(stmt)
         trades = result.scalars().all()
 

@@ -68,8 +68,24 @@ def _mock_session(trades, signals):
             # The production code filters out estimate rows; mirror that here.
             visible_trades = [t for t in trades if not t.is_estimate]
             result.scalars.return_value.all.return_value = visible_trades
+            # /summary now runs one aggregate query; build the single row it expects.
+            closed = [t for t in visible_trades if t.closed_at is not None]
+            pnl = [t.realized_pnl_usd or Decimal("0") for t in closed]
+            agg = MagicMock()
+            agg.realized = sum((t.realized_pnl_usd or Decimal("0") for t in visible_trades), Decimal("0"))
+            agg.fees = sum((t.fees_usd or Decimal("0") for t in visible_trades), Decimal("0"))
+            agg.funding = sum((t.funding_usd or Decimal("0") for t in visible_trades), Decimal("0"))
+            agg.wins = sum(1 for p in pnl if p > 0)
+            agg.losses = sum(1 for p in pnl if p < 0)
+            agg.gross_profit = sum((p for p in pnl if p > 0), Decimal("0"))
+            agg.gross_loss = sum((p for p in pnl if p < 0), Decimal("0"))
+            result.one.return_value = agg
         elif "signal_executions" in str_stmt:
             result.scalars.return_value.all.return_value = signals
+            agg = MagicMock()
+            agg.pnl = sum((s.realized_pnl_usd or Decimal("0") for s in signals), Decimal("0"))
+            agg.fees = sum((s.fees_usd or Decimal("0") for s in signals), Decimal("0"))
+            result.one.return_value = agg
         else:
             result.scalars.return_value.all.return_value = []
         return result

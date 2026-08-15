@@ -182,8 +182,8 @@ async def _deactivate(cfg: BotConfig, event_type: str, note: str):
     except Exception as e:
         print(f"[LPReconciler] Could not stop bot {cfg.id}: {e}", flush=True)
 
-    # Notify admin by email
-    _send_admin_email(cfg, event_type, note)
+    # Notify admin by email (blocking SMTP — keep it off the event loop)
+    await asyncio.to_thread(_send_admin_email, cfg, event_type, note)
 
 
 def _send_admin_email(cfg: BotConfig, event_type: str, note: str):
@@ -215,7 +215,7 @@ def _send_admin_email(cfg: BotConfig, event_type: str, note: str):
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain"))
 
-        s = smtplib.SMTP(email_cfg["smtp_server"], email_cfg["smtp_port"])
+        s = smtplib.SMTP(email_cfg["smtp_server"], email_cfg["smtp_port"], timeout=15)
         s.starttls()
         s.login(email_cfg["smtp_username"], email_cfg["smtp_password"])
         s.send_message(msg)
