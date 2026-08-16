@@ -677,3 +677,44 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', monospac
   opacity: 0.8;
   white-space: nowrap;
 }
+
+/* ── Platform performance section ───────────────────────────────────── */
+.perf-section {
+  margin: 0 1.5rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.perf-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .75rem 1.25rem; background: #111; border-bottom: 1px solid var(--border);
+}
+.perf-title { font-size: .8rem; font-weight: 700; letter-spacing: .04em; }
+.perf-range { font-size: .68rem; color: var(--muted); }
+.perf-kpis {
+  display: flex; gap: 1rem; flex-wrap: wrap;
+  padding: 1rem 1.25rem 0;
+}
+.perf-kpis .stat-card { flex: 1; min-width: 130px; }
+.perf-breakdown {
+  display: flex; flex-wrap: wrap; gap: 1.5rem;
+  padding: .9rem 1.25rem 1.1rem;
+}
+.perf-breakdown-col { flex: 1; min-width: 220px; }
+.perf-breakdown-title {
+  font-size: .62rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin-bottom: .4rem;
+}
+.perf-line {
+  display: flex; justify-content: space-between; gap: 1rem;
+  font-size: .74rem; padding: 2px 0;
+}
+.perf-line .muted { color: var(--muted); }
+
+/* Bot liveness / last-error lines on overview cards */
+.bot-last-error {
+  display: inline-block; max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: bottom; cursor: help;
+}

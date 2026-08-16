@@ -76,6 +76,8 @@ function showContent() {
   if (jwtIsAdmin(state.jwt)) {
     document.getElementById('btn-nuclear').classList.remove('hidden');
     document.getElementById('btn-maintenance').classList.remove('hidden');
+    document.getElementById('btn-stop-whales').classList.remove('hidden');
+    document.getElementById('btn-start-whales').classList.remove('hidden');
     syncMaintenanceBtn();
   }
   renderRefreshControl();
@@ -195,7 +197,7 @@ function _showReconnectOverlay(show) {
 async function doRefresh() {
   setStatus('Actualizando...');
   try {
-    await Promise.all([fetchEthPrice(), renderOverview(), fetchSignalLabStatus(), fetchSignalLabMonitor()]);
+    await Promise.all([fetchEthPrice(), renderOverview(), fetchSignalLabStatus(), fetchSignalLabMonitor(), fetchPlatformPerformance()]);
     _apiFails = 0;
     _showReconnectOverlay(false);
     const now = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -322,6 +324,87 @@ function renderStats(s) {
   }
 }
 
+// ── Platform performance (GET /admin/performance) ─────────────────────────
+async function fetchPlatformPerformance() {
+  const el = document.getElementById('perf-content');
+  if (!el) return;
+  try {
+    const d = await apiGet('/admin/performance');
+    renderPlatformPerformance(d);
+  } catch (e) {
+    if (e.message === 'Session expired') return;
+    el.innerHTML = `<div class="loading-msg" style="color:var(--red)">Error al cargar rendimiento: ${e.message}</div>`;
+  }
+}
+
+function renderPlatformPerformance(d) {
+  const el      = document.getElementById('perf-content');
+  const rangeEl = document.getElementById('perf-range');
+  if (!el) return;
+  if (rangeEl) rangeEl.textContent = `últimos ${d.days ?? 30} días`;
+
+  const num   = v => (v == null || isNaN(Number(v))) ? 0 : Number(v);
+  const money = v => `${v >= 0 ? '+' : ''}$${fmtNum(v)}`;
+  const pnlCls = v => v >= 0 ? 'pnl-pos' : 'pnl-neg';
+
+  const botPnl  = num(d.bot_realized_pnl_usd);
+  const botFees = num(d.bot_fees_usd);
+  const botFund = num(d.bot_funding_usd);
+  const sigPnl  = num(d.signal_realized_pnl_usd);
+  const sigFees = num(d.signal_fees_usd);
+  // Net: prefer the backend key, fall back to computing from parts.
+  const net     = d.platform_net_pnl_usd != null
+    ? num(d.platform_net_pnl_usd)
+    : botPnl - botFees - botFund + sigPnl - sigFees;
+
+  const closed  = num(d.total_bot_trades ?? d.total_trades);
+  const wins    = num(d.bot_winning_trades ?? d.winning_trades);
+  const losses  = num(d.bot_losing_trades ?? d.losing_trades);
+  const winRate = d.win_rate != null
+    ? num(d.win_rate)
+    : (closed > 0 ? (wins / closed) * 100 : null);
+  const profitFactor = d.profit_factor != null ? num(d.profit_factor) : null;
+
+  el.innerHTML = `
+    <div class="perf-kpis">
+      <div class="stat-card">
+        <div class="stat-value ${pnlCls(net)}">${money(net)}</div>
+        <div class="stat-label">P&L neto plataforma</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--text)">${closed}</div>
+        <div class="stat-label">Trades bots cerrados</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--text)">
+          <span class="pnl-pos">${wins}</span><span style="color:var(--muted)"> / </span><span class="pnl-neg">${losses}</span>
+        </div>
+        <div class="stat-label">Ganados / Perdidos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--text)">${winRate != null ? winRate.toFixed(1) + '%' : '—'}</div>
+        <div class="stat-label">Win rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--text)">${profitFactor != null ? profitFactor.toFixed(2) : '—'}</div>
+        <div class="stat-label">Profit factor</div>
+      </div>
+    </div>
+    <div class="perf-breakdown">
+      <div class="perf-breakdown-col">
+        <div class="perf-breakdown-title">🤖 Bots (LP / FURY / Whale)</div>
+        <div class="perf-line"><span class="muted">P&L realizado</span><span class="${pnlCls(botPnl)}">${money(botPnl)}</span></div>
+        <div class="perf-line"><span class="muted">Fees</span><span class="pnl-neg">-$${fmtNum(botFees)}</span></div>
+        <div class="perf-line"><span class="muted">Funding</span><span class="${botFund > 0 ? 'pnl-neg' : ''}">${botFund > 0 ? '-' : ''}$${fmtNum(botFund)}</span></div>
+      </div>
+      <div class="perf-breakdown-col">
+        <div class="perf-breakdown-title">🧪 Signal Lab</div>
+        <div class="perf-line"><span class="muted">P&L realizado</span><span class="${pnlCls(sigPnl)}">${money(sigPnl)}</span></div>
+        <div class="perf-line"><span class="muted">Fees</span><span class="pnl-neg">-$${fmtNum(sigFees)}</span></div>
+      </div>
+    </div>`;
+}
+
 function renderPools(pools) {
   const grid = document.getElementById('pools-grid');
   if (!pools.length) {
@@ -433,18 +516,81 @@ function toggleHistorical() {
   toggleSectionStopped('lp');
 }
 
+// Section-header toggle (re-rendered each refresh — no persistent busy state)
 async function toggleWhaleBots(start) {
-  const action = start ? 'start-whale-bots' : 'stop-whale-bots';
-  const label  = start ? 'Activar' : 'Pausar';
-  if (!confirm(`¿${label} todos los Whale bots?`)) return;
+  return _whaleBulk(start, null);
+}
+
+// Refresh-bar bulk buttons ("Detener/Iniciar bots whale") with busy state
+async function whaleBulkAction(start) {
+  const btn = document.getElementById(start ? 'btn-start-whales' : 'btn-stop-whales');
+  return _whaleBulk(start, btn);
+}
+
+async function _whaleBulk(start, btn) {
+  const otherBtn = start
+    ? document.getElementById('btn-stop-whales')
+    : document.getElementById('btn-start-whales');
+  if (!confirm(start
+    ? '¿Iniciar todos los bots whale inactivos?'
+    : '⚠️ ¿Detener TODOS los bots whale en ejecución?\n\nLos bots dejarán de monitorear posiciones whale hasta que los vuelvas a iniciar.')) return;
+  const origLabel = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = start ? '⏳ Iniciando…' : '⏳ Deteniendo…'; }
+  if (otherBtn) otherBtn.disabled = true;
   try {
-    const data = await apiPost(`/admin/${action}`);
-    const n    = start ? data.started_count : data.stopped_count;
-    alert(`✅ ${label}: ${n} whale bot(s)`);
+    const action = start ? 'start-whale-bots' : 'stop-whale-bots';
+    const data   = await apiPost(`/admin/${action}`);
+    const n      = start ? data.started_count : data.stopped_count;
+    alert(`✅ ${start ? 'Iniciados' : 'Detenidos'}: ${n} whale bot(s)`);
     await renderOverview();
   } catch (e) {
     if (e.message !== 'Session expired') alert('Error: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origLabel; }
+    if (otherBtn) otherBtn.disabled = false;
   }
+}
+
+// ── Bot liveness / last-error (nullable fields from /admin/overview) ───────
+// Backend may not send these yet — render only when present, omit silently.
+function botLivenessHtml(p) {
+  let ageSec = null;
+  if (p.seconds_since_output != null && !isNaN(Number(p.seconds_since_output))) {
+    ageSec = Math.max(0, Number(p.seconds_since_output));
+  } else if (p.last_seen) {
+    const ts = (p.last_seen.endsWith('Z') || p.last_seen.includes('+'))
+      ? p.last_seen : p.last_seen.replace(' ', 'T') + 'Z';
+    const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+    if (!isNaN(diff)) ageSec = Math.max(0, diff);
+  }
+  if (ageSec == null) return '';
+  const label = ageSec < 60   ? `${Math.floor(ageSec)}s`
+              : ageSec < 3600 ? `${Math.floor(ageSec / 60)}min`
+              :               `${Math.floor(ageSec / 3600)}h`;
+  const hung  = p.running && ageSec > 1800;
+  const cls   = hung ? 'pool-val--red' : ageSec > 600 ? 'pool-val--yellow' : '';
+  return `
+  <div class="pool-row">
+    <span class="pool-label">Última salida</span>
+    <span class="pool-val ${cls}">hace ${label}${hung ? ' — ⚠ posible bot colgado' : ''}</span>
+  </div>`;
+}
+
+function botLastErrorHtml(p) {
+  if (!p.last_error || p.running) return '';
+  const full  = String(p.last_error);
+  const short = full.length > 90 ? full.slice(0, 90) + '…' : full;
+  return `
+  <div class="pool-row">
+    <span class="pool-label">Último error</span>
+    <span class="pool-val pool-val--red bot-last-error" title="${escHtml(full)}">${escHtml(short)}</span>
+  </div>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
 }
 
 // ── Health logic ───────────────────────────────────────────────────────────
@@ -590,6 +736,7 @@ function whaleCard(p, isHistorical = false) {
     <span class="pool-label">Último evento</span>
     <span class="pool-val">${lastEvtStr} <span style="color:var(--muted)">${lastTimeStr}</span></span>
   </div>
+  ${botLivenessHtml(p)}${botLastErrorHtml(p)}
 
   ${recentEventsHtml ? `<div class="mini-events">${recentEventsHtml}</div>` : ''}
 
@@ -739,6 +886,7 @@ function poolCard(p, ethPrice, isHistorical = false) {
     <span class="pool-label">Último evento</span>
     <span class="pool-val">${lastEvtStr} <span style="color:var(--muted)">${lastTimeStr}</span></span>
   </div>
+  ${botLivenessHtml(p)}${botLastErrorHtml(p)}
   ${pnlStr ? `
   <div class="pool-row">
     <span class="pool-label">PnL estimado</span>

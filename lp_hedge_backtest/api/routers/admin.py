@@ -78,7 +78,11 @@ async def _fetch_hl_data(wallet_addr: str) -> dict:
             return {"state": None, "fills": [], "open_orders": [], "error": str(e)}
 
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _sync)
+    try:
+        return await asyncio.wait_for(loop.run_in_executor(None, _sync), timeout=10)
+    except asyncio.TimeoutError:
+        # Same error shape as a failed fetch — HL unreachable/slow
+        return {"state": None, "fills": [], "open_orders": [], "error": "HL request timed out"}
 
 
 def _parse_hl_position(state: dict, coin: str = "ETH") -> dict | None:
@@ -487,7 +491,11 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
 
     wallet_rows = []
     for w in wallets:
-        bal = await asyncio.to_thread(_fetch, w.hl_wallet_addr)
+        try:
+            bal = await asyncio.wait_for(asyncio.to_thread(_fetch, w.hl_wallet_addr), timeout=10)
+        except asyncio.TimeoutError:
+            # Same error shape as a failed fetch — HL unreachable/slow
+            bal = {"total": None, "perp": None, "spot": None, "spot_usable": False}
 
         recent_execs = []
         for ex in wallet_execs.get(w.hl_wallet_addr, []):
@@ -768,6 +776,7 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
         last_evt_map: dict = {}
         recent_map: dict = {cid: [] for cid in config_ids}
         started_map: dict = {}
+        error_map: dict = {}
         volume_map: dict = {}
 
         if config_ids:
@@ -817,6 +826,24 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
             for r in started_rows:
                 started_map[r.config_id] = r
 
+            # Latest persisted error per config (crash reason for the UI)
+            error_rn = func.row_number().over(
+                partition_by=BotEvent.config_id, order_by=BotEvent.id.desc()
+            ).label("rn")
+            error_sub = (
+                select(BotEvent.config_id, BotEvent.details, error_rn)
+                .where(
+                    BotEvent.config_id.in_(config_ids),
+                    BotEvent.event_type == "error",
+                )
+                .subquery()
+            )
+            error_rows = (await db.execute(
+                select(error_sub).where(error_sub.c.rn == 1)
+            )).all()
+            for r in error_rows:
+                error_map[r.config_id] = r
+
             # Volume: sum notionals from hedge_opened event details (JSON)
             vol_rows = (await db.execute(
                 select(
@@ -839,6 +866,7 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
         total_volume = 0.0
         active_shorts = 0
         whale_bots = 0
+        now = datetime.now(timezone.utc)
 
         for cfg in configs:
             last_evt = last_evt_map.get(cfg.id)
@@ -853,6 +881,16 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
             running = cfg.id in manager._procs
             hb = manager.last_seen(cfg.id)
             last_heartbeat = hb.isoformat() if hb else None
+            seconds_since_output = (
+                int((now - hb).total_seconds()) if hb else None
+            )
+
+            error_evt  = error_map.get(cfg.id)
+            last_error = (
+                error_evt.details.get("msg")
+                if error_evt and isinstance(error_evt.details, dict)
+                else None
+            )
 
             last_event_type = last_evt.event_type if last_evt else None
             if last_event_type == "hedge_opened" and running:
@@ -884,6 +922,9 @@ async def admin_overview(admin: str = Depends(get_current_admin)):
                 "hl_wallet_addr": cfg.hl_wallet_addr,
                 "created_at":     cfg.created_at.isoformat() if cfg.created_at else None,
                 "last_heartbeat": last_heartbeat,
+                "last_seen":      last_heartbeat,
+                "seconds_since_output": seconds_since_output,
+                "last_error":     last_error,
                 "last_event": {
                     "type":    last_evt.event_type,
                     "price":   float(last_evt.price_at_event) if last_evt.price_at_event else None,

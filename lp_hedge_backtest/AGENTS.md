@@ -385,6 +385,21 @@ Follow-up to the performance pass: a frontend/backend/bot UX audit, fixes landed
 **Tests:** 110 (was 101) — new coverage for `build_start_config`, unknown-label preservation,
 missing-credential 401, and the rate limiter's `Retry-After`.
 
+### Admin page gaps closed (2026-08-16)
+
+- **Platform performance section** in `landing/admin/` — first UI for `GET /admin/performance`
+  (KPIs + bots-vs-signal-lab breakdown; participates in the existing refresh loop).
+- **Bulk whale-bot buttons** ("⏸ Detener bots whale" / "▶ Iniciar bots whale") wired to the
+  previously UI-less `POST /admin/stop-whale-bots` / `start-whale-bots`.
+- **`/admin/overview` bot entries** now carry `last_seen`, `seconds_since_output`, and `last_error`
+  (latest persisted `error` event's `details.msg`, one window-function query for all configs — the
+  constant-query-count property is preserved). The admin cards render "última salida hace Xmin",
+  flag >30 min silence on running bots as a possible hang, and show the crash reason on dead bots.
+- The last two unguarded HL SDK calls (`_fetch_hl_data` and the signal-lab monitor's per-wallet
+  fetch) now have the same 10 s `asyncio.wait_for` guard as the rest.
+- Known gap: `/admin/performance` has no `profit_factor` key (needs gross profit/loss sums), so the
+  admin card shows `—` for profit factor until the backend adds it.
+
 ---
 
 ## 8. Common pitfalls
