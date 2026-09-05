@@ -258,6 +258,7 @@ async def lifespan(app: FastAPI):
             pass
     from api.bot_manager import manager
     await manager.shutdown()
+    await aclose_shared_clients()
     await engine.dispose()
 
 
@@ -340,6 +341,28 @@ async def set_maintenance(
 _price_cache: dict = {"data": None, "ts": 0.0}
 _PRICE_TTL = 30  # seconds
 
+# Shared process-lifetime HTTP client — reuses connections across requests.
+_price_client: httpx.AsyncClient | None = None
+
+
+def _get_price_client() -> httpx.AsyncClient:
+    global _price_client
+    if _price_client is None:
+        _price_client = httpx.AsyncClient(timeout=8)
+    return _price_client
+
+
+async def aclose_shared_clients() -> None:
+    """Close this module's shared HTTP client plus the other modules' — lifespan shutdown."""
+    global _price_client
+    if _price_client is not None:
+        await _price_client.aclose()
+        _price_client = None
+    from api.telegram_alerts import aclose_shared_client as _close_tg
+    from api.routers.signal_lab import aclose_shared_client as _close_sl
+    await _close_tg()
+    await _close_sl()
+
 
 @app.get("/prices")
 async def get_prices():
@@ -350,12 +373,11 @@ async def get_prices():
 
     url = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin&vs_currencies=usd"
     try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            r = await client.get(url)
-            r.raise_for_status()
-            _price_cache["data"] = r.json()
-            _price_cache["ts"]   = now
-            return _price_cache["data"]
+        r = await _get_price_client().get(url)
+        r.raise_for_status()
+        _price_cache["data"] = r.json()
+        _price_cache["ts"]   = now
+        return _price_cache["data"]
     except Exception as e:
         # Return last cached value if available, else empty
         if _price_cache["data"]:

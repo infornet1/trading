@@ -3,144 +3,25 @@
 // ── Config ─────────────────────────────────────────────────────────────────
 const API_BASE = '/trading/lp-hedge/api';
 const FEED_MAX = 50;
-const LANG_KEY = 'vf_lang';   // same storage key as landing/i18n.js
 
-// ── Page-local i18n ────────────────────────────────────────────────────────
-// NOTE: page-local translation map (polymarket page only). Uses the same
-// data-i18n attribute convention and the same localStorage key ('vf_lang')
-// as landing/i18n.js, so merging these keys into i18n.js later is mechanical.
-const I18N = {
-  es: {
-    'poly.connect':           '🟢  Conectar Wallet',
-    'poly.connecting':        '⏳ Conectando…',
-    'poly.hero.sub':          'Compra shares de un mercado de Polymarket y sal automáticamente: take-profit y stop-loss sintético vigilados cada pocos segundos.',
-    'poly.auth.banner':       '🔒 Conecta tu wallet para gestionar tus bots. Los bots en ejecución siguen corriendo aunque tu sesión expire.',
-    'poly.auth.connect':      'Conectar',
-    'poly.feed.title':        '📡 Actividad en Vivo',
-    'poly.feed.updated':      'Actualizado',
-    'poly.feed.empty':        'Sin actividad aún — lanza un bot abajo.',
-    'poly.bots.title':        '⚙️ Mis Bots',
-    'poly.bots.hint':         'Conecta wallet para gestionar',
-    'poly.bots.none':         'No tienes bots aún. Lanza uno abajo.',
-    'poly.launch.title':      '🚀 Nuevo Bot',
-    'poly.launch.overlay':    '🔒 Conecta tu wallet para lanzar un bot',
-    'poly.form.token':        'Token ID del mercado',
-    'poly.form.size':         'Tamaño (USDC)',
-    'poly.form.entry':        'Precio de entrada (opcional)',
-    'poly.form.entry_ph':     'vacío = mercado',
-    'poly.form.tp':           'Take-profit',
-    'poly.form.sl':           'Stop-loss',
-    'poly.form.funder':       'Polygon funder address',
-    'poly.form.privkey':      'Polygon private key',
-    'poly.form.paper':        '📋 Paper mode (sin órdenes reales)',
-    'poly.launch.btn':        '🎯  Launch Polymarket Bot',
-    'poly.launch.launching':  '⏳ Lanzando…',
-    'poly.status.active':     'ACTIVO',
-    'poly.status.stopped':    'DETENIDO',
-    'poly.btn.stop':          '■ Stop',
-    'poly.btn.restart':       '▶ Restart',
-    'poly.busy.stopping':     '⏳ Deteniendo…',
-    'poly.busy.restarting':   '⏳ Reiniciando…',
-    'poly.busy.deleting':     '⏳ …',
-    'poly.confirm.stop':      '⚠️ ¿Detener este bot?\n\nLa posición queda ABIERTA en Polymarket — al detenerse, el bot solo deja de monitorearla y NUNCA vende. Para salir, hazlo manualmente en Polymarket o reinicia el bot.',
-    'poly.confirm.delete':    '¿Eliminar este bot? Esta acción no puede deshacerse.',
-    'poly.card.paper':        '📋 paper',
-    'poly.card.entry':        'entrada',
-    'poly.card.entry.market': 'mercado',
-    'poly.card.entry.limit':  'límite',
-    'poly.error.load_bots':   'Error cargando bots',
-    'poly.error.launch':      'Launch failed',
-    'poly.error.stop':        'Stop failed',
-    'poly.error.restart':     'Restart failed',
-    'poly.error.delete':      'Delete failed',
-    'poly.error.no_wallet':   'No se detectó wallet. Instala Rabby o MetaMask.',
-    'poly.error.connect':     'Wallet connect failed',
-    'poly.err.token_required':'Token ID es requerido',
-    'poly.err.size':          'Tamaño debe ser > 0',
-    'poly.err.tp_range':      'Take-profit debe estar entre 0 y 1',
-    'poly.err.sl_range':      'Stop-loss debe estar entre 0 y 1',
-    'poly.err.tp_gt_sl':      'Take-profit debe ser mayor que stop-loss',
-    'poly.err.keys_required': 'Funder address y private key son requeridos en modo live',
-    'poly.ws.live':           'En vivo',
-    'poly.ws.reconnecting':   'Reconectando…',
-    'poly.ws.offline':        'Sin conexión',
-  },
-  en: {
-    'poly.connect':           '🟢  Connect Wallet',
-    'poly.connecting':        '⏳ Connecting…',
-    'poly.hero.sub':          'Buy shares in a Polymarket market and exit automatically: take-profit and synthetic stop-loss watched every few seconds.',
-    'poly.auth.banner':       '🔒 Connect your wallet to manage your bots. Bots that are already running keep running even if your session expires.',
-    'poly.auth.connect':      'Connect',
-    'poly.feed.title':        '📡 Live Activity',
-    'poly.feed.updated':      'Updated',
-    'poly.feed.empty':        'No activity yet — launch a bot below.',
-    'poly.bots.title':        '⚙️ My Bots',
-    'poly.bots.hint':         'Connect wallet to manage',
-    'poly.bots.none':         'No bots yet. Launch one below.',
-    'poly.launch.title':      '🚀 New Bot',
-    'poly.launch.overlay':    '🔒 Connect your wallet to launch a bot',
-    'poly.form.token':        'Market token ID',
-    'poly.form.size':         'Size (USDC)',
-    'poly.form.entry':        'Entry price (optional)',
-    'poly.form.entry_ph':     'empty = market',
-    'poly.form.tp':           'Take-profit',
-    'poly.form.sl':           'Stop-loss',
-    'poly.form.funder':       'Polygon funder address',
-    'poly.form.privkey':      'Polygon private key',
-    'poly.form.paper':        '📋 Paper mode (no real orders)',
-    'poly.launch.btn':        '🎯  Launch Polymarket Bot',
-    'poly.launch.launching':  '⏳ Launching…',
-    'poly.status.active':     'ACTIVE',
-    'poly.status.stopped':    'STOPPED',
-    'poly.btn.stop':          '■ Stop',
-    'poly.btn.restart':       '▶ Restart',
-    'poly.busy.stopping':     '⏳ Stopping…',
-    'poly.busy.restarting':   '⏳ Restarting…',
-    'poly.busy.deleting':     '⏳ …',
-    'poly.confirm.stop':      '⚠️ Stop this bot?\n\nThe position stays OPEN on Polymarket — on stop the bot only stops monitoring it and NEVER sells. To exit, do it manually on Polymarket or restart the bot.',
-    'poly.confirm.delete':    'Delete this bot? This action cannot be undone.',
-    'poly.card.paper':        '📋 paper',
-    'poly.card.entry':        'entry',
-    'poly.card.entry.market': 'market',
-    'poly.card.entry.limit':  'limit',
-    'poly.error.load_bots':   'Error loading bots',
-    'poly.error.launch':      'Launch failed',
-    'poly.error.stop':        'Stop failed',
-    'poly.error.restart':     'Restart failed',
-    'poly.error.delete':      'Delete failed',
-    'poly.error.no_wallet':   'No wallet detected. Install Rabby or MetaMask.',
-    'poly.error.connect':     'Wallet connect failed',
-    'poly.err.token_required':'Token ID is required',
-    'poly.err.size':          'Size must be > 0',
-    'poly.err.tp_range':      'Take-profit must be between 0 and 1',
-    'poly.err.sl_range':      'Stop-loss must be between 0 and 1',
-    'poly.err.tp_gt_sl':      'Take-profit must be greater than stop-loss',
-    'poly.err.keys_required': 'Funder address and private key are required in live mode',
-    'poly.ws.live':           'Live',
-    'poly.ws.reconnecting':   'Reconnecting…',
-    'poly.ws.offline':        'Offline',
-  },
-};
-
-let pageLang = localStorage.getItem(LANG_KEY) || 'es';
-
-function t(key) {
-  return I18N[pageLang]?.[key] ?? I18N.en[key] ?? key;
-}
+// ── i18n (central module: ../i18n.js, loaded before this script) ──────────
+// Translations live in landing/i18n.js (keys prefixed 'poly.*'); it exposes
+// window.t / window.setLanguage / window.currentLang and persists to the
+// 'vf_lang' localStorage key. These thin wrappers only add the page-specific
+// pieces the central module doesn't know about: the #lang-es/#lang-en toggle
+// classes and re-rendering JS-built strings on language switch.
+function t(key) { return window.t(key); }
 
 function applyLang() {
-  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
-  document.documentElement.lang = pageLang;
-  document.getElementById('lang-es')?.classList.toggle('active', pageLang === 'es');
-  document.getElementById('lang-en')?.classList.toggle('active', pageLang === 'en');
+  window.applyTranslations();
+  document.getElementById('lang-es')?.classList.toggle('active', window.currentLang === 'es');
+  document.getElementById('lang-en')?.classList.toggle('active', window.currentLang === 'en');
 }
 
 window.setLang = function (lang) {
-  if (!I18N[lang] || lang === pageLang) return;
-  pageLang = lang;
-  localStorage.setItem(LANG_KEY, lang);
-  applyLang();
+  if (lang === window.currentLang) return;
+  window.setLanguage(lang);   // persists vf_lang + applies data-i18n strings
+  applyLang();                // toggle the page's lang buttons
   // Re-render JS-built strings so they follow the new language
   updateWalletUI();
   renderMyBots();

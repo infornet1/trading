@@ -406,6 +406,29 @@ missing-credential 401, and the rate limiter's `Retry-After`.
   full `viznago_dev` schema (structure only, no data) and stamped `alembic_version` at head
   (`c3a7f19d2e54`). No service uses it yet — it is now ready as a prod-schema placeholder.
 
+### Enhancement pass (2026-09-05)
+
+- **Missed-signal detector** (`telegram_listener/missed_signal_check.py` + cron
+  `/etc/cron.d/viznago_missed_signal_check`, daily 08:17 VET, `TZ=America/Caracas` explicit).
+  Closes the blind spot the heartbeat can't: a half-open connection passes pings while receiving
+  nothing. The script copies the Telethon session to a temp dir (**never opens the live session
+  file**), scans the monitored threads for the last 72 h with the real `signal_parser`, diffs
+  against `signal_events` by `msg_id`, and emails `EMAIL_RECIPIENTS` if a parseable signal has no
+  DB row. Non-HL assets (e.g. GOLD) are intentionally not "missed" — the listener skips them too.
+- **Two new signal threads monitored**: 27 (Long-Term) and 1438 (Technical Analyst on Coins —
+  IDEAS). `signal_sources` rows 5/6 + `SOURCE_ID_MAP` in `listener.py` and the detector (keep the
+  two files' maps in sync). The parser only fires on complete signals, so analysis chatter in the
+  IDEAS thread is harmless.
+- **`/admin/performance` gained `profit_factor`** (gross profit/loss conditional sums; the admin
+  card already rendered it as `—` waiting for the key). `/admin/signal-lab-monitor` wallet fetches
+  are now concurrent (`asyncio.gather`, 10 s timeout each).
+- **Shared `httpx.AsyncClient` singletons** for `/prices`, `telegram_alerts`, and
+  `signal_lab.get_signal_price` (closed in the lifespan shutdown hook).
+- **Whale/Polymarket i18n consolidated** into `landing/i18n.js` (48 `whale.*` + 53 `poly.*` keys,
+  byte-identical strings, `vf_lang` key kept); page-local maps deleted.
+- **`dashboard.js` LP RPC caching**: tokenId list refetched only when `balanceOf` changes; pool
+  addresses cached permanently; `positions`/`slot0` stay live.
+
 ---
 
 ## 8. Common pitfalls

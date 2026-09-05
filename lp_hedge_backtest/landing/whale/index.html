@@ -271,6 +271,7 @@
        SCRIPTS
   ============================================================ -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <script src="../i18n.js"></script>
   <script src="whale.js"></script>
   <script src="../chat-widget.js"></script>
   <script>
@@ -288,7 +289,7 @@
         btn.classList.remove('open');
       }
     });
-    // setLang() is defined in whale.js (page-local i18n, persisted to vf_lang).
+    // setLang() is defined in whale.js (thin wrapper over ../i18n.js, persisted to vf_lang).
   </script>
 
 </body>

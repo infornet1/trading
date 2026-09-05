@@ -4,134 +4,25 @@
 const API_BASE         = '/trading/lp-hedge/api';
 const WHALE_SIGNAL_MAX = 50;
 const LOG_MAX          = 50;
-const LANG_KEY         = 'vf_lang';   // same storage key as landing/i18n.js
 
-// ── Page-local i18n ────────────────────────────────────────────────────────
-// NOTE: page-local translation map (whale page only). Uses the same
-// data-i18n attribute convention and the same localStorage key ('vf_lang')
-// as landing/i18n.js, so merging these keys into i18n.js later is mechanical.
-const I18N = {
-  es: {
-    'whale.connect':             '🟢  Conectar Wallet',
-    'whale.connecting':          '⏳ Conectando…',
-    'whale.hero.sub':            'Monitorea los top traders de Hyperliquid en tiempo real. Detecta aperturas, cierres y side flips de posiciones grandes.',
-    'whale.auth.banner':         '🔒 Conecta tu wallet para gestionar tus trackers. Los bots en ejecución siguen corriendo aunque tu sesión expire.',
-    'whale.auth.connect':        'Conectar',
-    'whale.stats.signals_today': 'Señales hoy',
-    'whale.stats.active':        'Trackers activos',
-    'whale.stats.whales':        'Whales monitoreados',
-    'whale.stats.last':          'Última señal',
-    'whale.feed.title':          '📡 Señales en Vivo',
-    'whale.feed.updating':       'Actualizando…',
-    'whale.feed.updated':        'Actualizado',
-    'whale.feed.empty':          'Sin señales aún — el tracker está sondeando…',
-    'whale.trackers.title':      '⚙️ Mis Trackers',
-    'whale.trackers.hint':       'Conecta wallet para gestionar',
-    'whale.trackers.none':       'No tienes trackers aún. Lanza uno abajo.',
-    'whale.launch.title':        '🚀 Nuevo Tracker',
-    'whale.launch.overlay':      '🔒 Conecta tu wallet para lanzar un tracker',
-    'whale.form.top_n':          'Leaderboard Top N',
-    'whale.form.min_notional':   'Min Notional (USD)',
-    'whale.form.poll':           'Poll Interval (seg)',
-    'whale.form.watch':          'Watch Assets',
-    'whale.form.watch_ph':       'BTC,ETH (vacío = todos)',
-    'whale.form.custom':         'Addresses Personalizadas (opcional)',
-    'whale.form.custom_ph':      '0xABC..., 0xDEF... (opcional)',
-    'whale.form.ws':             'Modo WebSocket',
-    'whale.form.paper':          '📋 Solo lectura / Paper mode',
-    'whale.launch.btn':          '🐋  Launch Whale Tracker',
-    'whale.launch.launching':    '⏳ Lanzando…',
-    'whale.status.active':       'ACTIVO',
-    'whale.status.stopped':      'DETENIDO',
-    'whale.btn.stop':            '■ Stop',
-    'whale.btn.restart':         '▶ Restart',
-    'whale.busy.stopping':       '⏳ Deteniendo…',
-    'whale.busy.restarting':     '⏳ Reiniciando…',
-    'whale.busy.deleting':       '⏳ …',
-    'whale.confirm.stop':        '¿Detener este tracker? Solo se detiene el monitoreo — el whale bot es de solo lectura y nunca abre posiciones.',
-    'whale.confirm.delete':      '¿Eliminar este tracker? Esta acción no puede deshacerse.',
-    'whale.error.load_bots':     'Error cargando bots',
-    'whale.error.launch':        'Launch failed',
-    'whale.error.stop':          'Stop failed',
-    'whale.error.restart':       'Restart failed',
-    'whale.error.delete':        'Delete failed',
-    'whale.error.no_wallet':     'No se detectó wallet. Instala Rabby o MetaMask.',
-    'whale.error.connect':       'Wallet connect failed',
-    'whale.ws.live':             'En vivo',
-    'whale.ws.reconnecting':     'Reconectando…',
-    'whale.ws.offline':          'Sin conexión',
-  },
-  en: {
-    'whale.connect':             '🟢  Connect Wallet',
-    'whale.connecting':          '⏳ Connecting…',
-    'whale.hero.sub':            'Monitor top Hyperliquid traders in real-time. Detect large position opens, closes, and side flips.',
-    'whale.auth.banner':         '🔒 Connect your wallet to manage your trackers. Bots that are already running keep running even if your session expires.',
-    'whale.auth.connect':        'Connect',
-    'whale.stats.signals_today': 'Signals today',
-    'whale.stats.active':        'Active trackers',
-    'whale.stats.whales':        'Whales watched',
-    'whale.stats.last':          'Last signal',
-    'whale.feed.title':          '📡 Live Signals',
-    'whale.feed.updating':       'Updating…',
-    'whale.feed.updated':        'Updated',
-    'whale.feed.empty':          'No signals yet — the tracker is polling…',
-    'whale.trackers.title':      '⚙️ My Trackers',
-    'whale.trackers.hint':       'Connect wallet to manage',
-    'whale.trackers.none':       'No trackers yet. Launch one below.',
-    'whale.launch.title':        '🚀 New Tracker',
-    'whale.launch.overlay':      '🔒 Connect your wallet to launch a tracker',
-    'whale.form.top_n':          'Leaderboard Top N',
-    'whale.form.min_notional':   'Min Notional (USD)',
-    'whale.form.poll':           'Poll Interval (s)',
-    'whale.form.watch':          'Watch Assets',
-    'whale.form.watch_ph':       'BTC,ETH (empty = all)',
-    'whale.form.custom':         'Custom Addresses (optional)',
-    'whale.form.custom_ph':      '0xABC..., 0xDEF... (optional)',
-    'whale.form.ws':             'WebSocket mode',
-    'whale.form.paper':          '📋 Read-only / Paper mode',
-    'whale.launch.btn':          '🐋  Launch Whale Tracker',
-    'whale.launch.launching':    '⏳ Launching…',
-    'whale.status.active':       'ACTIVE',
-    'whale.status.stopped':      'STOPPED',
-    'whale.btn.stop':            '■ Stop',
-    'whale.btn.restart':         '▶ Restart',
-    'whale.busy.stopping':       '⏳ Stopping…',
-    'whale.busy.restarting':     '⏳ Restarting…',
-    'whale.busy.deleting':       '⏳ …',
-    'whale.confirm.stop':        'Stop this tracker? It only stops monitoring — the whale bot is read-only and never opens positions.',
-    'whale.confirm.delete':      'Delete this tracker? This action cannot be undone.',
-    'whale.error.load_bots':     'Error loading bots',
-    'whale.error.launch':        'Launch failed',
-    'whale.error.stop':          'Stop failed',
-    'whale.error.restart':       'Restart failed',
-    'whale.error.delete':        'Delete failed',
-    'whale.error.no_wallet':     'No wallet detected. Install Rabby or MetaMask.',
-    'whale.error.connect':       'Wallet connect failed',
-    'whale.ws.live':             'Live',
-    'whale.ws.reconnecting':     'Reconnecting…',
-    'whale.ws.offline':          'Offline',
-  },
-};
-
-let pageLang = localStorage.getItem(LANG_KEY) || 'es';
-
-function t(key) {
-  return I18N[pageLang]?.[key] ?? I18N.en[key] ?? key;
-}
+// ── i18n (central module: ../i18n.js, loaded before this script) ──────────
+// Translations live in landing/i18n.js (keys prefixed 'whale.*'); it exposes
+// window.t / window.setLanguage / window.currentLang and persists to the
+// 'vf_lang' localStorage key. These thin wrappers only add the page-specific
+// pieces the central module doesn't know about: the #lang-es/#lang-en toggle
+// classes and re-rendering JS-built strings on language switch.
+function t(key) { return window.t(key); }
 
 function applyLang() {
-  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
-  document.documentElement.lang = pageLang;
-  document.getElementById('lang-es')?.classList.toggle('active', pageLang === 'es');
-  document.getElementById('lang-en')?.classList.toggle('active', pageLang === 'en');
+  window.applyTranslations();
+  document.getElementById('lang-es')?.classList.toggle('active', window.currentLang === 'es');
+  document.getElementById('lang-en')?.classList.toggle('active', window.currentLang === 'en');
 }
 
 window.setLang = function (lang) {
-  if (!I18N[lang] || lang === pageLang) return;
-  pageLang = lang;
-  localStorage.setItem(LANG_KEY, lang);
-  applyLang();
+  if (lang === window.currentLang) return;
+  window.setLanguage(lang);   // persists vf_lang + applies data-i18n strings
+  applyLang();                // toggle the page's lang buttons
   // Re-render JS-built strings so they follow the new language
   updateWalletUI();
   renderMyTrackers();

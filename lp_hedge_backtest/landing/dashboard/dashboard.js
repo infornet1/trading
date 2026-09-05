@@ -784,6 +784,16 @@ window.switchToChain = function (chainIdHex) {
 
 // ── On-Chain Position Fetching ────────────────────────────────────────────
 
+// RPC caches — the refresh path calls balanceOf + N tokenOfOwnerByIndex +
+// N positions + per-pool getPool/slot0 on every cycle. positions() and
+// slot0() stay uncached (live data); the two below are safe to cache:
+//   _tokenIdCache  — tokenId list per (chain, account), refreshed only when
+//                    balanceOf changes (balanceOf itself is always re-queried,
+//                    so mints/burns/transfers are picked up)
+//   _poolAddrCache — getPool() results are immutable on-chain → cache forever
+let   _tokenIdCache  = { key: null, balance: -1, tokenIds: [] };
+const _poolAddrCache = new Map();  // `${chainId}:${token0}-${token1}-${fee}` → lowercase addr | null
+
 async function fetchPositions() {
   if (!state.address || !state.provider) return;
 
@@ -813,19 +823,30 @@ async function fetchPositions() {
     // How many LP NFTs does this wallet own?
     const balance = Number(await nfpm.balanceOf(state.address));
 
+    const idCacheKey = `${state.chainId}:${state.address.toLowerCase()}`;
+
     if (balance === 0) {
+      _tokenIdCache = { key: idCacheKey, balance: 0, tokenIds: [] };
       state.positions = [];
       hide('positions-loading');
       renderPositions();
       return;
     }
 
-    // Fetch all tokenIds in parallel
-    const tokenIdPromises = [];
-    for (let i = 0; i < balance; i++) {
-      tokenIdPromises.push(nfpm.tokenOfOwnerByIndex(state.address, i));
+    // TokenId list is stable while balanceOf is unchanged — only re-enumerate
+    // when the balance (or the account/chain) changed since the last fetch.
+    let tokenIds;
+    if (_tokenIdCache.key === idCacheKey && _tokenIdCache.balance === balance) {
+      tokenIds = _tokenIdCache.tokenIds;
+    } else {
+      // Fetch all tokenIds in parallel
+      const tokenIdPromises = [];
+      for (let i = 0; i < balance; i++) {
+        tokenIdPromises.push(nfpm.tokenOfOwnerByIndex(state.address, i));
+      }
+      tokenIds = await Promise.all(tokenIdPromises);
+      _tokenIdCache = { key: idCacheKey, balance, tokenIds };
     }
-    const tokenIds = await Promise.all(tokenIdPromises);
 
     // Fetch position data for each tokenId in parallel.
     // NOTE: ethers v6 returns a Result (Proxy) object — named properties are
@@ -858,15 +879,25 @@ async function fetchPositions() {
       }
     }
 
-    // Fetch pool addresses & slot0 in parallel
+    // Fetch pool addresses & slot0 in parallel.
+    // Pool addresses are immutable on-chain → cached permanently (per chain);
+    // slot0 is live data and is always re-fetched.
     const poolFetches = Array.from(uniquePools.entries()).map(async ([key, pool]) => {
       try {
-        const poolAddr = await factory.getPool(pool.token0, pool.token1, pool.fee);
-        if (poolAddr === '0x0000000000000000000000000000000000000000') return;
+        const poolCacheKey = `${state.chainId}:${key}`;
+        let poolAddr = _poolAddrCache.get(poolCacheKey);
+        if (poolAddr === undefined) {
+          const fetched = await factory.getPool(pool.token0, pool.token1, pool.fee);
+          poolAddr = fetched === '0x0000000000000000000000000000000000000000'
+            ? null
+            : fetched.toLowerCase();
+          _poolAddrCache.set(poolCacheKey, poolAddr);
+        }
+        if (poolAddr === null) return;
         const poolContract = new ethers.Contract(poolAddr, POOL_ABI, readProvider);
         const slot0 = await poolContract.slot0();
         uniquePools.get(key).slot0      = { sqrtPriceX96: slot0[0], tick: Number(slot0[1]) };
-        uniquePools.get(key).poolAddress = poolAddr.toLowerCase();
+        uniquePools.get(key).poolAddress = poolAddr;
       } catch (err) {
         console.warn(`Could not fetch pool slot0 for key ${key}:`, err.message);
       }

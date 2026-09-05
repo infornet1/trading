@@ -13,6 +13,23 @@ import httpx
 _TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
 _API_BASE = f"https://api.telegram.org/bot{_TOKEN}"
 
+# Shared process-lifetime HTTP client — reuses connections across alerts.
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(timeout=8)
+    return _client
+
+
+async def aclose_shared_client() -> None:
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None
+
 # Only these event types trigger a Telegram push (high-priority set)
 _ALERT_EVENTS = {
     "hedge_opened", "sl_hit", "tp_hit", "trailing_stop",
@@ -114,12 +131,11 @@ async def send_message(chat_id: int, text: str) -> bool:
     if not _TOKEN:
         return False
     try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            r = await client.post(
-                f"{_API_BASE}/sendMessage",
-                json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
-            )
-            return r.status_code == 200
+        r = await _get_client().post(
+            f"{_API_BASE}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+        )
+        return r.status_code == 200
     except Exception as e:
         print(f"[Telegram] Send error to {chat_id}: {e}", flush=True)
         return False

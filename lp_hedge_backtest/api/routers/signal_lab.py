@@ -39,6 +39,23 @@ _HL_ASSETS_CACHE: list | None = None
 _HL_ASSETS_TS:    float       = 0.0
 _HL_ASSETS_TTL:   int         = 3600  # refresh every hour
 
+# Shared process-lifetime HTTP client — reuses connections across calls.
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(timeout=5)
+    return _client
+
+
+async def aclose_shared_client() -> None:
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None
+
 router = APIRouter(prefix="/signal-lab", tags=["signal-lab"])
 
 _LP_RANGE_CACHE = os.path.join(
@@ -381,14 +398,13 @@ async def get_signal_price(
 ):
     sym = symbol.upper().strip()
     try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            r = await client.post(
-                "https://api.hyperliquid.xyz/info",
-                json={"type": "allMids"},
-                headers={"Content-Type": "application/json"},
-            )
-            r.raise_for_status()
-            mids = r.json()
+        r = await _get_client().post(
+            "https://api.hyperliquid.xyz/info",
+            json={"type": "allMids"},
+            headers={"Content-Type": "application/json"},
+        )
+        r.raise_for_status()
+        mids = r.json()
         price = mids.get(sym)
         if price is None:
             return {"symbol": sym, "price": None, "available": False}

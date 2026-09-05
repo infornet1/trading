@@ -489,13 +489,19 @@ async def signal_lab_monitor(admin: str = Depends(get_current_admin)):
         except Exception:
             return {"total": None, "perp": None, "spot": None, "spot_usable": False}
 
-    wallet_rows = []
-    for w in wallets:
+    async def _fetch_wallet(addr):
         try:
-            bal = await asyncio.wait_for(asyncio.to_thread(_fetch, w.hl_wallet_addr), timeout=10)
+            return await asyncio.wait_for(asyncio.to_thread(_fetch, addr), timeout=10)
         except asyncio.TimeoutError:
             # Same error shape as a failed fetch — HL unreachable/slow
-            bal = {"total": None, "perp": None, "spot": None, "spot_usable": False}
+            return {"total": None, "perp": None, "spot": None, "spot_usable": False}
+
+    # Fetch all wallet balances concurrently — one slow HL call must not
+    # serialize the whole monitor endpoint.
+    balances = await asyncio.gather(*(_fetch_wallet(w.hl_wallet_addr) for w in wallets))
+
+    wallet_rows = []
+    for w, bal in zip(wallets, balances):
 
         recent_execs = []
         for ex in wallet_execs.get(w.hl_wallet_addr, []):
@@ -1182,6 +1188,8 @@ async def admin_performance(
             func.coalesce(func.sum(BotTrade.realized_pnl_usd), 0).label("pnl"),
             func.coalesce(func.sum(BotTrade.fees_usd), 0).label("fees"),
             func.coalesce(func.sum(BotTrade.funding_usd), 0).label("funding"),
+            func.coalesce(func.sum(case((win_cond, BotTrade.realized_pnl_usd), else_=0)), 0).label("gross_profit"),
+            func.coalesce(func.sum(case((loss_cond, BotTrade.realized_pnl_usd), else_=0)), 0).label("gross_loss"),
         ).where(BotTrade.closed_at >= since)
         if not include_estimates:
             stmt = stmt.where(BotTrade.is_estimate.is_(False))
@@ -1200,6 +1208,10 @@ async def admin_performance(
         signal_pnl = Decimal(str(srow.pnl))
         signal_fees = Decimal(str(srow.fees))
 
+        gross_profit = Decimal(str(row.gross_profit))
+        gross_loss = abs(Decimal(str(row.gross_loss)))
+        profit_factor = (gross_profit / gross_loss) if gross_loss else None
+
         return {
             "days": days,
             "since": since.isoformat(),
@@ -1211,5 +1223,6 @@ async def admin_performance(
             "bot_funding_usd": float(bot_funding),
             "signal_realized_pnl_usd": float(signal_pnl),
             "signal_fees_usd": float(signal_fees),
+            "profit_factor": round(float(profit_factor), 2) if profit_factor is not None else None,
             "platform_net_pnl_usd": float(bot_pnl - bot_fees - bot_funding + signal_pnl - signal_fees),
         }
