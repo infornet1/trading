@@ -400,6 +400,12 @@ missing-credential 401, and the rate limiter's `Retry-After`.
 - Known gap: `/admin/performance` has no `profit_factor` key (needs gross profit/loss sums), so the
   admin card shows `—` for profit factor until the backend adds it.
 
+### Environments sync (2026-09-05)
+
+- **`viznago_prod` DB provisioned**: it existed but was completely empty (no tables). Loaded the
+  full `viznago_dev` schema (structure only, no data) and stamped `alembic_version` at head
+  (`c3a7f19d2e54`). No service uses it yet — it is now ready as a prod-schema placeholder.
+
 ---
 
 ## 8. Common pitfalls
